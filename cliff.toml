@@ -18,7 +18,14 @@ body = """
 {% for commit in commits %}\
 - {{ commit.message | upper_first }}\
 {% endfor %}
-{% endfor %}\n
+{% endfor %}\
+{% if github.contributors | length > 0 %}
+### 👥 Contributeurs
+
+{% for contributor in github.contributors | sort(attribute="username") %}\
+* @{{ contributor.username }}
+{% endfor %}
+{% endif %}\n
 """
 trim = true
 footer = ""
@@ -51,3 +58,9 @@ sort_commits = "oldest"
 [bump]
 features_always_bump_minor = true
 breaking_always_bump_major = true
+
+# Intégration GitHub : permet de lister les contributeurs (github.contributors)
+# dans les notes de version. Nécessite GITHUB_TOKEN au runtime (fourni par GHA).
+[remote.github]
+owner = "lguerard"
+repo = "tricouture"
