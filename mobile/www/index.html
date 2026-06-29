@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="fr">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+		<title>Tricouture</title>
+		<style>
+			body {
+				margin: 0;
+				min-height: 100vh;
+				display: grid;
+				place-items: center;
+				font-family: system-ui, sans-serif;
+				background: #faf7fb;
+				color: #2b2330;
+				padding: 1.5rem;
+			}
+			.card {
+				background: #fff;
+				border: 1px solid #e6dde9;
+				border-radius: 12px;
+				padding: 1.5rem;
+				max-width: 380px;
+				width: 100%;
+				box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+			}
+			h1 {
+				color: #7c4d8b;
+				margin: 0 0 0.5rem;
+			}
+			input,
+			button {
+				width: 100%;
+				box-sizing: border-box;
+				padding: 0.7rem;
+				font-size: 1rem;
+				border-radius: 8px;
+				border: 1px solid #e6dde9;
+				margin-top: 0.6rem;
+			}
+			button {
+				background: #7c4d8b;
+				color: #fff;
+				border: none;
+				cursor: pointer;
+			}
+			.muted {
+				color: #7a7080;
+				font-size: 0.9rem;
+			}
+		</style>
+	</head>
+	<body>
+		<div class="card">
+			<h1>🪡 Tricouture</h1>
+			<p class="muted">
+				Entre l'adresse de ton serveur Tricouture pour t'y connecter (ex.
+				<code>https://tricouture.mondomaine.fr</code>).
+			</p>
+			<input id="url" type="url" placeholder="https://…" inputmode="url" autocomplete="url" />
+			<button id="go">Se connecter</button>
+			<p class="muted" id="hint" style="margin-top: 1rem">
+				Astuce : tu peux aussi figer l'URL au build via la variable GitHub Actions
+				<code>SERVER_URL</code>.
+			</p>
+		</div>
+		<script>
+			// Coque de secours : mémorise l'URL et redirige la WebView vers le serveur.
+			const saved = localStorage.getItem('serverUrl');
+			if (saved) location.href = saved;
+			document.getElementById('go').addEventListener('click', () => {
+				let v = document.getElementById('url').value.trim();
+				if (!v) return;
+				if (!/^https?:\/\//.test(v)) v = 'https://' + v;
+				localStorage.setItem('serverUrl', v);
+				location.href = v;
+			});
+		</script>
+	</body>
+</html>
