@@ -1,8 +1,9 @@
 import { redirect, type Handle } from '@sveltejs/kit';
 import { readToken, validateSession } from '$lib/server/auth';
+import { isLocale, DEFAULT_LOCALE } from '$lib/i18n';
 
 // Routes accessibles sans authentification.
-const PUBLIC_PREFIXES = ['/login', '/register'];
+const PUBLIC_PREFIXES = ['/login', '/register', '/api/locale'];
 
 function isPublic(pathname: string): boolean {
 	return PUBLIC_PREFIXES.some((p) => pathname === p || pathname.startsWith(p + '/'));
@@ -12,6 +13,9 @@ export const handle: Handle = async ({ event, resolve }) => {
 	const token = readToken(event);
 	event.locals.user = token ? await validateSession(token) : null;
 	event.locals.sessionId = token;
+
+	const cookieLocale = event.cookies.get('locale');
+	event.locals.locale = isLocale(cookieLocale) ? cookieLocale : DEFAULT_LOCALE;
 
 	const { pathname } = event.url;
 
@@ -33,5 +37,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 		throw redirect(303, '/');
 	}
 
-	return resolve(event);
+	return resolve(event, {
+		transformPageChunk: ({ html }) => html.replace('%lang%', event.locals.locale)
+	});
 };

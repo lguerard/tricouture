@@ -1,27 +1,40 @@
 <script lang="ts">
 	import '../app.css';
 	import { page } from '$app/stores';
+	import { invalidateAll } from '$app/navigation';
+	import { t, LOCALES, type Locale } from '$lib/i18n';
 
 	let { data, children } = $props();
 
-	const nav = [
-		{ href: '/', label: 'Tableau de bord', icon: '🏠' },
-		{ href: '/patterns', label: 'Patrons', icon: '📄' },
-		{ href: '/projects/board', label: 'Projets', icon: '🧶' },
-		{ href: '/stash', label: 'Stock', icon: '🧵' },
-		{ href: '/calendar', label: 'Calendrier', icon: '📅' },
-		{ href: '/goals', label: 'Objectifs', icon: '🎯' },
-		{ href: '/stats', label: 'Mon année', icon: '📊' },
-		{ href: '/achievements', label: 'Succès', icon: '🏅' },
-		{ href: '/bins', label: 'Rangement', icon: '📦' },
-		{ href: '/recipients', label: 'Destinataires', icon: '🎁' },
-		{ href: '/assistant', label: 'Assistant IA', icon: '🤖' },
-		{ href: '/gallery', label: 'Galerie', icon: '🖼️' }
-	];
+	const locale = $derived(data.locale);
+	const nav = $derived([
+		{ href: '/', key: 'nav.dashboard', icon: '🏠' },
+		{ href: '/patterns', key: 'nav.patterns', icon: '📄' },
+		{ href: '/projects/board', key: 'nav.projects', icon: '🧶' },
+		{ href: '/stash', key: 'nav.stash', icon: '🧵' },
+		{ href: '/calendar', key: 'nav.calendar', icon: '📅' },
+		{ href: '/goals', key: 'nav.goals', icon: '🎯' },
+		{ href: '/stats', key: 'nav.stats', icon: '📊' },
+		{ href: '/achievements', key: 'nav.achievements', icon: '🏅' },
+		{ href: '/bins', key: 'nav.bins', icon: '📦' },
+		{ href: '/recipients', key: 'nav.recipients', icon: '🎁' },
+		{ href: '/assistant', key: 'nav.assistant', icon: '🤖' },
+		{ href: '/gallery', key: 'nav.gallery', icon: '🖼️' }
+	]);
 
 	const current = $derived($page.url.pathname);
 	function active(href: string): boolean {
 		return href === '/' ? current === '/' : current.startsWith(href);
+	}
+
+	async function setLocale(code: Locale) {
+		if (code === locale) return;
+		await fetch('/api/locale', {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({ locale: code })
+		});
+		await invalidateAll();
 	}
 </script>
 
@@ -32,15 +45,20 @@
 			<nav>
 				{#each nav as item}
 					<a class="nav-item" class:active={active(item.href)} href={item.href}>
-						<span class="ico">{item.icon}</span>{item.label}
+						<span class="ico">{item.icon}</span>{t(locale, item.key)}
 					</a>
 				{/each}
 			</nav>
 			<div class="spacer"></div>
+			<div class="langswitch">
+				{#each LOCALES as l}
+					<button class:on={locale === l.code} onclick={() => setLocale(l.code)}>{l.label}</button>
+				{/each}
+			</div>
 			<div class="user">
 				<span class="muted">{data.user.displayName}</span>
 				<form method="POST" action="/logout">
-					<button class="link" type="submit">Déconnexion</button>
+					<button class="link" type="submit">{t(locale, 'nav.logout')}</button>
 				</form>
 			</div>
 		</aside>
@@ -50,6 +68,11 @@
 	</div>
 {:else}
 	<main class="auth-wrap">
+		<div class="langswitch corner">
+			{#each LOCALES as l}
+				<button class:on={locale === l.code} onclick={() => setLocale(l.code)}>{l.label}</button>
+			{/each}
+		</div>
 		{@render children()}
 	</main>
 {/if}
@@ -127,6 +150,27 @@
 		display: grid;
 		place-items: center;
 		padding: 1.5rem;
+		position: relative;
+	}
+	.langswitch {
+		display: flex;
+		gap: 0.3rem;
+		padding: 0.4rem 0.5rem;
+	}
+	.langswitch.corner {
+		position: absolute;
+		top: 1rem;
+		right: 1rem;
+	}
+	.langswitch button {
+		padding: 0.2rem 0.5rem;
+		font-size: 0.8rem;
+		border-radius: 6px;
+	}
+	.langswitch button.on {
+		background: var(--accent);
+		color: #fff;
+		border-color: var(--accent);
 	}
 	@media (max-width: 720px) {
 		.shell {

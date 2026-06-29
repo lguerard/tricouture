@@ -1,30 +1,32 @@
 <script lang="ts">
 	import { page } from '$app/stores';
+	import { t } from '$lib/i18n';
 	let { form } = $props();
 	const next = $derived($page.url.searchParams.get('next') ?? '/');
+	const l = $derived($page.data.locale);
 </script>
 
 <div class="card auth-card">
 	<h1>🪡 Tricouture</h1>
-	<p class="muted">Connecte-toi pour accéder à tes patrons et projets.</p>
+	<p class="muted">{t(l, 'auth.login.subtitle')}</p>
 
 	<form method="POST">
 		<input type="hidden" name="next" value={next} />
 		<div class="field">
-			<label for="email">Email</label>
+			<label for="email">{t(l, 'auth.email')}</label>
 			<input id="email" name="email" type="email" autocomplete="email" value={form?.email ?? ''} required />
 		</div>
 		<div class="field">
-			<label for="password">Mot de passe</label>
+			<label for="password">{t(l, 'auth.password')}</label>
 			<input id="password" name="password" type="password" autocomplete="current-password" required />
 		</div>
 		{#if form?.error}
 			<p class="error">{form.error}</p>
 		{/if}
-		<button class="btn-primary" type="submit" style="width:100%">Se connecter</button>
+		<button class="btn-primary" type="submit" style="width:100%">{t(l, 'auth.signin')}</button>
 	</form>
 
-	<p class="muted alt">Pas de compte ? <a href="/register">Créer un compte</a></p>
+	<p class="muted alt">{t(l, 'auth.noAccount')} <a href="/register">{t(l, 'auth.createAccount')}</a></p>
 </div>
 
 <style>
