@@ -1,0 +1,11 @@
+node_modules/
+app/node_modules/
+app/.svelte-kit/
+app/build/
+app/.env
+.env
+media/
+pgdata/
+models/
+*.log
+.DS_Store
