@@ -1,0 +1,79 @@
+name: Build Android APK
+
+on:
+  workflow_dispatch:
+    inputs:
+      server_url:
+        description: "URL du serveur Tricouture (sinon variable SERVER_URL du repo)"
+        required: false
+        type: string
+  # Permet à d'autres workflows (release) de réutiliser ce build.
+  workflow_call:
+    inputs:
+      server_url:
+        required: false
+        type: string
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup Java (JDK 17)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Capacitor deps
+        working-directory: mobile
+        run: npm install
+
+      - name: Resolve server URL
+        id: url
+        run: |
+          URL="${{ github.event.inputs.server_url }}"
+          if [ -z "$URL" ]; then URL="${{ vars.SERVER_URL }}"; fi
+          echo "value=$URL" >> "$GITHUB_OUTPUT"
+          echo "URL serveur : ${URL:-(non définie, coque de config affichée)}"
+
+      - name: Add Android platform
+        working-directory: mobile
+        env:
+          CAP_SERVER_URL: ${{ steps.url.outputs.value }}
+        run: npx cap add android
+
+      - name: Inject runtime permissions (caméra, micro)
+        working-directory: mobile
+        run: |
+          MANIFEST=android/app/src/main/AndroidManifest.xml
+          perl -0pi -e 's/(<uses-permission android:name="android.permission.INTERNET" \/>)/$1\n    <uses-permission android:name="android.permission.CAMERA" \/>\n    <uses-permission android:name="android.permission.RECORD_AUDIO" \/>/' "$MANIFEST" || true
+          grep -q "permission.CAMERA" "$MANIFEST" || \
+            perl -0pi -e 's/(<application)/<uses-permission android:name="android.permission.CAMERA" \/>\n    <uses-permission android:name="android.permission.RECORD_AUDIO" \/>\n    $1/' "$MANIFEST"
+          echo "--- permissions ---"; grep uses-permission "$MANIFEST" || true
+
+      - name: Capacitor sync
+        working-directory: mobile
+        env:
+          CAP_SERVER_URL: ${{ steps.url.outputs.value }}
+        run: npx cap sync android
+
+      - name: Build debug APK
+        working-directory: mobile/android
+        run: ./gradlew assembleDebug --no-daemon
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: tricouture-android-debug
+          path: mobile/android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
