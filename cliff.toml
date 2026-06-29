@@ -1,0 +1,53 @@
+# Configuration git-cliff — génère le CHANGELOG depuis les commits conventionnels.
+# https://git-cliff.org/docs/configuration
+
+[changelog]
+header = """
+# Changelog
+
+Toutes les modifications notables de Tricouture.\n
+"""
+body = """
+{% if version %}\
+## [{{ version | trim_start_matches(pat="v") }}] - {{ timestamp | date(format="%Y-%m-%d") }}
+{% else %}\
+## [Non publié]
+{% endif %}\
+{% for group, commits in commits | group_by(attribute="group") %}
+### {{ group | upper_first }}
+{% for commit in commits %}\
+- {{ commit.message | upper_first }}\
+{% endfor %}
+{% endfor %}\n
+"""
+trim = true
+footer = ""
+
+[git]
+conventional_commits = true
+filter_unconventional = true
+split_commits = false
+# Regroupe par type ; l'icône est conservée dans le message.
+commit_parsers = [
+  { message = "^feat", group = "✨ Fonctionnalités" },
+  { message = "^fix", group = "🐛 Corrections" },
+  { message = "^docs", group = "📝 Documentation" },
+  { message = "^style", group = "💄 Style" },
+  { message = "^refactor", group = "♻️ Refactorisation" },
+  { message = "^test", group = "✅ Tests" },
+  { message = "^perf", group = "⚡ Performances" },
+  { message = "^ci", group = "👷 CI/CD" },
+  { message = "^build", group = "🏗️ Build" },
+  { message = "^chore", group = "🔧 Divers" },
+  { message = "^revert", group = "⏪ Reverts" },
+  { message = ".*", group = "🔧 Divers" },
+]
+protect_breaking_commits = true
+filter_commits = false
+tag_pattern = "v[0-9].*"
+topo_order = false
+sort_commits = "oldest"
+
+[bump]
+features_always_bump_minor = true
+breaking_always_bump_major = true
