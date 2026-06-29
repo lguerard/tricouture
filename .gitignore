@@ -4,8 +4,8 @@ app/.svelte-kit/
 app/build/
 app/.env
 .env
-media/
-pgdata/
-models/
+/media/
+/pgdata/
+/models/
 *.log
 .DS_Store
