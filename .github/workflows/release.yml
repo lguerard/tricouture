@@ -26,6 +26,9 @@ jobs:
 
       - name: Compute version and notes
         id: cliff
+        env:
+          # Requis par git-cliff pour récupérer les contributeurs via l'API GitHub.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -e
           VERSION=$(git cliff --config cliff.toml --bumped-version)
