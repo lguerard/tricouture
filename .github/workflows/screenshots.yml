@@ -1,0 +1,153 @@
+name: Screenshots
+
+# Génère des captures d'écran automatiques de l'app Android après chaque release.
+# Peut aussi être déclenché manuellement (workflow_dispatch).
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  DATABASE_URL: postgres://tricouture:test@localhost:5432/tricouture
+  ORIGIN: http://10.0.2.2:3000
+  AUTH_SECRET: screenshots-ci-secret-not-for-prod
+  NODE_ENV: production
+
+jobs:
+  screenshots:
+    runs-on: ubuntu-latest
+
+    services:
+      db:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: tricouture
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: tricouture
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # ── Appli web ────────────────────────────────────────────────────────
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - name: Install app dependencies
+        working-directory: app
+        run: npm ci
+
+      - name: Apply database migrations
+        working-directory: app
+        run: |
+          psql "$DATABASE_URL" -c "CREATE EXTENSION IF NOT EXISTS vector;"
+          # Sépare les statements sur --> statement-breakpoint avant de les exécuter.
+          # Supprime les marqueurs drizzle puis exécute via psql
+          sed 's/-->.*statement-breakpoint//g' drizzle/0000_pink_banshee.sql | psql "$DATABASE_URL"
+
+      - name: Seed demo data
+        working-directory: app
+        run: node scripts/seed-demo.mjs
+
+      - name: Build SvelteKit app
+        working-directory: app
+        run: npm run build
+
+      - name: Start server
+        working-directory: app
+        run: node build &
+        env:
+          PORT: 3000
+          HOST: 0.0.0.0
+
+      - name: Wait for server
+        run: |
+          for i in $(seq 1 20); do
+            curl -sf http://localhost:3000/login && break
+            sleep 2
+          done
+
+      # ── APK (avec URL localhost émulateur) ───────────────────────────────
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Capacitor deps
+        working-directory: mobile
+        run: npm install
+
+      - name: Add Android platform
+        working-directory: mobile
+        env:
+          CAP_SERVER_URL: http://10.0.2.2:3000
+        run: npx cap add android
+
+      - name: Capacitor sync
+        working-directory: mobile
+        env:
+          CAP_SERVER_URL: http://10.0.2.2:3000
+        run: npx cap sync android
+
+      - name: Build debug APK
+        working-directory: mobile/android
+        run: ./gradlew assembleDebug --no-daemon
+
+      # ── Émulateur + Maestro ──────────────────────────────────────────────
+      - name: Install Maestro
+        run: |
+          curl -Ls "https://get.maestro.mobile.dev" | bash
+          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+
+      - name: Run Maestro screenshots
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          profile: pixel_6
+          ram-size: 4096M
+          heap-size: 512M
+          avd-name: screenshot-device
+          disable-animations: true
+          emulator-options: -no-snapshot-save -no-audio -no-boot-anim -gpu swiftshader_indirect
+          script: |
+            adb wait-for-device
+            adb install mobile/android/app/build/outputs/apk/debug/app-debug.apk
+            # Laisse le temps au WebView de charger le serveur
+            sleep 5
+            maestro test maestro/screenshots.yaml --output maestro-output
+            # Copie les screenshots à la racine pour l'upload
+            cp maestro-output/screenshots/*.png . 2>/dev/null || \
+              find . -name "*.png" -path "*/screenshots/*" -exec cp {} . \;
+
+      # ── Upload sur la release ────────────────────────────────────────────
+      - name: Upload screenshots to release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.release.tag_name }}
+          files: "*.png"
+
+      - name: Upload screenshots as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots
+          path: "*.png"
+          if-no-files-found: warn
