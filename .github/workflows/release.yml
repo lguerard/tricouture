@@ -43,7 +43,7 @@ jobs:
           echo "released=true" >> "$GITHUB_OUTPUT"
 
           git cliff --config cliff.toml --tag "$VERSION" -o CHANGELOG.md
-          git cliff --config cliff.toml --latest --tag "$VERSION" --strip all -o RELEASE_NOTES.md
+          git cliff --config cliff.release.toml --latest --tag "$VERSION" --strip all -o RELEASE_NOTES.md
           echo "Prochaine version : $VERSION"
 
       - name: Upload release notes

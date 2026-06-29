@@ -1,0 +1,57 @@
+# Template git-cliff pour les notes de release GitHub (sans header de version).
+# Utilisé par le workflow release.yml pour générer RELEASE_NOTES.md.
+# Pour le CHANGELOG complet (avec headers version), voir cliff.toml.
+
+[changelog]
+header = ""
+body = """
+{% for group, commits in commits | group_by(attribute="group") %}
+### {{ group | upper_first }}
+{% for commit in commits %}\
+- {{ commit.message | upper_first }} \
+([`{{ commit.id | truncate(length=7, end="") }}`]\
+(https://github.com/lguerard/tricouture/commit/{{ commit.id }}))
+{% endfor %}
+{% endfor %}\
+{% if github.contributors | length > 0 %}
+### 👥 Contributeurs
+
+{% for contributor in github.contributors | sort(attribute="username") %}\
+- [@{{ contributor.username }}](https://github.com/{{ contributor.username }})
+{% endfor %}
+{% endif %}\n
+"""
+trim = true
+footer = ""
+
+[git]
+conventional_commits = true
+filter_unconventional = true
+split_commits = false
+commit_parsers = [
+  { message = "^feat", group = "✨ Fonctionnalités" },
+  { message = "^fix", group = "🐛 Corrections" },
+  { message = "^docs", group = "📝 Documentation" },
+  { message = "^style", group = "💄 Style" },
+  { message = "^refactor", group = "♻️ Refactorisation" },
+  { message = "^test", group = "✅ Tests" },
+  { message = "^perf", group = "⚡ Performances" },
+  { message = "^ci", group = "👷 CI/CD" },
+  { message = "^build", group = "🏗️ Build" },
+  { message = "^chore", group = "🔧 Divers" },
+  { message = "^revert", group = "⏪ Reverts" },
+  { message = ".*", group = "🔧 Divers" },
+]
+protect_breaking_commits = true
+filter_commits = false
+tag_pattern = "[0-9]*"
+topo_order = false
+sort_commits = "oldest"
+
+[bump]
+features_always_bump_minor = true
+breaking_always_bump_major = true
+
+[remote.github]
+owner = "lguerard"
+repo = "tricouture"
