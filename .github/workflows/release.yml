@@ -1,0 +1,82 @@
+name: Release
+
+# À chaque push sur main : calcule la prochaine version via git-cliff,
+# génère les notes, recompile l'APK Android et publie une GitHub Release.
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  changelog:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.cliff.outputs.version }}
+      released: ${{ steps.cliff.outputs.released }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install git-cliff
+        uses: taiki-e/install-action@git-cliff
+
+      - name: Compute version and notes
+        id: cliff
+        run: |
+          set -e
+          VERSION=$(git cliff --config cliff.toml --bumped-version)
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+          # S'il n'y a aucun nouveau commit conventionnel, on n'a rien à publier.
+          if git rev-parse "$VERSION" >/dev/null 2>&1; then
+            echo "released=false" >> "$GITHUB_OUTPUT"
+            echo "Version $VERSION déjà taguée — pas de release."
+            exit 0
+          fi
+          echo "released=true" >> "$GITHUB_OUTPUT"
+
+          git cliff --config cliff.toml --tag "$VERSION" -o CHANGELOG.md
+          git cliff --config cliff.toml --latest --tag "$VERSION" --strip all -o RELEASE_NOTES.md
+          echo "Prochaine version : $VERSION"
+
+      - name: Upload release notes
+        if: steps.cliff.outputs.released == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-notes
+          path: |
+            CHANGELOG.md
+            RELEASE_NOTES.md
+
+  android:
+    needs: changelog
+    if: needs.changelog.outputs.released == 'true'
+    uses: ./.github/workflows/android.yml
+
+  publish:
+    needs: [changelog, android]
+    if: needs.changelog.outputs.released == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download release notes
+        uses: actions/download-artifact@v4
+        with:
+          name: release-notes
+
+      - name: Download APK
+        uses: actions/download-artifact@v4
+        with:
+          name: tricouture-android-debug
+          path: apk
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.changelog.outputs.version }}
+          name: ${{ needs.changelog.outputs.version }}
+          body_path: RELEASE_NOTES.md
+          files: apk/app-debug.apk
