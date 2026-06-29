@@ -1,0 +1,7 @@
+fastapi==0.115.5
+uvicorn[standard]==0.32.1
+python-multipart==0.0.12
+easyocr==1.7.2
+pillow==11.0.0
+# open_clip-torch est optionnel (recherche image par embedding) ; décommenter pour l'activer :
+# open_clip-torch==2.29.0
