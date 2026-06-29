@@ -17,6 +17,11 @@
 				<option value={c} selected={data.craftFilter === c}>{CRAFT_LABELS[c]}</option>
 			{/each}
 		</select>
+		<select name="scope" onchange={(e) => e.currentTarget.form?.requestSubmit()}>
+			<option value="" selected={data.scope === ''}>Tout</option>
+			<option value="mine" selected={data.scope === 'mine'}>Mes patrons</option>
+			<option value="shared" selected={data.scope === 'shared'}>Partagés avec moi</option>
+		</select>
 		<button type="submit">Rechercher</button>
 	</form>
 
@@ -30,6 +35,11 @@
 						<strong>{p.title}</strong>
 						<span class="tag">{CRAFT_LABELS[p.craft]}</span>
 					</div>
+					{#if !p.mine}
+						<span class="shared">🔗 Partagé par {p.ownerName}</span>
+					{:else if p.isShared}
+						<span class="shared mine">🔗 Partagé</span>
+					{/if}
 					{#if p.garmentType || p.designer}
 						<span class="muted small">{[p.garmentType, p.designer].filter(Boolean).join(' · ')}</span>
 					{/if}
@@ -80,5 +90,12 @@
 	}
 	.small {
 		font-size: 0.82rem;
+	}
+	.shared {
+		font-size: 0.78rem;
+		color: var(--accent);
+	}
+	.shared.mine {
+		color: var(--muted);
 	}
 </style>

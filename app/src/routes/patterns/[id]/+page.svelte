@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { enhance } from '$app/forms';
 	import { CRAFT_LABELS, DIFFICULTY_LABELS } from '$lib/labels';
 	let { data } = $props();
 	const p = $derived(data.pattern);
@@ -45,16 +46,28 @@
 				<span class="tag">{CRAFT_LABELS[p.craft]}</span>
 				{#each p.tags ?? [] as t}<span class="tag">{t}</span>{/each}
 			</div>
+			{#if !data.isOwner}
+				<span class="shared">🔗 Partagé par {data.ownerName}</span>
+			{/if}
 		</div>
-		<form
-			method="POST"
-			action="?/delete"
-			onsubmit={(e) => {
-				if (!confirm('Supprimer ce patron et ses fichiers ?')) e.preventDefault();
-			}}
-		>
-			<button type="submit">🗑 Supprimer</button>
-		</form>
+		{#if data.isOwner}
+			<div class="owner-actions">
+				<form method="POST" action="?/toggleShare" use:enhance>
+					<button type="submit" class:on={p.isShared}>
+						{p.isShared ? '🔗 Partagé (cliquer pour arrêter)' : '🔗 Partager'}
+					</button>
+				</form>
+				<form
+					method="POST"
+					action="?/delete"
+					onsubmit={(e) => {
+						if (!confirm('Supprimer ce patron et ses fichiers ?')) e.preventDefault();
+					}}
+				>
+					<button type="submit">🗑 Supprimer</button>
+				</form>
+			</div>
+		{/if}
 	</header>
 
 	<div class="cols">
@@ -130,6 +143,23 @@
 		align-items: flex-start;
 		gap: 1rem;
 		margin-top: 0.5rem;
+	}
+	.owner-actions {
+		display: flex;
+		gap: 0.5rem;
+		flex-wrap: wrap;
+		justify-content: flex-end;
+	}
+	.owner-actions button.on {
+		background: var(--accent);
+		color: #fff;
+		border-color: var(--accent);
+	}
+	.shared {
+		display: inline-block;
+		margin-top: 0.4rem;
+		font-size: 0.82rem;
+		color: var(--accent);
 	}
 	.cols {
 		display: grid;

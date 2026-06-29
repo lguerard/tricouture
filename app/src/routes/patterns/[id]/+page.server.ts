@@ -1,9 +1,21 @@
 import { error, fail, redirect } from '@sveltejs/kit';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, or } from 'drizzle-orm';
 import { db } from '$lib/server/db';
-import { patterns, patternFiles } from '$lib/server/db/schema';
+import { patterns, patternFiles, users } from '$lib/server/db/schema';
 import { deleteStored } from '$lib/server/storage';
 import type { Actions, PageServerLoad } from './$types';
+
+// Patron accessible si on en est propriétaire OU s'il est partagé.
+async function accessiblePattern(uid: string, id: string) {
+	return (
+		await db
+			.select({ pattern: patterns, ownerName: users.displayName })
+			.from(patterns)
+			.innerJoin(users, eq(patterns.ownerId, users.id))
+			.where(and(eq(patterns.id, id), or(eq(patterns.ownerId, uid), eq(patterns.isShared, true))))
+			.limit(1)
+	)[0];
+}
 
 async function ownedPattern(uid: string, id: string) {
 	return (
@@ -16,22 +28,36 @@ async function ownedPattern(uid: string, id: string) {
 }
 
 export const load: PageServerLoad = async ({ locals, params }) => {
-	const pattern = await ownedPattern(locals.user!.id, params.id);
-	if (!pattern) throw error(404, 'Patron introuvable');
+	const uid = locals.user!.id;
+	const row = await accessiblePattern(uid, params.id);
+	if (!row) throw error(404, 'Patron introuvable');
 
 	const files = await db
 		.select()
 		.from(patternFiles)
-		.where(eq(patternFiles.patternId, pattern.id));
+		.where(eq(patternFiles.patternId, row.pattern.id));
 
-	return { pattern, files };
+	const isOwner = row.pattern.ownerId === uid;
+	return { pattern: row.pattern, files, isOwner, ownerName: row.ownerName };
 };
 
 export const actions: Actions = {
+	// Active/désactive le partage (propriétaire uniquement).
+	toggleShare: async ({ locals, params }) => {
+		const uid = locals.user!.id;
+		const p = await ownedPattern(uid, params.id);
+		if (!p) return fail(403, { error: 'Action réservée au propriétaire' });
+		await db
+			.update(patterns)
+			.set({ isShared: !p.isShared, updatedAt: new Date() })
+			.where(eq(patterns.id, p.id));
+		return { ok: true, isShared: !p.isShared };
+	},
+
 	delete: async ({ locals, params }) => {
 		const uid = locals.user!.id;
 		const pattern = await ownedPattern(uid, params.id);
-		if (!pattern) return fail(404, { error: 'Introuvable' });
+		if (!pattern) return fail(403, { error: 'Suppression réservée au propriétaire' });
 
 		const files = await db
 			.select({ storedPath: patternFiles.storedPath })
