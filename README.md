@@ -224,14 +224,19 @@ réservées au propriétaire.
 L'app est une **coque Capacitor** (`mobile/`) qui charge ton serveur. Elle est
 compilée par **GitHub Actions** — aucun SDK Android à installer en local.
 
-1. (Recommandé) définis la variable de dépôt **`SERVER_URL`**
-   (*Settings → Actions → Variables*), ex. `https://tricouture.exemple.fr`.
-2. Onglet *Actions* → **Build Android APK** → *Run workflow*
-   (ou un tag déclenche la [release](#versions-et-releases)).
-3. Récupère l'artefact `tricouture-android-debug` (`app-debug.apk`),
-   installe-le sur le téléphone (autoriser les sources inconnues).
+**Par défaut, l'app demande l'URL de ton serveur au premier lancement** et la
+mémorise : aucune adresse n'est codée en dur dans le dépôt.
 
-Si `SERVER_URL` n'est pas définie, l'app demande l'URL au premier lancement.
+1. Onglet *Actions* → **Build Android APK** → *Run workflow*
+   (ou un tag déclenche la [release](#versions-et-releases)).
+2. Récupère l'artefact `tricouture-android-debug` (`app-debug.apk`),
+   installe-le sur le téléphone (autoriser les sources inconnues).
+3. Au lancement, saisis l'URL de ton serveur.
+
+> Optionnel : pour figer l'URL au build (sans écran de saisie), définis la
+> variable de dépôt **`SERVER_URL`** (*Settings → Actions → Variables*).
+> Cette valeur reste privée (variable d'Actions), elle n'apparaît pas dans le
+> code source.
 
 ---
 
@@ -252,6 +257,18 @@ Cloudflare.
 Héberger sous un **sous-chemin** (ex. `exemple.fr/tricouture`) nécessite de
 définir `paths.base` dans SvelteKit et de reconstruire. Si tu veux cette
 option, ouvre une demande : elle implique une adaptation des liens internes.
+
+### Configurer l'URL publique
+
+Deux endroits indépendants utilisent l'URL :
+
+1. **Serveur (Docker)** — variable `ORIGIN` dans `.env`. Elle doit correspondre
+   exactement à l'URL vue par le navigateur (sinon cookies/formulaires rejetés).
+   Voir [Configurer l'URL côté Docker](docs/SELF-HOSTING.md#configurer-lurl-publique-docker).
+2. **App Android** — par défaut, **l'application demande l'URL au premier
+   lancement** (elle est mémorisée). Aucune URL n'est codée en dur dans le
+   dépôt. Tu peux éventuellement la figer au build via la variable d'Actions
+   `SERVER_URL` (voir ci-dessous).
 
 ---
 

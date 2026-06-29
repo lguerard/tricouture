@@ -74,6 +74,39 @@ openssl rand -base64 24   # -> POSTGRES_PASSWORD (puis recopie dans DATABASE_URL
 > ⚠️ `ORIGIN` doit correspondre à l'URL réellement utilisée par les navigateurs (sinon
 > les cookies de session et les formulaires seront rejetés). On le met à jour en §7.
 
+### Configurer l'URL publique (Docker)
+
+L'URL de ton instance est **lue au runtime** depuis la variable d'environnement
+`ORIGIN` (jamais codée en dur dans l'image). Trois façons de la définir :
+
+1. **Dans `.env`** (recommandé) — le `docker-compose.yml` l'injecte dans le
+   conteneur `app` :
+
+   ```ini
+   # .env
+   ORIGIN=https://tricouture.exemple.fr
+   ```
+
+2. **À la volée** sur la ligne de commande :
+
+   ```bash
+   ORIGIN=https://tricouture.exemple.fr docker compose up -d
+   ```
+
+3. **En dur dans le compose** (déconseillé) — sous `services.app.environment`.
+
+Après modification, recharge le conteneur :
+
+```bash
+docker compose up -d        # relit .env et recrée le conteneur app
+```
+
+- En **local**, garde `http://localhost:3000`.
+- En **production**, mets l'URL HTTPS publique (le cookie de session passe
+  alors automatiquement en `Secure`).
+- L'**app Android** ne dépend pas de `ORIGIN` : elle demande son URL au premier
+  lancement (ou via la variable d'Actions `SERVER_URL`, voir §11).
+
 ---
 
 ## 4. Démarrer le socle
@@ -291,22 +324,28 @@ Les migrations de base s'appliquent automatiquement au redémarrage du conteneur
 L'app Android est une **coque Capacitor** qui charge ton serveur. Elle se compile via GitHub
 Actions (aucun environnement Android à installer en local).
 
+> Par défaut, **aucune URL n'est codée en dur** : l'app demande l'adresse du
+> serveur au premier lancement et la mémorise. Tu n'as donc rien à configurer
+> pour compiler une APK générique.
+
 ### Compiler l'APK
 
 1. Pousse le dépôt sur GitHub.
-2. (Recommandé) Définis l'URL de ton serveur : *Settings → Secrets and variables → Actions →
-   Variables → New variable* : nom `SERVER_URL`, valeur `https://tricouture.exemple.fr`.
-3. Lance le workflow : onglet *Actions* → **Build Android APK** → *Run workflow*
-   (tu peux y saisir l'URL à la volée si tu n'as pas créé la variable).
-   Un tag `v*` (`git tag v0.1.0 && git push --tags`) déclenche aussi le build.
-4. Récupère l'artefact **`tricouture-android-debug`** (contient `app-debug.apk`).
+2. Lance le workflow : onglet *Actions* → **Build Android APK** → *Run workflow*.
+   Un tag déclenche aussi le build via la release.
+3. Récupère l'artefact **`tricouture-android-debug`** (contient `app-debug.apk`).
+
+> Optionnel — figer l'URL au build : *Settings → Secrets and variables →
+> Actions → Variables → New variable*, nom `SERVER_URL`, valeur
+> `https://tricouture.exemple.fr`. Cette variable reste privée (elle n'est pas
+> versionnée). Sans elle, l'app affiche l'écran de saisie d'URL.
 
 ### Installer sur le téléphone
 
 1. Transfère `app-debug.apk` sur le téléphone (câble, Drive, etc.).
 2. Ouvre-le : Android demandera d'**autoriser l'installation depuis cette source** → accepte.
-3. Au lancement : si `SERVER_URL` était défini, l'app se connecte directement ; sinon, elle
-   affiche un champ pour saisir l'URL de ton serveur (mémorisée ensuite).
+3. Au lancement, **saisis l'URL de ton serveur** (mémorisée ensuite). Si
+   `SERVER_URL` avait été défini au build, l'app se connecte directement.
 
 > La caméra (scan d'étiquette) et le micro (compteur vocal) demanderont une autorisation au
 > premier usage. L'APK debug n'est pas signé pour le Play Store : c'est une installation
