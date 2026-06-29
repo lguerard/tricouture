@@ -170,7 +170,7 @@ Prérequis : un nom de domaine géré par Cloudflare (gratuit). Place ton domain
    fournit un **token**.
 
 2. **Configure le routage public** dans l'assistant du tunnel :
-   - *Public hostname* : `tricouture.mondomaine.fr`
+   - *Public hostname* : `tricouture.exemple.fr`
    - *Service* : `HTTP://app:3000`
    (le tunnel tourne dans le même réseau Docker que l'app, il joint donc `app:3000`.)
 
@@ -195,11 +195,11 @@ Prérequis : un nom de domaine géré par Cloudflare (gratuit). Place ton domain
 4. **Mets à jour `ORIGIN`** dans `.env` :
 
    ```ini
-   ORIGIN=https://tricouture.mondomaine.fr
+   ORIGIN=https://tricouture.exemple.fr
    ```
    puis `docker compose ... up -d` à nouveau pour recharger l'app.
 
-5. Ouvre `https://tricouture.mondomaine.fr` — c'est en ligne, en HTTPS, sans avoir ouvert le
+5. Ouvre `https://tricouture.exemple.fr` — c'est en ligne, en HTTPS, sans avoir ouvert le
    moindre port. 🎉
 
 > Bonus sécurité : dans *Zero Trust → Access*, tu peux exiger une authentification Cloudflare
@@ -230,13 +230,13 @@ de ta box vers le serveur, Caddy gère le HTTPS Let's Encrypt automatiquement.
 `Caddyfile` minimal :
 
 ```caddy
-tricouture.mondomaine.fr {
+tricouture.exemple.fr {
     reverse_proxy app:3000
 }
 ```
 
 Ajoute un service Caddy au compose (image `caddy:2`), monte le `Caddyfile`, expose `80:80`
-et `443:443`, et mets `ORIGIN=https://tricouture.mondomaine.fr`. Inconvénient : il faut ouvrir
+et `443:443`, et mets `ORIGIN=https://tricouture.exemple.fr`. Inconvénient : il faut ouvrir
 des ports (impossible derrière CGNAT) — d'où la préférence pour l'option A.
 
 ---
@@ -295,7 +295,7 @@ Actions (aucun environnement Android à installer en local).
 
 1. Pousse le dépôt sur GitHub.
 2. (Recommandé) Définis l'URL de ton serveur : *Settings → Secrets and variables → Actions →
-   Variables → New variable* : nom `SERVER_URL`, valeur `https://tricouture.mondomaine.fr`.
+   Variables → New variable* : nom `SERVER_URL`, valeur `https://tricouture.exemple.fr`.
 3. Lance le workflow : onglet *Actions* → **Build Android APK** → *Run workflow*
    (tu peux y saisir l'URL à la volée si tu n'as pas créé la variable).
    Un tag `v*` (`git tag v0.1.0 && git push --tags`) déclenche aussi le build.
