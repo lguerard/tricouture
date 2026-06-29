@@ -44,7 +44,7 @@ commit_parsers = [
 ]
 protect_breaking_commits = true
 filter_commits = false
-tag_pattern = "v[0-9].*"
+tag_pattern = "[0-9]*"
 topo_order = false
 sort_commits = "oldest"
 
