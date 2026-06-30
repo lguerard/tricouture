@@ -17,7 +17,7 @@ export const CRAFT_LABELS: Record<Craft, string> = {
 
 export const CRAFTS: Craft[] = ['couture', 'tricot', 'crochet'];
 
-// Catégories d'épaisseur de laine (standard Craft Yarn Council).
+// Yarn weight categories (Craft Yarn Council standard).
 export const YARN_WEIGHTS = [
 	'lace',
 	'fingering',

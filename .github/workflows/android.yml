@@ -4,10 +4,10 @@ on:
   workflow_dispatch:
     inputs:
       server_url:
-        description: "URL du serveur Tricouture (sinon variable SERVER_URL du repo)"
+        description: "Tricouture server URL (falls back to SERVER_URL repo variable)"
         required: false
         type: string
-  # Permet à d'autres workflows (release) de réutiliser ce build.
+  # Allows other workflows (release) to reuse this build.
   workflow_call:
     inputs:
       server_url:
@@ -44,7 +44,7 @@ jobs:
           URL="${{ github.event.inputs.server_url }}"
           if [ -z "$URL" ]; then URL="${{ vars.SERVER_URL }}"; fi
           echo "value=$URL" >> "$GITHUB_OUTPUT"
-          echo "URL serveur : ${URL:-(non définie, coque de config affichée)}"
+          echo "Server URL: ${URL:-(not set, config shell will be shown)}"
 
       - name: Add Android platform
         working-directory: mobile
@@ -52,7 +52,7 @@ jobs:
           CAP_SERVER_URL: ${{ steps.url.outputs.value }}
         run: npx cap add android
 
-      - name: Inject runtime permissions (caméra, micro, notifications, vibration)
+      - name: Inject runtime permissions (camera, mic, notifications, vibration)
         working-directory: mobile
         run: |
           MANIFEST=android/app/src/main/AndroidManifest.xml
@@ -84,15 +84,15 @@ jobs:
           path: mobile/android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
 
-      # Signature release (optionnelle) : activée si le secret KEYSTORE_BASE64 est défini.
-      # Générer le keystore : keytool -genkey -v -keystore tricouture.jks -alias tricouture
+      # Release signing (optional) — enabled when KEYSTORE_BASE64 secret is set.
+      # Generate keystore: keytool -genkey -v -keystore tricouture.jks -alias tricouture
       #   -keyalg RSA -keysize 2048 -validity 10000
-      # Encoder : base64 -w 0 tricouture.jks > tricouture.jks.b64
-      # Secrets GitHub requis :
-      #   KEYSTORE_BASE64      – contenu base64 du fichier .jks
-      #   KEYSTORE_PASSWORD    – mot de passe du keystore
-      #   KEY_ALIAS            – alias de la clé (ex: tricouture)
-      #   KEY_PASSWORD         – mot de passe de la clé
+      # Encode:  base64 -w 0 tricouture.jks > tricouture.jks.b64
+      # Required GitHub secrets:
+      #   KEYSTORE_BASE64      – base64-encoded .jks file content
+      #   KEYSTORE_PASSWORD    – keystore password
+      #   KEY_ALIAS            – key alias (e.g. tricouture)
+      #   KEY_PASSWORD         – key password
       - name: Sign release APK
         if: ${{ secrets.KEYSTORE_BASE64 != '' }}
         working-directory: mobile/android

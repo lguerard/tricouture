@@ -27,38 +27,37 @@ const [user] = await sql`
 await sql`
 	INSERT INTO patterns (owner_id, title, craft, designer, source, difficulty, tags)
 	VALUES
-		(${user.id}, 'Écharpe torsades irlandaises', 'tricot', 'Kim Hargreaves', 'Ravelry', 3, '["hiver","accessoire"]'),
-		(${user.id}, 'Bonnet péruvien', 'crochet', 'Drops Design', 'drops-design.com', 2, '["hiver","accessoire"]'),
-		(${user.id}, 'Robe portefeuille', 'couture', null, 'Burda Style 03/2025', 4, '["été","robe"]'),
-		(${user.id}, 'Pull raglan sans couture', 'tricot', 'Joji Locatelli', 'Ravelry', 4, '["pull","raglan"]'),
-		(${user.id}, 'Chaussettes à picots', 'tricot', null, 'Drops Design', 1, '["chaussettes"]')
+		(${user.id}, 'Irish Cable Scarf', 'tricot', 'Kim Hargreaves', 'Ravelry', 3, '["winter","accessory"]'),
+		(${user.id}, 'Peruvian Hat', 'crochet', 'Drops Design', 'drops-design.com', 2, '["winter","accessory"]'),
+		(${user.id}, 'Wrap Dress', 'couture', null, 'Burda Style 03/2025', 4, '["summer","dress"]'),
+		(${user.id}, 'Seamless Raglan Sweater', 'tricot', 'Joji Locatelli', 'Ravelry', 4, '["sweater","raglan"]'),
+		(${user.id}, 'Picot Socks', 'tricot', null, 'Drops Design', 1, '["socks"]')
 `;
 
-const rows = await sql`
+await sql`
 	INSERT INTO projects (owner_id, title, status, board_position, progress_pct, current_row, total_rows, deadline)
 	VALUES
-		(${user.id}, 'Écharpe hiver 2026', 'monte', 0, 35, 42, 120, '2026-11-01'),
-		(${user.id}, 'Robe été de Marie', 'idee', 0, 0, 0, null, null),
-		(${user.id}, 'Chaussettes Noël papa', 'bloque', 0, 70, 60, 80, '2026-12-20'),
-		(${user.id}, 'Pull enfant fini', 'fini', 0, 100, 80, 80, null)
-	RETURNING id, status
+		(${user.id}, 'Winter Scarf 2026', 'monte', 0, 35, 42, 120, '2026-11-01'),
+		(${user.id}, 'Summer Dress for Marie', 'idee', 0, 0, 0, null, null),
+		(${user.id}, 'Christmas Socks', 'bloque', 0, 70, 60, 80, '2026-12-20'),
+		(${user.id}, 'Finished Kids Sweater', 'fini', 0, 100, 80, 80, null)
 `;
 
 await sql`
 	INSERT INTO yarns (owner_id, brand, name, colorway, weight_category, fiber, skeins, grams_per_skein, color_hex)
 	VALUES
-		(${user.id}, 'Drops', 'Karisma', 'Bleu nuit', 'DK', '100% laine mérinos', 4, 50, '#1a2e5e'),
-		(${user.id}, 'Plassard', 'Coton peigné', 'Écru naturel', 'DK', '100% coton', 6, 50, '#f5f0e8'),
-		(${user.id}, 'Lang Yarns', 'Mohair Luxe', 'Doré', 'Lace', '70% mohair 30% soie', 2, 25, '#c9a227'),
-		(${user.id}, 'Bergère de France', 'Merinos Mix', 'Bordeaux', 'Worsted', '60% laine 40% acrylique', 3, 50, '#6b1a2a'),
-		(${user.id}, 'Malabrigo', 'Rios', 'Lettuce', 'Worsted', '100% mérinos superwash', 2, 100, '#4a7c59')
+		(${user.id}, 'Drops', 'Karisma', 'Midnight Blue', 'DK', '100% merino wool', 4, 50, '#1a2e5e'),
+		(${user.id}, 'Plassard', 'Combed Cotton', 'Natural Ecru', 'DK', '100% cotton', 6, 50, '#f5f0e8'),
+		(${user.id}, 'Lang Yarns', 'Mohair Luxe', 'Golden', 'Lace', '70% mohair 30% silk', 2, 25, '#c9a227'),
+		(${user.id}, 'Bergère de France', 'Merinos Mix', 'Bordeaux', 'Worsted', '60% wool 40% acrylic', 3, 50, '#6b1a2a'),
+		(${user.id}, 'Malabrigo', 'Rios', 'Lettuce', 'Worsted', '100% superwash merino', 2, 100, '#4a7c59')
 `;
 
 await sql`
 	INSERT INTO goals (owner_id, title, kind, target_value, current_value, period_start, period_end)
 	VALUES
-		(${user.id}, '12 projets en 2026', 'projets_an', 12, 3, '2026-01-01', '2026-12-31'),
-		(${user.id}, 'Vider 5 pelotes du stash', 'stash_busting', 5, 2, '2026-01-01', '2026-06-30')
+		(${user.id}, '12 projects in 2026', 'projets_an', 12, 3, '2026-01-01', '2026-12-31'),
+		(${user.id}, 'Bust 5 skeins from stash', 'stash_busting', 5, 2, '2026-01-01', '2026-06-30')
 `;
 
 await sql.end();

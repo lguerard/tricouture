@@ -5,14 +5,14 @@ import { env } from '$env/dynamic/private';
 
 const MEDIA_DIR = env.MEDIA_DIR || join(process.cwd(), 'media');
 
-// Chemin absolu sur disque pour un chemin relatif stocké en base.
+// Returns the absolute disk path for a relative path stored in the database.
 export function absolutePath(relative: string): string {
 	const safe = normalize(relative).replace(/^(\.\.([/\\]|$))+/, '');
 	return join(MEDIA_DIR, safe);
 }
 
-// Sauvegarde un fichier uploadé dans le dossier de l'utilisateur.
-// Retourne le chemin relatif `<ownerId>/<uuid><ext>` (sert aussi de contrôle d'accès).
+// Saves an uploaded file in the owner's directory.
+// Returns the relative path `<ownerId>/<uuid><ext>` (also acts as an access-control anchor).
 export async function saveUpload(
 	ownerId: string,
 	file: File,
@@ -36,11 +36,11 @@ export async function deleteStored(relative: string): Promise<void> {
 	try {
 		await unlink(absolutePath(relative));
 	} catch {
-		// fichier déjà absent : on ignore
+		// file already gone — ignore
 	}
 }
 
-// Vérifie qu'un chemin appartient bien à l'utilisateur (1er segment = ownerId).
+// Checks that a path belongs to the given user (first segment must equal ownerId).
 export function ownsPath(ownerId: string, relative: string): boolean {
 	return normalize(relative).split(sep).join('/').startsWith(`${ownerId}/`);
 }

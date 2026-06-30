@@ -7,7 +7,7 @@ import { users, sessions } from './db/schema';
 
 const scrypt = promisify(scryptCb);
 
-const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 30; // 30 jours
+const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 30; // 30 days
 export const SESSION_COOKIE = 'session';
 
 export interface SessionUser {
@@ -17,7 +17,7 @@ export interface SessionUser {
 	isAdmin: boolean;
 }
 
-/* ---------------------- mots de passe ---------------------- */
+/* ---------------------- passwords ---------------------- */
 
 export async function hashPassword(password: string): Promise<string> {
 	const salt = randomBytes(16);
@@ -36,7 +36,7 @@ export async function verifyPassword(stored: string, password: string): Promise<
 
 /* ---------------------- sessions ---------------------- */
 
-// On stocke en base le hash du token ; le token brut n'existe que côté client.
+// Only the token hash is stored in the database; the raw token lives on the client only.
 function hashToken(token: string): string {
 	return createHash('sha256').update(token).digest('hex');
 }
@@ -46,7 +46,7 @@ export async function createSession(userId: string): Promise<string> {
 	const id = hashToken(token);
 	const expiresAt = new Date(Date.now() + SESSION_TTL_MS);
 	await db.insert(sessions).values({ id, userId, expiresAt });
-	return token; // renvoyé au client (cookie web ou Bearer mobile)
+	return token; // returned to client (web cookie or Bearer mobile)
 }
 
 export async function validateSession(token: string): Promise<SessionUser | null> {
@@ -82,9 +82,9 @@ export async function invalidateSession(token: string): Promise<void> {
 	await db.delete(sessions).where(eq(sessions.id, hashToken(token)));
 }
 
-/* ---------------------- helpers requête ---------------------- */
+/* ---------------------- request helpers ---------------------- */
 
-// Extrait le token soit du cookie (web) soit du header Authorization Bearer (mobile).
+// Extracts the token from either the session cookie (web) or the Authorization Bearer header (mobile).
 export function readToken(event: RequestEvent): string | null {
 	const auth = event.request.headers.get('authorization');
 	if (auth?.startsWith('Bearer ')) return auth.slice(7).trim();

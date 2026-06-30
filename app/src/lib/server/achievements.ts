@@ -16,7 +16,7 @@ import {
 import { TIER_POINTS, type Tier } from '$lib/achievements';
 
 /* ------------------------------------------------------------------ */
-/* Métriques (toutes dérivées de la base)                             */
+/* Metrics (all derived from the database)                            */
 /* ------------------------------------------------------------------ */
 
 export type Metrics = Record<string, number>;
@@ -105,7 +105,7 @@ export async function computeMetrics(uid: string): Promise<Metrics> {
 }
 
 /* ------------------------------------------------------------------ */
-/* Catalogue de succès                                                */
+/* Achievement catalogue                                              */
 /* ------------------------------------------------------------------ */
 
 export interface AchievementDef {
@@ -114,7 +114,7 @@ export interface AchievementDef {
 	description: string;
 	icon: string;
 	tier: Tier;
-	metric: string; // clé dans Metrics
+	metric: string; // key in Metrics
 	target: number;
 	category: string;
 }
@@ -180,7 +180,7 @@ export interface AchievementsResult {
 	totalCount: number;
 }
 
-// Calcule l'état, débloque et persiste les nouveaux succès atteints.
+// Computes state, unlocks and persists newly reached achievements.
 export async function syncAchievements(uid: string): Promise<AchievementsResult> {
 	const metrics = await computeMetrics(uid);
 

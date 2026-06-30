@@ -1,7 +1,7 @@
 import { env } from '$env/dynamic/private';
 
 const OLLAMA_URL = () => env.OLLAMA_URL?.replace(/\/$/, '') || '';
-// Modèles par défaut (surchargables via env). Choix tenant dans ~10 GB VRAM.
+// Default models (overridable via env). Chosen to fit within ~10 GB VRAM.
 const CHAT_MODEL = () => env.OLLAMA_CHAT_MODEL || 'qwen2.5:7b';
 const EMBED_MODEL = () => env.OLLAMA_EMBED_MODEL || 'nomic-embed-text';
 
@@ -10,7 +10,7 @@ export function aiConfigured(): boolean {
 }
 
 export class AiUnavailable extends Error {
-	constructor(msg = "Service IA indisponible (OLLAMA_URL non configuré ou hors-ligne).") {
+	constructor(msg = 'AI service unavailable (OLLAMA_URL not configured or offline).') {
 		super(msg);
 	}
 }
@@ -31,7 +31,7 @@ async function call(path: string, body: unknown): Promise<unknown> {
 	return res.json();
 }
 
-// Génération de texte (non-streaming pour rester simple).
+// Text generation (non-streaming for simplicity).
 export async function generate(prompt: string, system?: string): Promise<string> {
 	const data = (await call('/api/generate', {
 		model: CHAT_MODEL(),
@@ -42,12 +42,12 @@ export async function generate(prompt: string, system?: string): Promise<string>
 	return (data.response ?? '').trim();
 }
 
-// Vecteur d'embedding (768 dims avec nomic-embed-text → colonne vector(768)).
+// Embedding vector (768 dims with nomic-embed-text → vector(768) column).
 export async function embed(text: string): Promise<number[]> {
 	const data = (await call('/api/embeddings', {
 		model: EMBED_MODEL(),
 		prompt: text
 	})) as { embedding?: number[] };
-	if (!data.embedding) throw new Error('Embedding vide');
+	if (!data.embedding) throw new Error('Empty embedding');
 	return data.embedding;
 }

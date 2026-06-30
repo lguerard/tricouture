@@ -5,13 +5,13 @@
 header = """
 # Changelog
 
-Toutes les modifications notables de Tricouture.\n
+All notable changes to Tricouture.\n
 """
 body = """
 {% if version %}\
 ## [{{ version | trim_start_matches(pat="v") }}] — {{ timestamp | date(format="%Y-%m-%d") }}
 {% else %}\
-## [Non publié]
+## [Unreleased]
 {% endif %}\
 {% for group, commits in commits | group_by(attribute="group") %}
 ### {{ group | upper_first }}
@@ -38,18 +38,18 @@ filter_unconventional = true
 split_commits = false
 # Regroupe par type ; l'icône est conservée dans le message.
 commit_parsers = [
-  { message = "^feat", group = "✨ Fonctionnalités" },
-  { message = "^fix", group = "🐛 Corrections" },
+  { message = "^feat", group = "✨ Features" },
+  { message = "^fix", group = "🐛 Bug fixes" },
   { message = "^docs", group = "📝 Documentation" },
   { message = "^style", group = "💄 Style" },
-  { message = "^refactor", group = "♻️ Refactorisation" },
+  { message = "^refactor", group = "♻️ Refactoring" },
   { message = "^test", group = "✅ Tests" },
-  { message = "^perf", group = "⚡ Performances" },
+  { message = "^perf", group = "⚡ Performance" },
   { message = "^ci", group = "👷 CI/CD" },
   { message = "^build", group = "🏗️ Build" },
-  { message = "^chore", group = "🔧 Divers" },
+  { message = "^chore", group = "🔧 Miscellaneous" },
   { message = "^revert", group = "⏪ Reverts" },
-  { message = ".*", group = "🔧 Divers" },
+  { message = ".*", group = "🔧 Miscellaneous" },
 ]
 protect_breaking_commits = true
 filter_commits = false
@@ -61,8 +61,8 @@ sort_commits = "oldest"
 features_always_bump_minor = true
 breaking_always_bump_major = true
 
-# Intégration GitHub : permet de lister les contributeurs (github.contributors)
-# dans les notes de version. Nécessite GITHUB_TOKEN au runtime (fourni par GHA).
+# GitHub integration: lists contributors (github.contributors) in release notes.
+# Requires GITHUB_TOKEN at runtime (provided by GHA).
 [remote.github]
 owner = "lguerard"
 repo = "tricouture"

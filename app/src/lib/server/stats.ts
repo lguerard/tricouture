@@ -33,7 +33,7 @@ export async function computeStats(uid: string): Promise<UserStats> {
 			.where(and(eq(projects.ownerId, uid), eq(projects.status, 'monte')))
 	]);
 
-	// Métrage tricoté cette année = somme(pelotes utilisées × métrage/pelote) sur projets finis cette année.
+	// Meters knitted this year = sum(skeins used × meters per skein) for projects finished this year.
 	const meters =
 		(
 			await db
@@ -75,5 +75,5 @@ export async function computeStats(uid: string): Promise<UserStats> {
 	};
 }
 
-// Les succès/badges sont gérés par $lib/server/achievements.ts (système complet
-// avec paliers, points et progression).
+// Achievements/badges are managed by $lib/server/achievements.ts (full system
+// with tiers, points and progress tracking).

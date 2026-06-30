@@ -1,52 +1,52 @@
 appId: app.tricouture
 ---
-# Écran de login
+# Login screen
 - launchApp:
     clearState: true
 - extendedWaitUntil:
-    visible: "Se connecter"
+    visible: "Sign in"
     timeout: 15000
 - takeScreenshot: screenshots/01-login
 - tapOn: "Email"
 - inputText: "demo@tricouture.app"
-- tapOn: "Mot de passe"
+- tapOn: "Password"
 - inputText: "Demo1234!"
-- tapOn: "Se connecter"
+- tapOn: "Sign in"
 
-# Tableau de bord
+# Dashboard
 - extendedWaitUntil:
-    visible: "Tableau de bord"
+    visible: "Dashboard"
     timeout: 20000
 - waitForAnimationToEnd
 - takeScreenshot: screenshots/02-dashboard
 
-# Patrons
-- tapOn: "Patrons"
+# Patterns
+- tapOn: "Patterns"
 - extendedWaitUntil:
-    visible: "Écharpe"
+    visible: "Irish Cable"
     timeout: 10000
 - takeScreenshot: screenshots/03-patterns
 
-# Projets (Kanban)
-- tapOn: "Projets"
+# Projects (Kanban)
+- tapOn: "Projects"
 - extendedWaitUntil:
     visible: "Kanban"
     timeout: 10000
 - takeScreenshot: screenshots/04-projects
 
-# Stock
-- tapOn: "Stock"
+# Stash
+- tapOn: "Stash"
 - extendedWaitUntil:
     visible: "Drops"
     timeout: 10000
 - takeScreenshot: screenshots/05-stash
 
-# Stats
-- tapOn: "Mon année"
+# Stats (My year)
+- tapOn: "My year"
 - waitForAnimationToEnd
 - takeScreenshot: screenshots/06-stats
 
-# Objectifs
-- tapOn: "Objectifs"
+# Goals
+- tapOn: "Goals"
 - waitForAnimationToEnd
 - takeScreenshot: screenshots/07-goals

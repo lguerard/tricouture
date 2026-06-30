@@ -1,5 +1,5 @@
-// Dictionnaires de traduction (fr/en). Clés à plat séparées par des points.
-// Les clés manquantes en anglais retombent sur le français.
+// Translation dictionaries (fr/en). Flat dot-separated keys.
+// Missing English keys fall back to French.
 
 export type Locale = 'fr' | 'en';
 

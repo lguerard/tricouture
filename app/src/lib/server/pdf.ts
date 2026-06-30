@@ -1,6 +1,6 @@
 import { extractText, getDocumentProxy } from 'unpdf';
 
-// Extrait le texte d'un PDF (pour la recherche plein-texte). Best-effort.
+// Extracts text from a PDF (for full-text search). Best-effort.
 export async function extractPdfText(buf: Buffer): Promise<string | null> {
 	try {
 		const pdf = await getDocumentProxy(new Uint8Array(buf));

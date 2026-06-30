@@ -1,4 +1,4 @@
-// Métadonnées de présentation des succès — sûres côté client (pas d'accès DB).
+// Achievement presentation metadata — safe client-side (no DB access).
 export type Tier = 'bronze' | 'argent' | 'or' | 'platine';
 
 export const TIER_POINTS: Record<Tier, number> = {

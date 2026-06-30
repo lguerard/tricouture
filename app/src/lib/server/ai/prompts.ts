@@ -1,4 +1,4 @@
-// Glossaire et prompts métier pour l'assistant tricot/couture/crochet.
+// Domain glossary and prompts for the knitting/sewing/crochet assistant.
 
 export const KNITTING_GLOSSARY = `
 Glossaire de référence (anglais → français) à respecter strictement :

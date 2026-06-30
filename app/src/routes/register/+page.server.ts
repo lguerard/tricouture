@@ -28,7 +28,7 @@ export const actions: Actions = {
 			return fail(400, { email, displayName, error: 'Cet email est déjà utilisé.' });
 		}
 
-		// Le tout premier compte créé est administrateur.
+		// The very first account created is an administrator.
 		const count = (await db.select({ n: sql<number>`count(*)::int` }).from(users))[0]?.n ?? 0;
 
 		const passwordHash = await hashPassword(password);

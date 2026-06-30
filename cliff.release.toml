@@ -1,6 +1,6 @@
-# Template git-cliff pour les notes de release GitHub (sans header de version).
-# Utilisé par le workflow release.yml pour générer RELEASE_NOTES.md.
-# Pour le CHANGELOG complet (avec headers version), voir cliff.toml.
+# git-cliff template for GitHub release notes (no version header).
+# Used by release.yml to generate RELEASE_NOTES.md.
+# For the full CHANGELOG (with version headers), see cliff.toml.
 
 [changelog]
 header = ""
@@ -29,18 +29,18 @@ conventional_commits = true
 filter_unconventional = true
 split_commits = false
 commit_parsers = [
-  { message = "^feat", group = "✨ Fonctionnalités" },
-  { message = "^fix", group = "🐛 Corrections" },
+  { message = "^feat", group = "✨ Features" },
+  { message = "^fix", group = "🐛 Bug fixes" },
   { message = "^docs", group = "📝 Documentation" },
   { message = "^style", group = "💄 Style" },
-  { message = "^refactor", group = "♻️ Refactorisation" },
+  { message = "^refactor", group = "♻️ Refactoring" },
   { message = "^test", group = "✅ Tests" },
-  { message = "^perf", group = "⚡ Performances" },
+  { message = "^perf", group = "⚡ Performance" },
   { message = "^ci", group = "👷 CI/CD" },
   { message = "^build", group = "🏗️ Build" },
-  { message = "^chore", group = "🔧 Divers" },
+  { message = "^chore", group = "🔧 Miscellaneous" },
   { message = "^revert", group = "⏪ Reverts" },
-  { message = ".*", group = "🔧 Divers" },
+  { message = ".*", group = "🔧 Miscellaneous" },
 ]
 protect_breaking_commits = true
 filter_commits = false

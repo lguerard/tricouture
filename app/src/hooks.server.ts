@@ -2,7 +2,7 @@ import { redirect, type Handle } from '@sveltejs/kit';
 import { readToken, validateSession } from '$lib/server/auth';
 import { isLocale, DEFAULT_LOCALE } from '$lib/i18n';
 
-// Routes accessibles sans authentification.
+// Routes accessible without authentication.
 const PUBLIC_PREFIXES = ['/login', '/register', '/api/locale'];
 
 function isPublic(pathname: string): boolean {
@@ -19,10 +19,10 @@ export const handle: Handle = async ({ event, resolve }) => {
 
 	const { pathname } = event.url;
 
-	// API : renvoie 401 JSON au lieu de rediriger.
+	// API: return a 401 JSON response instead of redirecting.
 	if (pathname.startsWith('/api/')) {
 		if (!event.locals.user && !isPublic(pathname)) {
-			return new Response(JSON.stringify({ error: 'non authentifié' }), {
+			return new Response(JSON.stringify({ error: 'unauthenticated' }), {
 				status: 401,
 				headers: { 'content-type': 'application/json' }
 			});
