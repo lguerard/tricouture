@@ -1,12 +1,12 @@
-"""Service Stable Diffusion Tricouture — aperçu coloris.
+"""Tricouture Stable Diffusion service — colorway preview.
 
-Endpoint :
-  POST /preview   Génère un aperçu du vêtement/laine dans le coloris choisi.
-  GET  /health    Statut du service + disponibilité GPU.
+Endpoints:
+  POST /preview   Generate a preview of the garment/yarn in the chosen colorway.
+  GET  /health    Service status + GPU availability.
 
-Variables d'environnement :
-  SD_MODEL_ID   ID HuggingFace du modèle (défaut: stabilityai/stable-diffusion-2-1)
-  HF_TOKEN      Token HuggingFace (optionnel, pour les modèles privés)
+Environment variables:
+  SD_MODEL_ID   HuggingFace model ID (default: stabilityai/stable-diffusion-2-1)
+  HF_TOKEN      HuggingFace token (optional, for private models)
 """
 import base64
 import io
@@ -63,31 +63,31 @@ def _load_img2img():
 
 
 def _hex_to_name(hex_color: str) -> str:
-    """Convertit une couleur hex en description textuelle approximative."""
+    """Convert a hex color to an approximate textual description."""
     h = hex_color.lstrip('#')
     if len(h) != 6:
-        return "coloré"
+        return "colorful"
     r, g, b = int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
-    # Classification grossière (hue-based)
+    # Coarse hue-based classification
     mx = max(r, g, b)
     mn = min(r, g, b)
     if mx - mn < 30:
         if mx < 50:
-            return "noir"
+            return "black"
         if mx > 200:
-            return "blanc"
-        return "gris"
+            return "white"
+        return "gray"
     if r >= g and r >= b:
-        return "rouge vif" if r > 180 else "bordeaux"
+        return "bright red" if r > 180 else "burgundy"
     if g >= r and g >= b:
-        return "vert" if g > 150 else "kaki"
+        return "green" if g > 150 else "khaki"
     if b >= r and b >= g:
-        return "bleu" if b > 150 else "marine"
+        return "blue" if b > 150 else "navy"
     if r > 150 and g > 150 and b < 80:
-        return "jaune"
+        return "yellow"
     if r > 150 and b > 100 and g < 80:
-        return "violet"
-    return "coloré"
+        return "purple"
+    return "colorful"
 
 
 class PreviewRequest(BaseModel):
@@ -112,16 +112,16 @@ def health():
 @app.post("/preview")
 def preview(req: PreviewRequest):
     color_name = _hex_to_name(req.color_hex)
-    base_prompt = req.prompt.strip() or "pelote de laine, textile, vêtement"
+    base_prompt = req.prompt.strip() or "ball of yarn, textile, garment"
     full_prompt = (
-        f"{base_prompt}, coloris {color_name}, couleur {req.color_hex}, "
-        "photographie produit, haute qualité, fond blanc"
+        f"{base_prompt}, {color_name} colorway, color {req.color_hex}, "
+        "product photography, high quality, white background"
     )
-    neg_prompt = "flou, mauvaise qualité, texte, watermark, dessin animé"
+    neg_prompt = "blurry, bad quality, text, watermark, cartoon"
 
     try:
         if req.image_base64:
-            # img2img : recolorie l'image de référence.
+            # img2img: recolor the reference image.
             img_bytes = base64.b64decode(req.image_base64)
             ref_img = Image.open(io.BytesIO(img_bytes)).convert("RGB").resize((512, 512))
             pipe = _load_img2img()
@@ -134,7 +134,7 @@ def preview(req: PreviewRequest):
                 guidance_scale=req.guidance,
             )
         else:
-            # txt2img : génère de zéro.
+            # txt2img: generate from scratch.
             pipe = _load_txt2img()
             result = pipe(
                 prompt=full_prompt,

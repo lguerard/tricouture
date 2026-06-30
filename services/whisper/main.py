@@ -1,8 +1,8 @@
-"""Service Whisper Tricouture (GPU) — transcription vocale mains-libres.
+"""Tricouture Whisper service (GPU) — hands-free voice transcription.
 
 POST /transcribe (audio) -> { text }
-Sert au compteur de rangs vocal : l'app envoie un court extrait audio, on renvoie
-le texte ; l'app interprète des commandes ("rang suivant", "plus un", un nombre…).
+Used for the voice row counter: the app sends a short audio clip and receives
+the transcribed text; the app interprets commands ("next row", "plus one", a number...).
 """
 from fastapi import FastAPI, UploadFile, File
 from fastapi.responses import JSONResponse
@@ -21,7 +21,7 @@ def get_model():
         import torch
         device = "cuda" if torch.cuda.is_available() else "cpu"
         compute = "float16" if device == "cuda" else "int8"
-        # "small" : bon compromis vitesse/qualité pour des commandes courtes en français.
+        # "small": good speed/quality trade-off for short voice commands.
         _model = WhisperModel(os.environ.get("WHISPER_MODEL", "small"), device=device, compute_type=compute)
     return _model
 

@@ -1,5 +1,5 @@
-// Accès aux plugins Capacitor depuis le WebView.
-// Utilise le bridge global injecté par la coque native — aucun import Node.
+// Access Capacitor plugins from the WebView.
+// Uses the global bridge injected by the native shell — no Node imports.
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -11,7 +11,7 @@ function plugin(name: string): any {
 	return (window as any)?.Capacitor?.Plugins?.[name];
 }
 
-// Barcode scanner (ML Kit). Retourne le premier code scanné, ou null.
+// Barcode scanner (ML Kit). Returns the first scanned code, or null.
 export async function scanBarcode(): Promise<string | null> {
 	if (!isCapacitor()) return null;
 	const BarcodeScanner = plugin('BarcodeScanner');
@@ -27,7 +27,7 @@ export async function scanBarcode(): Promise<string | null> {
 	}
 }
 
-// Notifications locales — planifie un rappel pour une deadline de projet.
+// Local notifications — schedules a reminder for a project deadline.
 export async function scheduleDeadlineReminder(
 	projectId: string,
 	projectTitle: string,
@@ -42,7 +42,7 @@ export async function scheduleDeadlineReminder(
 	if (perms.display !== 'granted') return;
 
 	const alertAt = new Date(deadlineDate.getTime() - daysBeforeAlert * 86_400_000);
-	if (alertAt <= new Date()) return; // délai déjà passé
+	if (alertAt <= new Date()) return; // alert time already passed
 
 	const id = Math.abs(projectId.split('').reduce((acc, c) => acc ^ c.charCodeAt(0), 0)) % 2_147_483_647;
 
@@ -50,7 +50,7 @@ export async function scheduleDeadlineReminder(
 		notifications: [
 			{
 				id,
-				title: `⏰ Deadline dans ${daysBeforeAlert} jours`,
+				title: `⏰ Deadline in ${daysBeforeAlert} days`,
 				body: projectTitle,
 				schedule: { at: alertAt },
 				extra: { projectId }
@@ -59,7 +59,7 @@ export async function scheduleDeadlineReminder(
 	}).catch(() => {});
 }
 
-// Annule toutes les notifications planifiées pour un projet.
+// Cancel all scheduled notifications for a project.
 export async function cancelDeadlineReminder(projectId: string): Promise<void> {
 	if (!isCapacitor()) return;
 	const LocalNotifications = plugin('LocalNotifications');

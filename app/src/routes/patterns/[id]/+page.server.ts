@@ -30,7 +30,7 @@ async function ownedPattern(uid: string, id: string) {
 export const load: PageServerLoad = async ({ locals, params }) => {
 	const uid = locals.user!.id;
 	const row = await accessiblePattern(uid, params.id);
-	if (!row) throw error(404, 'Patron introuvable');
+	if (!row) throw error(404, 'Pattern not found');
 
 	const files = await db
 		.select()
@@ -46,7 +46,7 @@ export const actions: Actions = {
 	toggleShare: async ({ locals, params }) => {
 		const uid = locals.user!.id;
 		const p = await ownedPattern(uid, params.id);
-		if (!p) return fail(403, { error: 'Action réservée au propriétaire' });
+		if (!p) return fail(403, { error: 'Owner only' });
 		await db
 			.update(patterns)
 			.set({ isShared: !p.isShared, updatedAt: new Date() })
@@ -57,7 +57,7 @@ export const actions: Actions = {
 	delete: async ({ locals, params }) => {
 		const uid = locals.user!.id;
 		const pattern = await ownedPattern(uid, params.id);
-		if (!pattern) return fail(403, { error: 'Suppression réservée au propriétaire' });
+		if (!pattern) return fail(403, { error: 'Owner only' });
 
 		const files = await db
 			.select({ storedPath: patternFiles.storedPath })

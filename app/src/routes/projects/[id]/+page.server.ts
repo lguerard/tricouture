@@ -24,7 +24,7 @@ function progressFrom(currentRow: number, totalRows: number | null, fallback: nu
 
 export const load: PageServerLoad = async ({ locals, params }) => {
 	const project = await owned(locals.user!.id, params.id);
-	if (!project) throw error(404, 'Projet introuvable');
+	if (!project) throw error(404, 'Project not found');
 
 	const pattern = project.patternId
 		? (await db.select({ id: patterns.id, title: patterns.title }).from(patterns).where(eq(patterns.id, project.patternId)).limit(1))[0]
@@ -49,7 +49,7 @@ export const actions: Actions = {
 	row: async ({ locals, params, request }) => {
 		const uid = locals.user!.id;
 		const p = await owned(uid, params.id);
-		if (!p) return fail(404, { error: 'Introuvable' });
+		if (!p) return fail(404, { error: 'Not found' });
 		const delta = parseInt(String((await request.formData()).get('delta') ?? '0'), 10) || 0;
 		const currentRow = Math.max(0, p.currentRow + delta);
 		await db
@@ -62,7 +62,7 @@ export const actions: Actions = {
 	update: async ({ locals, params, request }) => {
 		const uid = locals.user!.id;
 		const p = await owned(uid, params.id);
-		if (!p) return fail(404, { error: 'Introuvable' });
+		if (!p) return fail(404, { error: 'Not found' });
 		const form = await request.formData();
 		const status = String(form.get('status') ?? p.status) as (typeof projectStatus.enumValues)[number];
 		const progressPct = Math.max(0, Math.min(100, parseInt(String(form.get('progressPct') ?? p.progressPct), 10) || 0));
@@ -92,12 +92,12 @@ export const actions: Actions = {
 	logPace: async ({ locals, params, request }) => {
 		const uid = locals.user!.id;
 		const p = await owned(uid, params.id);
-		if (!p) return fail(404, { error: 'Introuvable' });
+		if (!p) return fail(404, { error: 'Not found' });
 		const form = await request.formData();
 		const rowsDone = parseInt(String(form.get('rowsDone') ?? ''), 10);
 		const minutes = parseInt(String(form.get('minutes') ?? ''), 10);
 		if (!Number.isFinite(rowsDone) || !Number.isFinite(minutes) || minutes <= 0) {
-			return fail(400, { error: 'Rangs et minutes valides requis' });
+			return fail(400, { error: 'Valid rows and minutes required' });
 		}
 		await db.insert(paceLogs).values({ projectId: p.id, rowsDone, minutes });
 		await db
@@ -110,7 +110,7 @@ export const actions: Actions = {
 	delete: async ({ locals, params }) => {
 		const uid = locals.user!.id;
 		const p = await owned(uid, params.id);
-		if (!p) return fail(404, { error: 'Introuvable' });
+		if (!p) return fail(404, { error: 'Not found' });
 		await db.delete(projects).where(eq(projects.id, p.id));
 		throw redirect(303, '/projects/board');
 	}

@@ -1,7 +1,7 @@
-# Expose Tricouture via Cloudflare Tunnel (aucun port à ouvrir, HTTPS automatique).
-# Usage :
-#   1) Crée un tunnel sur Cloudflare Zero Trust, route le hostname public vers HTTP://app:3000
-#   2) Mets le token dans .env : CLOUDFLARE_TUNNEL_TOKEN=...
+# Expose Tricouture via Cloudflare Tunnel (no ports to open, automatic HTTPS).
+# Usage:
+#   1) Create a tunnel in Cloudflare Zero Trust, route the public hostname to http://app:3000
+#   2) Put the token in .env: CLOUDFLARE_TUNNEL_TOKEN=...
 #   3) docker compose -f docker-compose.yml -f docker-compose.cloudflared.yml up -d
 services:
   cloudflared:

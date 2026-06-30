@@ -1,15 +1,15 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
-// URL du serveur self-host, injectée au build (GitHub Actions variable SERVER_URL).
-// Ex : https://tricouture.mondomaine.fr
+// Self-host server URL, injected at build time (GitHub Actions variable SERVER_URL).
+// Example: https://tricouture.mydomain.com
 const serverUrl = process.env.CAP_SERVER_URL?.trim();
 
 const config: CapacitorConfig = {
 	appId: 'app.tricouture',
 	appName: 'Tricouture',
 	webDir: 'www',
-	// Si une URL est fournie, l'app charge directement le serveur (bridge Capacitor injecté).
-	// Sinon, la coque affiche www/index.html (page de configuration / fallback).
+	// If a URL is provided, the app loads directly from the server (Capacitor bridge injected).
+	// Otherwise, the shell displays www/index.html (configuration page / fallback).
 	server: serverUrl
 		? {
 				url: serverUrl,
