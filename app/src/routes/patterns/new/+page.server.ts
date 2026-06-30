@@ -55,7 +55,7 @@ export const actions: Actions = {
 				.returning({ id: patterns.id })
 		)[0];
 
-		// Fichiers (PDF/images). Le 1er PDF alimente le texte de recherche.
+		// Files (PDF/images). The first PDF feeds the full-text search index.
 		const files = form.getAll('files').filter((f): f is File => f instanceof File && f.size > 0);
 		let extractedText: string | null = null;
 		let first = true;
@@ -82,7 +82,7 @@ export const actions: Actions = {
 			try {
 				const parts = [title, craft, form.get('garmentType'), form.get('designer'), tags.join(' '), form.get('notes'), extractedText?.slice(0, 800)].filter(Boolean).join(' ');
 				updates.embedding = await embed(parts);
-			} catch { /* Ollama absent — recherche sémantique indisponible */ }
+			} catch { /* Ollama absent — semantic search unavailable */ }
 		}
 
 		if (Object.keys(updates).length) {

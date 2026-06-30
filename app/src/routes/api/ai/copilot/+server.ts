@@ -10,7 +10,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 	const body = await request.json().catch(() => ({}));
 	const patternId = String(body?.patternId ?? '');
 	const question = String(body?.question ?? '').trim();
-	if (!patternId || !question) return json({ error: 'patternId et question requis' }, { status: 400 });
+	if (!patternId || !question) return json({ error: 'patternId and question required' }, { status: 400 });
 
 	const pat = (
 		await db
@@ -19,7 +19,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			.where(and(eq(patterns.id, patternId), eq(patterns.ownerId, locals.user!.id)))
 			.limit(1)
 	)[0];
-	if (!pat) return json({ error: 'Patron introuvable' }, { status: 404 });
+	if (!pat) return json({ error: 'Pattern not found' }, { status: 404 });
 
 	const context = [pat.title, pat.notes, pat.extractedText].filter(Boolean).join('\n\n');
 	try {
@@ -27,6 +27,6 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		return json({ result });
 	} catch (e) {
 		if (e instanceof AiUnavailable) return json({ error: e.message }, { status: 503 });
-		return json({ error: 'Échec assistant' }, { status: 500 });
+		return json({ error: 'Assistant failed' }, { status: 500 });
 	}
 };

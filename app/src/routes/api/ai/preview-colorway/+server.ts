@@ -7,10 +7,10 @@ function sdUrl(): string {
 }
 
 export const POST: RequestHandler = async ({ request, locals }) => {
-	if (!locals.user) error(401, 'Non authentifié');
+	if (!locals.user) error(401, 'Unauthenticated');
 
 	const sdBase = sdUrl();
-	if (!sdBase) error(503, 'Service SD indisponible (SD_URL non configuré)');
+	if (!sdBase) error(503, 'SD service unavailable (SD_URL not configured)');
 
 	const body = await request.json().catch(() => ({}));
 	const prompt: string = typeof body.prompt === 'string' ? body.prompt.trim() : '';
@@ -34,12 +34,12 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			signal: AbortSignal.timeout(120_000)
 		});
 	} catch {
-		error(503, 'Service SD indisponible ou timeout (génération peut prendre ~30–60 s)');
+		error(503, 'SD service unavailable or timed out (generation can take ~30–60 s)');
 	}
 
 	if (!res.ok) {
 		const detail = await res.text().catch(() => '');
-		error(502, `Erreur SD : ${detail.slice(0, 200)}`);
+		error(502, `SD error: ${detail.slice(0, 200)}`);
 	}
 
 	const data = (await res.json()) as { image_base64: string; format: string; prompt: string };

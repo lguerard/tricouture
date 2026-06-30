@@ -9,7 +9,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	const craftFilter = url.searchParams.get('craft') ?? '';
 	const scope = url.searchParams.get('scope') ?? ''; // '', 'mine', 'shared'
 
-	// Visibles : mes patrons + ceux partagés par d'autres.
+	// Visible: own patterns + those shared by others.
 	const conds = [or(eq(patterns.ownerId, uid), eq(patterns.isShared, true))!];
 	if (scope === 'mine') conds.push(eq(patterns.ownerId, uid));
 	if (scope === 'shared') conds.push(and(eq(patterns.isShared, true), sql`${patterns.ownerId} <> ${uid}`)!);
@@ -17,8 +17,8 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		conds.push(eq(patterns.craft, craftFilter));
 	}
 	if (q) {
-		// Recherche plein-texte (français) sur titre + texte extrait des PDF,
-		// avec repli ILIKE pour les correspondances partielles.
+		// Full-text search (French dictionary) on title + extracted PDF text,
+		// with ILIKE fallback for partial matches.
 		conds.push(
 			sql`(
 				to_tsvector('french', coalesce(${patterns.title}, '') || ' ' || coalesce(${patterns.extractedText}, ''))
@@ -47,7 +47,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		.orderBy(desc(patterns.updatedAt))
 		.limit(200);
 
-	// Marque l'appartenance pour l'affichage (sans exposer l'ownerId brut au client).
+	// Tag ownership for display (without exposing the raw ownerId to the client).
 	const mapped = rows.map(({ ownerId, ...r }) => ({
 		...r,
 		mine: ownerId === uid

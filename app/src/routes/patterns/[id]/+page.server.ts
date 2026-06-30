@@ -5,7 +5,7 @@ import { patterns, patternFiles, users } from '$lib/server/db/schema';
 import { deleteStored } from '$lib/server/storage';
 import type { Actions, PageServerLoad } from './$types';
 
-// Patron accessible si on en est propriétaire OU s'il est partagé.
+// Pattern accessible if the user owns it OR it is shared.
 async function accessiblePattern(uid: string, id: string) {
 	return (
 		await db
@@ -42,7 +42,7 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 };
 
 export const actions: Actions = {
-	// Active/désactive le partage (propriétaire uniquement).
+	// Toggle sharing on/off (owner only).
 	toggleShare: async ({ locals, params }) => {
 		const uid = locals.user!.id;
 		const p = await ownedPattern(uid, params.id);

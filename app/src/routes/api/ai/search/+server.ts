@@ -7,23 +7,23 @@ import type { RequestHandler } from './$types';
 
 export const POST: RequestHandler = async ({ request, locals }) => {
 	const uid = locals.user?.id;
-	if (!uid) error(401, 'Non authentifié');
-	if (!aiConfigured()) error(503, 'Service IA indisponible');
+	if (!uid) error(401, 'Unauthenticated');
+	if (!aiConfigured()) error(503, 'AI service unavailable');
 
 	const body = await request.json().catch(() => ({}));
 	const query: string = typeof body.query === 'string' ? body.query.trim() : '';
 	const kind: string = typeof body.kind === 'string' ? body.kind : 'all';
-	if (!query) error(400, 'query requis');
+	if (!query) error(400, 'query required');
 
 	let vec: number[];
 	try {
 		vec = await embed(query);
 	} catch (e) {
-		if (e instanceof AiUnavailable) error(503, 'Service IA indisponible');
+		if (e instanceof AiUnavailable) error(503, 'AI service unavailable');
 		throw e;
 	}
 
-	// Drizzle sql tag pour cosine distance pgvector (<=>).
+	// Drizzle sql tag for pgvector cosine distance (<=>).
 	const vecLiteral = `[${vec.join(',')}]`;
 
 	const results: { kind: string; id: string; title: string; similarity: number }[] = [];

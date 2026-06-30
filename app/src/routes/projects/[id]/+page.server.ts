@@ -36,7 +36,7 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 		.where(eq(paceLogs.projectId, project.id))
 		.orderBy(paceLogs.loggedAt);
 
-	// vitesse moyenne (rangs/h) et prédiction de fin
+	// average speed (rows/h) and completion prediction
 	const totals = pace.reduce((a, p) => ({ rows: a.rows + p.rowsDone, min: a.min + p.minutes }), { rows: 0, min: 0 });
 	const rowsPerHour = totals.min > 0 ? totals.rows / (totals.min / 60) : null;
 	const remaining = project.totalRows ? Math.max(0, project.totalRows - project.currentRow) : null;

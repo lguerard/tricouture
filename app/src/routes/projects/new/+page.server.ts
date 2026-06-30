@@ -27,7 +27,7 @@ export const actions: Actions = {
 		const deadline = String(form.get('deadline') ?? '') || null;
 		const totalRows = parseInt(String(form.get('totalRows') ?? ''), 10);
 
-		// place la carte en fin de colonne
+		// place the card at the end of the column
 		const maxPos = (
 			await db
 				.select({ m: sql<number>`coalesce(max(${projects.boardPosition}), -1)::int` })
