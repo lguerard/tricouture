@@ -1,13 +1,13 @@
-"""Service vision Tricouture (GPU).
+"""Tricouture Vision service (GPU).
 
-Endpoints :
-- GET  /health            : statut + disponibilité GPU
-- POST /ocr               : OCR d'une étiquette de pelote -> texte + champs devinés
-- POST /gauge             : (heuristique) estimation d'échantillon depuis une photo
-- POST /embed-image       : embedding image (couleur/texture) pour recherche par photo
+Endpoints:
+- GET  /health            : status + GPU availability
+- POST /ocr               : OCR a yarn label -> text + guessed fields
+- POST /gauge             : (heuristic) gauge estimation from a photo
+- POST /embed-image       : image embedding (color/texture) for photo search
 
-OCR via EasyOCR (utilise le GPU s'il est dispo). Le parsing d'étiquette est best-effort :
-il renvoie le texte brut + des champs devinés ; l'app laisse l'utilisateur corriger.
+OCR via EasyOCR (uses GPU if available). Label parsing is best-effort:
+returns raw text + guessed fields; the app lets the user correct them.
 """
 import io
 import re
@@ -20,10 +20,10 @@ _reader = None
 
 
 def get_reader():
-    """Charge EasyOCR paresseusement (et garde le modèle en mémoire)."""
+    """Load EasyOCR lazily (keeps the model in memory)."""
     global _reader
     if _reader is None:
-        import easyocr  # import tardif : démarrage rapide
+        import easyocr  # late import for fast startup
         import torch
         _reader = easyocr.Reader(["fr", "en"], gpu=torch.cuda.is_available())
     return _reader
@@ -41,7 +41,7 @@ WEIGHTS = ["lace", "fingering", "sport", "dk", "worsted", "aran", "bulky", "supe
 
 
 def guess_fields(text: str) -> dict:
-    """Devine marque/fibre/poids/métrage depuis le texte OCR d'une étiquette."""
+    """Guess brand/fiber/weight/yardage from OCR label text."""
     low = text.lower()
     fields: dict = {}
 
@@ -72,25 +72,25 @@ async def ocr(file: UploadFile = File(...)):
     try:
         lines = get_reader().readtext(data, detail=0, paragraph=True)
     except Exception as e:  # pragma: no cover
-        return JSONResponse({"error": f"OCR indisponible: {e}"}, status_code=503)
+        return JSONResponse({"error": f"OCR unavailable: {e}"}, status_code=503)
     text = "\n".join(lines)
     return {"text": text, "fields": guess_fields(text)}
 
 
 @app.post("/gauge")
 async def gauge(file: UploadFile = File(...)):
-    # Le comptage automatique de mailles/rangs nécessite un modèle dédié (à entraîner).
-    # Placeholder : renvoie une réponse explicite pour que l'app le signale.
+    # Automatic stitch/row counting requires a dedicated model (to be trained).
+    # Placeholder: returns an explicit response so the app can display it.
     await file.read()
     return JSONResponse(
-        {"error": "Estimation d'échantillon non encore disponible (modèle à venir)."},
+        {"error": "Gauge estimation not yet available (model coming soon)."},
         status_code=501,
     )
 
 
 @app.post("/embed-image")
 async def embed_image(file: UploadFile = File(...)):
-    """Embedding image via OpenCLIP si présent, sinon 501."""
+    """Image embedding via OpenCLIP if available, otherwise 501."""
     data = await file.read()
     try:
         import torch, open_clip
@@ -105,6 +105,6 @@ async def embed_image(file: UploadFile = File(...)):
             vec = model.encode_image(img)[0].cpu().tolist()
         return {"embedding": vec}
     except ImportError:
-        return JSONResponse({"error": "open_clip non installé"}, status_code=501)
+        return JSONResponse({"error": "open_clip not installed"}, status_code=501)
     except Exception as e:  # pragma: no cover
         return JSONResponse({"error": str(e)}, status_code=500)

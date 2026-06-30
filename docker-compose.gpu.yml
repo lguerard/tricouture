@@ -1,6 +1,6 @@
-# Override pour activer les sidecars IA sur GPU (phases 3-5).
-# Usage : docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d
-# Prérequis hôte : pilote NVIDIA + nvidia-container-toolkit.
+# Override to enable AI sidecars on GPU (phases 3-5).
+# Usage: docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d
+# Host prerequisite: NVIDIA driver + nvidia-container-toolkit.
 services:
   ollama:
     image: ollama/ollama:latest
@@ -14,9 +14,9 @@ services:
             - driver: nvidia
               count: all
               capabilities: [gpu]
-    # Pas de port exposé : consommé par "app" via le réseau compose.
+    # No port exposed: consumed by "app" via the compose network.
 
-  # Télécharge les modèles au premier démarrage puis s'arrête.
+  # Downloads models on first start then exits.
   ollama-pull:
     image: ollama/ollama:latest
     depends_on:
@@ -32,7 +32,7 @@ services:
         ollama pull ${OLLAMA_EMBED_MODEL:-nomic-embed-text}
     restart: "no"
 
-  # Service vision (OCR étiquettes, échantillon, embeddings image) — phase 4.
+  # Vision service (label OCR, gauge sample, image embeddings) — phase 4.
   vision:
     build: ./services/vision
     restart: unless-stopped
@@ -46,7 +46,7 @@ services:
               count: all
               capabilities: [gpu]
 
-  # Service Whisper (transcription vocale mains-libres) — phase 5.
+  # Whisper service (hands-free voice transcription) — phase 5.
   whisper:
     build: ./services/whisper
     restart: unless-stopped
@@ -58,9 +58,9 @@ services:
               count: all
               capabilities: [gpu]
 
-  # Service Stable Diffusion (aperçu coloris) — phase 5.
-  # Modèle configurable via SD_MODEL_ID (défaut SD 2.1-base ~4 GB VRAM).
-  # Premier démarrage : télécharge les poids HuggingFace (~5-6 GB).
+  # Stable Diffusion service (colorway preview) — phase 5.
+  # Model configurable via SD_MODEL_ID (default SD 2.1-base ~4 GB VRAM).
+  # First start: downloads HuggingFace weights (~5-6 GB).
   sd:
     build: ./services/sd
     restart: unless-stopped

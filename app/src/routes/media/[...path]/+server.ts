@@ -8,7 +8,7 @@ import { patternFiles, patterns } from '$lib/server/db/schema';
 import { absolutePath, ownsPath } from '$lib/server/storage';
 import type { RequestHandler } from './$types';
 
-// Un fichier non possédé reste accessible s'il appartient à un patron partagé.
+// A file not owned by the user is still accessible if it belongs to a shared pattern.
 async function isSharedPatternFile(rel: string): Promise<boolean> {
 	const row = (
 		await db
@@ -32,9 +32,9 @@ const MIME: Record<string, string> = {
 
 export const GET: RequestHandler = async ({ params, locals }) => {
 	const rel = params.path;
-	if (!locals.user) throw error(403, 'Accès refusé');
+	if (!locals.user) throw error(403, 'Access denied');
 	if (!ownsPath(locals.user.id, rel) && !(await isSharedPatternFile(rel))) {
-		throw error(403, 'Accès refusé');
+		throw error(403, 'Access denied');
 	}
 
 	const abs = absolutePath(rel);
@@ -42,7 +42,7 @@ export const GET: RequestHandler = async ({ params, locals }) => {
 	try {
 		size = (await stat(abs)).size;
 	} catch {
-		throw error(404, 'Fichier introuvable');
+		throw error(404, 'File not found');
 	}
 
 	const type = MIME[extname(rel).toLowerCase()] ?? 'application/octet-stream';

@@ -35,7 +35,7 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
-    # Pas de ports exposés vers l'hôte : accès uniquement depuis le réseau compose.
+    # No ports exposed to the host: only accessible within the compose network.
 
 volumes:
   pgdata:

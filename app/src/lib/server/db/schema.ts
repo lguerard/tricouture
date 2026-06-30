@@ -43,7 +43,7 @@ export const users = pgTable('users', {
 });
 
 export const sessions = pgTable('sessions', {
-	id: text('id').primaryKey(), // token opaque (hashé)
+	id: text('id').primaryKey(), // opaque token (hashed)
 	userId: uuid('user_id')
 		.notNull()
 		.references(() => users.id, { onDelete: 'cascade' }),
@@ -52,7 +52,7 @@ export const sessions = pgTable('sessions', {
 });
 
 /* ------------------------------------------------------------------ */
-/* Patrons                                                            */
+/* Patterns                                                           */
 /* ------------------------------------------------------------------ */
 
 export const patterns = pgTable(
@@ -64,20 +64,20 @@ export const patterns = pgTable(
 			.references(() => users.id, { onDelete: 'cascade' }),
 		title: varchar('title', { length: 255 }).notNull(),
 		craft: craft('craft').notNull(),
-		garmentType: varchar('garment_type', { length: 120 }), // pull, chaussette, robe...
+		garmentType: varchar('garment_type', { length: 120 }), // sweater, sock, dress...
 		designer: varchar('designer', { length: 160 }),
 		source: varchar('source', { length: 255 }), // Ravelry, magazine, URL...
 		language: varchar('language', { length: 16 }), // fr, en, ja...
 		difficulty: integer('difficulty'), // 1-5
-		sizes: text('sizes'), // texte libre des tailles dispo
-		gaugeStitches: real('gauge_stitches'), // mailles / 10cm
-		gaugeRows: real('gauge_rows'), // rangs / 10cm
-		yardageRequired: integer('yardage_required'), // mètres requis
+		sizes: text('sizes'), // free-text available sizes
+		gaugeStitches: real('gauge_stitches'), // stitches / 10cm
+		gaugeRows: real('gauge_rows'), // rows / 10cm
+		yardageRequired: integer('yardage_required'), // meters required
 		tags: jsonb('tags').$type<string[]>().notNull().default([]),
 		notes: text('notes'),
 		isShared: boolean('is_shared').notNull().default(false),
-		extractedText: text('extracted_text'), // texte des PDF pour FTS
-		embedding: vector('embedding', { dimensions: 768 }), // recherche sémantique (phase 3)
+		extractedText: text('extracted_text'), // PDF text for FTS
+		embedding: vector('embedding', { dimensions: 768 }), // semantic search (phase 3)
 		createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 		updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow()
 	},
@@ -95,7 +95,7 @@ export const patternFiles = pgTable(
 			.notNull()
 			.references(() => patterns.id, { onDelete: 'cascade' }),
 		filename: varchar('filename', { length: 255 }).notNull(),
-		storedPath: text('stored_path').notNull(), // relatif à MEDIA_DIR
+		storedPath: text('stored_path').notNull(), // relative to MEDIA_DIR
 		mimeType: varchar('mime_type', { length: 120 }).notNull(),
 		sizeBytes: integer('size_bytes').notNull(),
 		isPrimary: boolean('is_primary').notNull().default(false),
@@ -121,16 +121,16 @@ export const yarns = pgTable(
 		name: varchar('name', { length: 160 }),
 		colorway: varchar('colorway', { length: 160 }),
 		colorHex: varchar('color_hex', { length: 7 }),
-		dyeLot: varchar('dye_lot', { length: 80 }), // bain de teinture
+		dyeLot: varchar('dye_lot', { length: 80 }), // dye lot number
 		weightCategory: varchar('weight_category', { length: 40 }), // fingering, worsted...
-		fiber: varchar('fiber', { length: 160 }), // 100% laine mérinos...
-		yardsPerSkein: integer('yards_per_skein'), // métrage par pelote
+		fiber: varchar('fiber', { length: 160 }), // e.g. 100% merino wool
+		yardsPerSkein: integer('yards_per_skein'), // meters per skein
 		gramsPerSkein: integer('grams_per_skein'),
-		skeins: real('skeins').notNull().default(1), // quantité (pelotes)
+		skeins: real('skeins').notNull().default(1), // quantity (skeins)
 		photoPath: text('photo_path'),
 		binId: uuid('bin_id'),
 		notes: text('notes'),
-		embedding: vector('embedding', { dimensions: 768 }), // recherche couleur/texture (phase 4)
+		embedding: vector('embedding', { dimensions: 768 }), // color/texture search (phase 4)
 		createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
 	},
 	(t) => ({ ownerIdx: index('yarns_owner_idx').on(t.ownerId) })
@@ -144,11 +144,11 @@ export const fabrics = pgTable(
 			.notNull()
 			.references(() => users.id, { onDelete: 'cascade' }),
 		name: varchar('name', { length: 160 }),
-		fabricType: varchar('fabric_type', { length: 120 }), // jersey, coton, lin...
+		fabricType: varchar('fabric_type', { length: 120 }), // jersey, cotton, linen...
 		composition: varchar('composition', { length: 160 }),
 		colorHex: varchar('color_hex', { length: 7 }),
 		lengthCm: integer('length_cm'),
-		widthCm: integer('width_cm'), // laize
+		widthCm: integer('width_cm'), // fabric width
 		photoPath: text('photo_path'),
 		binId: uuid('bin_id'),
 		notes: text('notes'),
@@ -164,7 +164,7 @@ export const notions = pgTable(
 		ownerId: uuid('owner_id')
 			.notNull()
 			.references(() => users.id, { onDelete: 'cascade' }),
-		name: varchar('name', { length: 160 }).notNull(), // boutons, fermeture, fil...
+		name: varchar('name', { length: 160 }).notNull(), // buttons, zipper, thread...
 		category: varchar('category', { length: 80 }),
 		quantity: integer('quantity').notNull().default(0),
 		photoPath: text('photo_path'),
@@ -183,10 +183,10 @@ export const tools = pgTable(
 			.notNull()
 			.references(() => users.id, { onDelete: 'cascade' }),
 		type: toolType('type').notNull(),
-		sizeMm: real('size_mm'), // diamètre aiguille/crochet
-		lengthCm: integer('length_cm'), // longueur câble pour circulaires
+		sizeMm: real('size_mm'), // needle/hook diameter
+		lengthCm: integer('length_cm'), // cable length for circulars
 		quantity: integer('quantity').notNull().default(1),
-		// projet qui occupe actuellement cet outil (null = libre)
+		// project currently using this tool (null = available)
 		inUseProjectId: uuid('in_use_project_id'),
 		binId: uuid('bin_id'),
 		notes: text('notes'),
@@ -196,7 +196,7 @@ export const tools = pgTable(
 );
 
 /* ------------------------------------------------------------------ */
-/* Mensurations & destinataires                                       */
+/* Measurements & recipients                                          */
 /* ------------------------------------------------------------------ */
 
 export const measurementsProfiles = pgTable(
@@ -207,7 +207,7 @@ export const measurementsProfiles = pgTable(
 			.notNull()
 			.references(() => users.id, { onDelete: 'cascade' }),
 		name: varchar('name', { length: 120 }).notNull(),
-		// mesures stockées en JSON souple (tour de poitrine, taille, longueur bras...)
+		// measurements stored in flexible JSON (bust, waist, arm length...)
 		measurements: jsonb('measurements').$type<Record<string, number>>().notNull().default({}),
 		notes: text('notes'),
 		createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
@@ -235,7 +235,7 @@ export const recipients = pgTable(
 );
 
 /* ------------------------------------------------------------------ */
-/* Projets (WIP) + Kanban                                             */
+/* Projects (WIP) + Kanban                                            */
 /* ------------------------------------------------------------------ */
 
 export const projects = pgTable(
@@ -248,16 +248,16 @@ export const projects = pgTable(
 		title: varchar('title', { length: 255 }).notNull(),
 		patternId: uuid('pattern_id').references(() => patterns.id, { onDelete: 'set null' }),
 		status: projectStatus('status').notNull().default('idee'),
-		boardPosition: integer('board_position').notNull().default(0), // ordre dans la colonne Kanban
+		boardPosition: integer('board_position').notNull().default(0), // order within Kanban column
 		progressPct: integer('progress_pct').notNull().default(0),
-		currentRow: integer('current_row').notNull().default(0), // compteur de rangs
+		currentRow: integer('current_row').notNull().default(0), // row counter
 		totalRows: integer('total_rows'),
 		timeSpentMinutes: integer('time_spent_minutes').notNull().default(0),
-		costCents: integer('cost_cents').notNull().default(0), // coût matières
-		retailPriceCents: integer('retail_price_cents'), // prix prêt-à-porter équivalent (économies)
+		costCents: integer('cost_cents').notNull().default(0), // materials cost
+		retailPriceCents: integer('retail_price_cents'), // equivalent retail price (savings)
 		deadline: date('deadline'),
 		recipientId: uuid('recipient_id').references(() => recipients.id, { onDelete: 'set null' }),
-		location: varchar('location', { length: 160 }), // où est rangé le WIP
+		location: varchar('location', { length: 160 }), // where the WIP is stored
 		notes: text('notes'),
 		createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 		updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
@@ -269,7 +269,7 @@ export const projects = pgTable(
 	})
 );
 
-// Matières consommées par un projet (laine principalement)
+// Materials consumed by a project (yarn mainly)
 export const projectYarns = pgTable(
 	'project_yarns',
 	{
@@ -283,7 +283,7 @@ export const projectYarns = pgTable(
 	(t) => ({ projectIdx: index('project_yarns_project_idx').on(t.projectId) })
 );
 
-// Photos d'avancement (timeline)
+// Progress photos (timeline)
 export const projectPhotos = pgTable(
 	'project_photos',
 	{
@@ -298,7 +298,7 @@ export const projectPhotos = pgTable(
 	(t) => ({ projectIdx: index('project_photos_project_idx').on(t.projectId) })
 );
 
-// Sessions de travail -> vitesse réelle (prédiction de deadline)
+// Work sessions -> actual pace (deadline prediction)
 export const paceLogs = pgTable(
 	'pace_logs',
 	{
@@ -314,7 +314,7 @@ export const paceLogs = pgTable(
 );
 
 /* ------------------------------------------------------------------ */
-/* Galerie, objectifs, badges, inspiration, rangement                 */
+/* Gallery, goals, badges, inspiration, storage                       */
 /* ------------------------------------------------------------------ */
 
 export const finishedObjects = pgTable(
@@ -328,7 +328,7 @@ export const finishedObjects = pgTable(
 		title: varchar('title', { length: 255 }).notNull(),
 		photoPath: text('photo_path'),
 		craft: craft('craft'),
-		careInstructions: text('care_instructions'), // étiquette entretien
+		careInstructions: text('care_instructions'), // care label
 		notes: text('notes'),
 		createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
 	},
@@ -343,7 +343,7 @@ export const goals = pgTable(
 			.notNull()
 			.references(() => users.id, { onDelete: 'cascade' }),
 		title: varchar('title', { length: 200 }).notNull(),
-		kind: varchar('kind', { length: 40 }).notNull(), // projets_an, stash_busting, defi_mensuel...
+		kind: varchar('kind', { length: 40 }).notNull(), // projects_year, stash_busting, monthly_challenge...
 		targetValue: integer('target_value').notNull().default(1),
 		currentValue: integer('current_value').notNull().default(0),
 		periodStart: date('period_start'),
@@ -360,7 +360,7 @@ export const achievements = pgTable(
 		ownerId: uuid('owner_id')
 			.notNull()
 			.references(() => users.id, { onDelete: 'cascade' }),
-		code: varchar('code', { length: 80 }).notNull(), // identifiant du badge
+		code: varchar('code', { length: 80 }).notNull(), // badge identifier
 		unlockedAt: timestamp('unlocked_at', { withTimezone: true }).notNull().defaultNow()
 	},
 	(t) => ({ ownerCode: uniqueIndex('achievements_owner_code').on(t.ownerId, t.code) })
@@ -388,7 +388,7 @@ export const moodItems = pgTable(
 			.references(() => moodBoards.id, { onDelete: 'cascade' }),
 		imagePath: text('image_path'),
 		sourceUrl: text('source_url'),
-		palette: jsonb('palette').$type<string[]>().notNull().default([]), // couleurs extraites
+		palette: jsonb('palette').$type<string[]>().notNull().default([]), // extracted colors
 		note: text('note'),
 		createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
 	},
@@ -403,15 +403,15 @@ export const storageBins = pgTable(
 			.notNull()
 			.references(() => users.id, { onDelete: 'cascade' }),
 		label: varchar('label', { length: 160 }).notNull(),
-		location: varchar('location', { length: 160 }), // placard, étagère...
-		qrCode: varchar('qr_code', { length: 80 }).notNull().unique(), // identifiant scanné
+		location: varchar('location', { length: 160 }), // cupboard, shelf...
+		qrCode: varchar('qr_code', { length: 80 }).notNull().unique(), // scanned identifier
 		createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
 	},
 	(t) => ({ ownerIdx: index('bins_owner_idx').on(t.ownerId) })
 );
 
 /* ------------------------------------------------------------------ */
-/* Types inférés                                                      */
+/* Inferred types                                                     */
 /* ------------------------------------------------------------------ */
 
 export type User = typeof users.$inferSelect;

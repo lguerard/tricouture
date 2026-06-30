@@ -14,7 +14,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 		.where(eq(storageBins.ownerId, uid))
 		.orderBy(desc(storageBins.createdAt));
 
-	// QR encodant l'URL de consultation du bac (scannable depuis l'app mobile).
+	// QR encoding the bin's lookup URL (scannable from the mobile app).
 	const withQr = await Promise.all(
 		bins.map(async (b) => ({
 			...b,
@@ -22,7 +22,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 		}))
 	);
 
-	// Compte d'items rangés par bac (laine + tissu + mercerie + outils).
+	// Count of stored items per bin (yarn + fabric + notions + tools).
 	const counts = new Map<string, number>();
 	for (const table of [yarns, fabrics, notions, tools]) {
 		const rows = await db
@@ -41,7 +41,7 @@ export const actions: Actions = {
 		const uid = locals.user!.id;
 		const form = await request.formData();
 		const label = String(form.get('label') ?? '').trim();
-		if (!label) return fail(400, { error: 'Nom requis' });
+		if (!label) return fail(400, { error: 'Name required' });
 		await db.insert(storageBins).values({
 			ownerId: uid,
 			label,

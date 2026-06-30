@@ -1,4 +1,4 @@
-# Configuration git-cliff — génère le CHANGELOG depuis les commits conventionnels.
+# git-cliff configuration — generates the CHANGELOG from conventional commits.
 # https://git-cliff.org/docs/configuration
 
 [changelog]
@@ -22,7 +22,7 @@ body = """
 {% endfor %}
 {% endfor %}\
 {% if github.contributors | length > 0 %}
-### 👥 Contributeurs
+### 👥 Contributors
 
 {% for contributor in github.contributors | sort(attribute="username") %}\
 - [@{{ contributor.username }}](https://github.com/{{ contributor.username }})
@@ -36,7 +36,7 @@ footer = ""
 conventional_commits = true
 filter_unconventional = true
 split_commits = false
-# Regroupe par type ; l'icône est conservée dans le message.
+# Groups by type; the icon is preserved in the message.
 commit_parsers = [
   { message = "^feat", group = "✨ Features" },
   { message = "^fix", group = "🐛 Bug fixes" },
