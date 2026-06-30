@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import { YARN_WEIGHTS, TOOL_TYPES, TOOL_TYPE_LABELS } from '$lib/labels';
+	import { isCapacitor, scanBarcode } from '$lib/capacitor';
 	let { data } = $props();
 
 	type Tab = 'yarn' | 'fabric' | 'notion' | 'tool';
@@ -20,6 +21,49 @@
 			adding = false;
 		};
 	};
+
+	// Aperçu coloris SD
+	let previewYarnId = $state<string | null>(null);
+	let previewBusy = $state(false);
+	let previewSrc = $state<string | null>(null);
+	let previewError = $state('');
+
+	async function generatePreview(yarnId: string, colorHex: string, label: string) {
+		previewYarnId = yarnId;
+		previewBusy = true;
+		previewSrc = null;
+		previewError = '';
+		try {
+			const res = await fetch('/api/ai/preview-colorway', {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({ prompt: `pelote de laine ${label}, texturée`, colorHex })
+			});
+			const d = await res.json();
+			if (!res.ok) {
+				previewError = d.message ?? 'Aperçu indisponible';
+			} else {
+				previewSrc = `data:image/png;base64,${d.image_base64}`;
+			}
+		} catch {
+			previewError = 'Erreur réseau';
+		}
+		previewBusy = false;
+	}
+
+	// Scan code-barres via Capacitor (Android natif).
+	let barcodeBusy = $state(false);
+	async function scanBarcodeNative() {
+		barcodeBusy = true;
+		const code = await scanBarcode();
+		barcodeBusy = false;
+		if (!code) return;
+		// Pré-remplit le champ "notes" avec le code scanné pour référence manuelle.
+		// TODO: brancher sur une API de lookup (Open Food Facts, Ravelry…).
+		const el = document.getElementById('yarn-notes') as HTMLInputElement | null;
+		if (el) el.value = code;
+		scanMsg = `Code scanné : ${code}`;
+	}
 
 	// Scan d'étiquette : envoie la photo au service vision, pré-remplit le formulaire.
 	let scanBusy = $state(false);
@@ -75,6 +119,11 @@
 		<div class="card add">
 			{#if tab === 'yarn'}
 				<div class="scan">
+					{#if isCapacitor()}
+						<button type="button" class="scan-btn" onclick={scanBarcodeNative} disabled={barcodeBusy}>
+							{barcodeBusy ? 'Scan…' : '📦 Scanner le code-barres'}
+						</button>
+					{/if}
 					<label class="scan-btn">
 						📷 Scanner l'étiquette
 						<input type="file" accept="image/*" capture="environment" onchange={scanLabel} hidden />
@@ -105,6 +154,7 @@
 						<div class="field"><label for="sk">Pelotes</label><input id="sk" name="skeins" type="number" step="0.5" value="1" /></div>
 					</div>
 					<div class="field"><label for="ph">Photo</label><input id="ph" name="photo" type="file" accept="image/*" /></div>
+					<div class="field"><label for="yarn-notes">Notes / code-barres</label><input id="yarn-notes" name="notes" /></div>
 					<button class="btn-primary" type="submit">Ajouter la laine</button>
 				</form>
 			{:else if tab === 'fabric'}
@@ -153,16 +203,34 @@
 		<div class="grid">
 			{#each data.yarnList as y}
 				<div class="card stash-item">
-					{#if y.photoPath}<img src={`/media/${y.photoPath}`} alt={y.name ?? 'laine'} />{:else}
-						<div class="swatch" style={`background:${y.colorHex ?? '#eee'}`}></div>{/if}
+					{#if previewYarnId === y.id && previewSrc}
+						<img src={previewSrc} alt="aperçu coloris IA" class="preview-img" />
+					{:else if y.photoPath}
+						<img src={`/media/${y.photoPath}`} alt={y.name ?? 'laine'} />
+					{:else}
+						<div class="swatch" style={`background:${y.colorHex ?? '#eee'}`}></div>
+					{/if}
 					<strong>{[y.brand, y.name].filter(Boolean).join(' ') || y.colorway || 'Laine'}</strong>
 					<span class="muted small">{[y.colorway, y.weightCategory].filter(Boolean).join(' · ')}</span>
 					<span class="muted small">{y.fiber ?? ''}</span>
 					<span class="small">{y.skeins} pelote{y.skeins > 1 ? 's' : ''}{y.dyeLot ? ` · bain ${y.dyeLot}` : ''}</span>
-					<form method="POST" action="?/delete" use:enhance={refresh}>
-						<input type="hidden" name="kind" value="yarn" /><input type="hidden" name="id" value={y.id} />
-						<button class="del" type="submit">Supprimer</button>
-					</form>
+					{#if previewYarnId === y.id && previewError}
+						<span class="muted small">{previewError}</span>
+					{/if}
+					<div class="card-actions">
+						<button
+							type="button"
+							class="btn-ghost small"
+							disabled={previewBusy && previewYarnId === y.id}
+							onclick={() => generatePreview(y.id, y.colorHex ?? '#888', [y.brand, y.name, y.colorway].filter(Boolean).join(' '))}
+						>
+							{previewBusy && previewYarnId === y.id ? '⏳ Génération…' : '🎨 Aperçu IA'}
+						</button>
+						<form method="POST" action="?/delete" use:enhance={refresh}>
+							<input type="hidden" name="kind" value="yarn" /><input type="hidden" name="id" value={y.id} />
+							<button class="del" type="submit">Supprimer</button>
+						</form>
+					</div>
 				</div>
 			{/each}
 		</div>
@@ -282,6 +350,31 @@
 		padding: 0.3rem 0.5rem;
 		color: var(--danger);
 		align-self: flex-start;
+	}
+	.card-actions {
+		display: flex;
+		gap: 0.4rem;
+		align-items: center;
+		flex-wrap: wrap;
+		margin-top: 0.3rem;
+	}
+	.btn-ghost {
+		background: transparent;
+		border: 1px solid var(--border);
+		cursor: pointer;
+		border-radius: var(--radius);
+	}
+	.btn-ghost.small {
+		font-size: 0.82rem;
+		padding: 0.3rem 0.6rem;
+	}
+	.preview-img {
+		width: 100%;
+		height: 120px;
+		object-fit: cover;
+		border-radius: var(--radius);
+		margin-bottom: 0.3rem;
+		border: 2px solid var(--accent);
 	}
 	@media (max-width: 560px) {
 		.row3 {

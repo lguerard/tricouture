@@ -58,6 +58,25 @@ services:
               count: all
               capabilities: [gpu]
 
+  # Service Stable Diffusion (aperçu coloris) — phase 5.
+  # Modèle configurable via SD_MODEL_ID (défaut SD 2.1-base ~4 GB VRAM).
+  # Premier démarrage : télécharge les poids HuggingFace (~5-6 GB).
+  sd:
+    build: ./services/sd
+    restart: unless-stopped
+    environment:
+      SD_MODEL_ID: ${SD_MODEL_ID:-stabilityai/stable-diffusion-2-1-base}
+      HF_TOKEN: ${HF_TOKEN:-}
+    volumes:
+      - models:/models
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
 volumes:
   models:
   media:

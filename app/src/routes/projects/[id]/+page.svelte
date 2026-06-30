@@ -1,8 +1,16 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import { onMount } from 'svelte';
 	import { STATUS_LABELS, STATUS_ORDER } from '$lib/labels';
+	import { scheduleDeadlineReminder } from '$lib/capacitor';
 	let { data } = $props();
 	const p = $derived(data.project);
+
+	onMount(() => {
+		if (p.deadline && p.status !== 'fini') {
+			scheduleDeadlineReminder(p.id, p.title, new Date(p.deadline));
+		}
+	});
 
 	const savings = $derived(
 		p.retailPriceCents != null ? (p.retailPriceCents - p.costCents) / 100 : null

@@ -52,13 +52,19 @@ jobs:
           CAP_SERVER_URL: ${{ steps.url.outputs.value }}
         run: npx cap add android
 
-      - name: Inject runtime permissions (caméra, micro)
+      - name: Inject runtime permissions (caméra, micro, notifications, vibration)
         working-directory: mobile
         run: |
           MANIFEST=android/app/src/main/AndroidManifest.xml
-          perl -0pi -e 's/(<uses-permission android:name="android.permission.INTERNET" \/>)/$1\n    <uses-permission android:name="android.permission.CAMERA" \/>\n    <uses-permission android:name="android.permission.RECORD_AUDIO" \/>/' "$MANIFEST" || true
-          grep -q "permission.CAMERA" "$MANIFEST" || \
-            perl -0pi -e 's/(<application)/<uses-permission android:name="android.permission.CAMERA" \/>\n    <uses-permission android:name="android.permission.RECORD_AUDIO" \/>\n    $1/' "$MANIFEST"
+          add_perm() {
+            grep -q "\"$1\"" "$MANIFEST" || \
+              perl -0pi -e "s|(<uses-permission android:name=\"android.permission.INTERNET\" />)|\$1\n    <uses-permission android:name=\"$1\" />|" "$MANIFEST"
+          }
+          add_perm "android.permission.CAMERA"
+          add_perm "android.permission.RECORD_AUDIO"
+          add_perm "android.permission.POST_NOTIFICATIONS"
+          add_perm "android.permission.VIBRATE"
+          add_perm "android.permission.RECEIVE_BOOT_COMPLETED"
           echo "--- permissions ---"; grep uses-permission "$MANIFEST" || true
 
       - name: Capacitor sync
@@ -71,9 +77,44 @@ jobs:
         working-directory: mobile/android
         run: ./gradlew assembleDebug --no-daemon
 
-      - name: Upload APK artifact
+      - name: Upload debug APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: tricouture-android-debug
           path: mobile/android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
+
+      # Signature release (optionnelle) : activée si le secret KEYSTORE_BASE64 est défini.
+      # Générer le keystore : keytool -genkey -v -keystore tricouture.jks -alias tricouture
+      #   -keyalg RSA -keysize 2048 -validity 10000
+      # Encoder : base64 -w 0 tricouture.jks > tricouture.jks.b64
+      # Secrets GitHub requis :
+      #   KEYSTORE_BASE64      – contenu base64 du fichier .jks
+      #   KEYSTORE_PASSWORD    – mot de passe du keystore
+      #   KEY_ALIAS            – alias de la clé (ex: tricouture)
+      #   KEY_PASSWORD         – mot de passe de la clé
+      - name: Sign release APK
+        if: ${{ secrets.KEYSTORE_BASE64 != '' }}
+        working-directory: mobile/android
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          echo "$KEYSTORE_BASE64" | base64 -d > /tmp/tricouture.jks
+          ./gradlew assembleRelease \
+            -Pandroid.injected.signing.store.file=/tmp/tricouture.jks \
+            -Pandroid.injected.signing.store.password="$KEYSTORE_PASSWORD" \
+            -Pandroid.injected.signing.key.alias="$KEY_ALIAS" \
+            -Pandroid.injected.signing.key.password="$KEY_PASSWORD" \
+            --no-daemon
+          rm -f /tmp/tricouture.jks
+
+      - name: Upload release APK artifact
+        if: ${{ secrets.KEYSTORE_BASE64 != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: tricouture-android-release
+          path: mobile/android/app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: warn

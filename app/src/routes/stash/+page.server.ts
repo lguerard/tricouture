@@ -3,6 +3,7 @@ import { and, eq, desc } from 'drizzle-orm';
 import { db } from '$lib/server/db';
 import { yarns, fabrics, notions, tools } from '$lib/server/db/schema';
 import { saveUpload, deleteStored } from '$lib/server/storage';
+import { embed, aiConfigured } from '$lib/server/ai/ollama';
 import type { Actions, PageServerLoad } from './$types';
 import type { toolType } from '$lib/server/db/schema';
 
@@ -35,20 +36,33 @@ export const actions: Actions = {
 		if (photo instanceof File && photo.size > 0) {
 			photoPath = (await saveUpload(uid, photo, 'yarns')).storedPath;
 		}
-		await db.insert(yarns).values({
-			ownerId: uid,
-			brand: str(form.get('brand')),
-			name: str(form.get('name')),
-			colorway: str(form.get('colorway')),
-			colorHex: str(form.get('colorHex')),
-			dyeLot: str(form.get('dyeLot')),
-			weightCategory: str(form.get('weightCategory')),
-			fiber: str(form.get('fiber')),
-			yardsPerSkein: num(form.get('yardsPerSkein')),
-			gramsPerSkein: num(form.get('gramsPerSkein')),
-			skeins: num(form.get('skeins')) ?? 1,
-			photoPath
-		});
+		const inserted = (
+			await db.insert(yarns).values({
+				ownerId: uid,
+				brand: str(form.get('brand')),
+				name: str(form.get('name')),
+				colorway: str(form.get('colorway')),
+				colorHex: str(form.get('colorHex')),
+				dyeLot: str(form.get('dyeLot')),
+				weightCategory: str(form.get('weightCategory')),
+				fiber: str(form.get('fiber')),
+				yardsPerSkein: num(form.get('yardsPerSkein')),
+				gramsPerSkein: num(form.get('gramsPerSkein')),
+				skeins: num(form.get('skeins')) ?? 1,
+				notes: str(form.get('notes')),
+				photoPath
+			}).returning({ id: yarns.id })
+		)[0];
+
+		if (aiConfigured()) {
+			try {
+				const parts = [str(form.get('brand')), str(form.get('name')), str(form.get('colorway')), str(form.get('fiber')), str(form.get('weightCategory'))].filter(Boolean).join(' ');
+				if (parts) {
+					const vec = await embed(parts);
+					await db.update(yarns).set({ embedding: vec }).where(eq(yarns.id, inserted.id));
+				}
+			} catch { /* Ollama absent */ }
+		}
 		return { ok: true };
 	},
 

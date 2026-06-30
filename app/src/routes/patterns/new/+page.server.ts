@@ -4,6 +4,7 @@ import { db } from '$lib/server/db';
 import { patterns, patternFiles } from '$lib/server/db/schema';
 import { saveUpload } from '$lib/server/storage';
 import { extractPdfText } from '$lib/server/pdf';
+import { embed, aiConfigured } from '$lib/server/ai/ollama';
 import type { Actions } from './$types';
 import type { Craft } from '$lib/server/db/schema';
 
@@ -74,11 +75,18 @@ export const actions: Actions = {
 			}
 		}
 
-		if (extractedText) {
-			await db
-				.update(patterns)
-				.set({ extractedText })
-				.where(eq(patterns.id, inserted.id));
+		const updates: Record<string, unknown> = {};
+		if (extractedText) updates.extractedText = extractedText;
+
+		if (aiConfigured()) {
+			try {
+				const parts = [title, craft, form.get('garmentType'), form.get('designer'), tags.join(' '), form.get('notes'), extractedText?.slice(0, 800)].filter(Boolean).join(' ');
+				updates.embedding = await embed(parts);
+			} catch { /* Ollama absent — recherche sémantique indisponible */ }
+		}
+
+		if (Object.keys(updates).length) {
+			await db.update(patterns).set(updates).where(eq(patterns.id, inserted.id));
 		}
 
 		throw redirect(303, `/patterns/${inserted.id}`);
