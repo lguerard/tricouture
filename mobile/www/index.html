@@ -1,9 +1,13 @@
 <!doctype html>
-<html lang="fr">
+<html lang="en">
 	<head>
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 		<title>Tricouture</title>
+		<link
+			rel="icon"
+			href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🪡</text></svg>"
+		/>
 		<style>
 			body {
 				margin: 0;
@@ -53,19 +57,42 @@
 	<body>
 		<div class="card">
 			<h1>🪡 Tricouture</h1>
-			<p class="muted">
-				Entre l'adresse de ton serveur Tricouture pour t'y connecter (ex.
-				<code>https://tricouture.mondomaine.fr</code>).
+			<p class="muted" data-t="intro">
+				Enter your Tricouture server address to connect (e.g.
+				<code>https://tricouture.example.com</code>).
 			</p>
 			<input id="url" type="url" placeholder="https://…" inputmode="url" autocomplete="url" />
-			<button id="go">Se connecter</button>
-			<p class="muted" id="hint" style="margin-top: 1rem">
-				Astuce : tu peux aussi figer l'URL au build via la variable GitHub Actions
+			<button id="go" data-t="go">Connect</button>
+			<p class="muted" id="hint" style="margin-top: 1rem" data-t="hint">
+				Tip: you can also lock the URL at build time via the GitHub Actions variable
 				<code>SERVER_URL</code>.
 			</p>
 		</div>
 		<script>
-			// Coque de secours : mémorise l'URL et redirige la WebView vers le serveur.
+			// Fallback shell: remembers the URL and redirects the WebView to the server.
+			const STRINGS = {
+				en: {
+					intro:
+						'Enter your Tricouture server address to connect (e.g. <code>https://tricouture.example.com</code>).',
+					go: 'Connect',
+					hint:
+						'Tip: you can also lock the URL at build time via the GitHub Actions variable <code>SERVER_URL</code>.'
+				},
+				fr: {
+					intro:
+						"Entre l'adresse de ton serveur Tricouture pour t'y connecter (ex. <code>https://tricouture.mondomaine.fr</code>).",
+					go: 'Se connecter',
+					hint:
+						'Astuce : tu peux aussi figer l\'URL au build via la variable GitHub Actions <code>SERVER_URL</code>.'
+				}
+			};
+			const locale = navigator.language?.toLowerCase().startsWith('fr') ? 'fr' : 'en';
+			document.documentElement.lang = locale;
+			for (const el of document.querySelectorAll('[data-t]')) {
+				el.innerHTML = STRINGS[locale][el.dataset.t];
+			}
+			document.getElementById('go').textContent = STRINGS[locale].go;
+
 			const saved = localStorage.getItem('serverUrl');
 			if (saved) location.href = saved;
 			document.getElementById('go').addEventListener('click', () => {

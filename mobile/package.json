@@ -2,7 +2,7 @@
   "name": "tricouture-mobile",
   "version": "0.1.0",
   "private": true,
-  "description": "Coque Android Capacitor pour Tricouture (pointe vers le serveur self-host).",
+  "description": "Capacitor Android shell for Tricouture (points at the self-hosted server).",
   "scripts": {
     "add:android": "cap add android",
     "sync": "cap sync android",
