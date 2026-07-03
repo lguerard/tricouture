@@ -10,7 +10,12 @@
 	const locale = $derived(data.locale);
 
 	type Card = (typeof data.columns)['idee'][number];
+	// svelte-ignore state_referenced_locally
 	let cols = $state<Record<ProjectStatus, Card[]>>(structuredClone(data.columns));
+	// Resync local board state when server data changes (navigation, invalidate).
+	$effect(() => {
+		cols = structuredClone(data.columns);
+	});
 	const flipMs = 150;
 
 	function consider(status: ProjectStatus, e: CustomEvent<DndEvent<Card>>) {
