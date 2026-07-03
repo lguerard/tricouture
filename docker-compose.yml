@@ -15,6 +15,7 @@ services:
       OLLAMA_EMBED_MODEL: ${OLLAMA_EMBED_MODEL:-nomic-embed-text}
       VISION_URL: ${VISION_URL:-}
       WHISPER_URL: ${WHISPER_URL:-}
+      SD_URL: ${SD_URL:-}
       NODE_ENV: production
     ports:
       - "3000:3000"
