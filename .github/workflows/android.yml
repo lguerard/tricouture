@@ -13,6 +13,15 @@ on:
       server_url:
         required: false
         type: string
+    secrets:
+      KEYSTORE_BASE64:
+        required: false
+      KEYSTORE_PASSWORD:
+        required: false
+      KEY_ALIAS:
+        required: false
+      KEY_PASSWORD:
+        required: false
 
 jobs:
   build:
@@ -41,7 +50,7 @@ jobs:
       - name: Resolve server URL
         id: url
         run: |
-          URL="${{ github.event.inputs.server_url }}"
+          URL="${{ inputs.server_url }}"
           if [ -z "$URL" ]; then URL="${{ vars.SERVER_URL }}"; fi
           echo "value=$URL" >> "$GITHUB_OUTPUT"
           echo "Server URL: ${URL:-(not set, config shell will be shown)}"

@@ -58,6 +58,7 @@ jobs:
     needs: changelog
     if: needs.changelog.outputs.released == 'true'
     uses: ./.github/workflows/android.yml
+    secrets: inherit
 
   publish:
     needs: [changelog, android]
