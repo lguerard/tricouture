@@ -1,0 +1,34 @@
+name: Cleanup orphaned releases
+
+# Deletes draft releases left orphaned when their tag was removed
+# (e.g. the broken 0.1.0–0.4.0 releases that all pointed at a stale commit).
+# Runs manually, or on a main push whose commit message contains
+# [cleanup-releases].
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      contains(github.event.head_commit.message, '[cleanup-releases]')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete draft releases
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          gh api "repos/${{ github.repository }}/releases" --paginate \
+            --jq '.[] | select(.draft == true) | .id' |
+          while read -r id; do
+            echo "Deleting draft release id=$id"
+            gh api -X DELETE "repos/${{ github.repository }}/releases/$id"
+          done
+          echo "Done."
