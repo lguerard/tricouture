@@ -83,11 +83,13 @@ besoin :
 
 ## Captures d'écran
 
-> Les images sont générées par
-> [`scripts/capture-screenshots.mjs`](scripts/capture-screenshots.mjs)
-> (voir [docs/screenshots](docs/screenshots/README.md)). Lance-le après
-> `docker compose up` pour les produire/mettre à jour.
+> Les images ne sont pas encore versionnées dans le dépôt. Elles se génèrent
+> avec [`scripts/capture-screenshots.mjs`](scripts/capture-screenshots.mjs)
+> (voir [docs/screenshots](docs/screenshots/README.md)) : lance-le après
+> `docker compose up`, puis commite les PNG produits et rétablis le tableau
+> ci-dessous (conservé en commentaire).
 
+<!--
 | Tableau de bord | Patrons |
 | --- | --- |
 | ![Tableau de bord](docs/screenshots/dashboard.png) | ![Patrons](docs/screenshots/patterns.png) |
@@ -103,6 +105,8 @@ besoin :
 | Assistant IA | Calendrier |
 | --- | --- |
 | ![Assistant](docs/screenshots/assistant.png) | ![Calendrier](docs/screenshots/calendar.png) |
+-->
+
 
 ---
 
@@ -311,6 +315,6 @@ Chaque **push sur `main`** déclenche le workflow *Release* :
 - ✅ IA texte (traduction, copilote, génération)
 - ✅ IA vision/voix (OCR étiquette, compteur vocal)
 - ✅ App Android (Capacitor) + CI release
-- ⏳ Aperçu coloris (Stable Diffusion)
+- ✅ Aperçu coloris (Stable Diffusion)
 - ⏳ Recherche sémantique (peuplement des embeddings)
 - ⏳ Mood boards, plugins natifs (code-barres, push)
