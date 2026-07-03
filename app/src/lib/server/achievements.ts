@@ -108,10 +108,11 @@ export async function computeMetrics(uid: string): Promise<Metrics> {
 /* Achievement catalogue                                              */
 /* ------------------------------------------------------------------ */
 
+// label/description/category are resolved from the i18n dict client-side via
+// `achv.<code>.label` / `achv.<code>.description` / `achv.cat.<category>` keys —
+// this catalogue only holds locale-invariant data.
 export interface AchievementDef {
 	code: string;
-	label: string;
-	description: string;
 	icon: string;
 	tier: Tier;
 	metric: string; // key in Metrics
@@ -121,45 +122,45 @@ export interface AchievementDef {
 
 export const ACHIEVEMENTS: AchievementDef[] = [
 	// Projects
-	{ code: 'premiere_maille', label: 'Première maille', description: 'Terminer ton tout premier projet.', icon: '🎉', tier: 'bronze', metric: 'finished_total', target: 1, category: 'Projets' },
-	{ code: 'artisan', label: 'Artisan', description: 'Terminer 5 projets.', icon: '🧵', tier: 'argent', metric: 'finished_total', target: 5, category: 'Projets' },
-	{ code: 'maitre_artisan', label: 'Maître artisan', description: 'Terminer 25 projets.', icon: '🏆', tier: 'or', metric: 'finished_total', target: 25, category: 'Projets' },
-	{ code: 'legende', label: 'Légende vivante', description: 'Terminer 100 projets.', icon: '👑', tier: 'platine', metric: 'finished_total', target: 100, category: 'Projets' },
-	{ code: 'annee_productive', label: 'Année productive', description: 'Terminer 12 projets dans l’année.', icon: '📆', tier: 'or', metric: 'finished_year', target: 12, category: 'Projets' },
+	{ code: 'premiere_maille', icon: '🎉', tier: 'bronze', metric: 'finished_total', target: 1, category: 'projects' },
+	{ code: 'artisan', icon: '🧵', tier: 'argent', metric: 'finished_total', target: 5, category: 'projects' },
+	{ code: 'maitre_artisan', icon: '🏆', tier: 'or', metric: 'finished_total', target: 25, category: 'projects' },
+	{ code: 'legende', icon: '👑', tier: 'platine', metric: 'finished_total', target: 100, category: 'projects' },
+	{ code: 'annee_productive', icon: '📆', tier: 'or', metric: 'finished_year', target: 12, category: 'projects' },
 
 	// Patterns
-	{ code: 'biblio_1', label: 'Premier patron', description: 'Ajouter un patron.', icon: '📄', tier: 'bronze', metric: 'patterns', target: 1, category: 'Patrons' },
-	{ code: 'biblio_25', label: 'Bibliothécaire', description: 'Stocker 25 patrons.', icon: '📚', tier: 'argent', metric: 'patterns', target: 25, category: 'Patrons' },
-	{ code: 'biblio_100', label: 'Archiviste', description: 'Stocker 100 patrons.', icon: '🗄️', tier: 'or', metric: 'patterns', target: 100, category: 'Patrons' },
-	{ code: 'touche_a_tout', label: 'Touche-à-tout', description: 'Avoir des patrons dans les 3 disciplines.', icon: '🌈', tier: 'or', metric: 'crafts_used', target: 3, category: 'Patrons' },
+	{ code: 'biblio_1', icon: '📄', tier: 'bronze', metric: 'patterns', target: 1, category: 'patterns' },
+	{ code: 'biblio_25', icon: '📚', tier: 'argent', metric: 'patterns', target: 25, category: 'patterns' },
+	{ code: 'biblio_100', icon: '🗄️', tier: 'or', metric: 'patterns', target: 100, category: 'patterns' },
+	{ code: 'touche_a_tout', icon: '🌈', tier: 'or', metric: 'crafts_used', target: 3, category: 'patterns' },
 
 	// Stash
-	{ code: 'premiere_pelote', label: 'Première pelote', description: 'Ajouter une laine au stock.', icon: '🧶', tier: 'bronze', metric: 'yarns', target: 1, category: 'Stock' },
-	{ code: 'collection', label: 'Collectionneuse', description: 'Posséder 25 laines.', icon: '🧶', tier: 'argent', metric: 'yarns', target: 25, category: 'Stock' },
-	{ code: 'mercerie_ambulante', label: 'Mercerie ambulante', description: 'Posséder 50 laines (oui, on sait).', icon: '🏬', tier: 'or', metric: 'yarns', target: 50, category: 'Stock' },
-	{ code: 'boite_a_boutons', label: 'Boîte à boutons', description: 'Enregistrer 10 articles de mercerie.', icon: '🔘', tier: 'bronze', metric: 'notions', target: 10, category: 'Stock' },
-	{ code: 'quincaillerie', label: 'Quincaillerie', description: 'Posséder 10 outils (aiguilles/crochets).', icon: '🪡', tier: 'bronze', metric: 'tools', target: 10, category: 'Stock' },
+	{ code: 'premiere_pelote', icon: '🧶', tier: 'bronze', metric: 'yarns', target: 1, category: 'stash' },
+	{ code: 'collection', icon: '🧶', tier: 'argent', metric: 'yarns', target: 25, category: 'stash' },
+	{ code: 'mercerie_ambulante', icon: '🏬', tier: 'or', metric: 'yarns', target: 50, category: 'stash' },
+	{ code: 'boite_a_boutons', icon: '🔘', tier: 'bronze', metric: 'notions', target: 10, category: 'stash' },
+	{ code: 'quincaillerie', icon: '🪡', tier: 'bronze', metric: 'tools', target: 10, category: 'stash' },
 
 	// Time & meters
-	{ code: 'premiers_metres', label: 'Premiers mètres', description: 'Tricoter 100 m (projets finis).', icon: '📏', tier: 'bronze', metric: 'meters_total', target: 100, category: 'Endurance' },
-	{ code: 'kilometre', label: 'Kilomètre', description: 'Tricoter 1000 m cumulés.', icon: '🛣️', tier: 'argent', metric: 'meters_total', target: 1000, category: 'Endurance' },
-	{ code: 'marathonien', label: 'Marathonien·ne', description: 'Cumuler 50 h de craft.', icon: '⏱️', tier: 'argent', metric: 'hours_total', target: 50, category: 'Endurance' },
-	{ code: 'centurion', label: 'Centurion', description: 'Cumuler 100 h de craft.', icon: '🦾', tier: 'or', metric: 'hours_total', target: 100, category: 'Endurance' },
-	{ code: 'compteur_fou', label: 'Compteur fou', description: 'Compter 1000 rangs au total.', icon: '🔢', tier: 'argent', metric: 'rows_total', target: 1000, category: 'Endurance' },
+	{ code: 'premiers_metres', icon: '📏', tier: 'bronze', metric: 'meters_total', target: 100, category: 'endurance' },
+	{ code: 'kilometre', icon: '🛣️', tier: 'argent', metric: 'meters_total', target: 1000, category: 'endurance' },
+	{ code: 'marathonien', icon: '⏱️', tier: 'argent', metric: 'hours_total', target: 50, category: 'endurance' },
+	{ code: 'centurion', icon: '🦾', tier: 'or', metric: 'hours_total', target: 100, category: 'endurance' },
+	{ code: 'compteur_fou', icon: '🔢', tier: 'argent', metric: 'rows_total', target: 1000, category: 'endurance' },
 
 	// Savings
-	{ code: 'econome', label: 'Économe', description: 'Économiser 50 € vs le prêt-à-porter.', icon: '💰', tier: 'bronze', metric: 'savings_total', target: 50, category: 'Économies' },
-	{ code: 'radin_malin', label: 'Radin malin', description: 'Économiser 200 € cumulés.', icon: '🤑', tier: 'argent', metric: 'savings_total', target: 200, category: 'Économies' },
+	{ code: 'econome', icon: '💰', tier: 'bronze', metric: 'savings_total', target: 50, category: 'savings' },
+	{ code: 'radin_malin', icon: '🤑', tier: 'argent', metric: 'savings_total', target: 200, category: 'savings' },
 
 	// Punctuality / gifts
-	{ code: 'ponctuel', label: 'Ponctuel·le', description: 'Finir un projet avant sa date butoir.', icon: '⏰', tier: 'bronze', metric: 'deadlines_met', target: 1, category: 'Cadeaux' },
-	{ code: 'jamais_en_retard', label: 'Jamais en retard', description: 'Tenir 10 échéances.', icon: '🎯', tier: 'or', metric: 'deadlines_met', target: 10, category: 'Cadeaux' },
-	{ code: 'generosite', label: 'Générosité', description: 'Enregistrer 3 destinataires.', icon: '🎁', tier: 'bronze', metric: 'recipients', target: 3, category: 'Cadeaux' },
+	{ code: 'ponctuel', icon: '⏰', tier: 'bronze', metric: 'deadlines_met', target: 1, category: 'gifts' },
+	{ code: 'jamais_en_retard', icon: '🎯', tier: 'or', metric: 'deadlines_met', target: 10, category: 'gifts' },
+	{ code: 'generosite', icon: '🎁', tier: 'bronze', metric: 'recipients', target: 3, category: 'gifts' },
 
 	// Organization & goals
-	{ code: 'rangement', label: 'Tout est rangé', description: 'Créer 3 bacs de rangement.', icon: '📦', tier: 'bronze', metric: 'bins', target: 3, category: 'Organisation' },
-	{ code: 'objectif_atteint', label: 'Objectif atteint', description: 'Compléter un objectif.', icon: '✅', tier: 'bronze', metric: 'goals_completed', target: 1, category: 'Organisation' },
-	{ code: 'ambitieux', label: 'Ambitieux·se', description: 'Compléter 5 objectifs.', icon: '🚀', tier: 'argent', metric: 'goals_completed', target: 5, category: 'Organisation' }
+	{ code: 'rangement', icon: '📦', tier: 'bronze', metric: 'bins', target: 3, category: 'organization' },
+	{ code: 'objectif_atteint', icon: '✅', tier: 'bronze', metric: 'goals_completed', target: 1, category: 'organization' },
+	{ code: 'ambitieux', icon: '🚀', tier: 'argent', metric: 'goals_completed', target: 5, category: 'organization' }
 ];
 
 export const TOTAL_POINTS = ACHIEVEMENTS.reduce((s, a) => s + TIER_POINTS[a.tier], 0);

@@ -3,6 +3,7 @@ import { eq } from 'drizzle-orm';
 import { db } from '$lib/server/db';
 import { users } from '$lib/server/db/schema';
 import { createSession, setSessionCookie, verifyPassword } from '$lib/server/auth';
+import { t } from '$lib/i18n';
 import type { Actions } from './$types';
 
 export const actions: Actions = {
@@ -15,14 +16,14 @@ export const actions: Actions = {
 		const next = String(form.get('next') ?? '/') || '/';
 
 		if (!email || !password) {
-			return fail(400, { email, error: 'Email et mot de passe requis.' });
+			return fail(400, { email, error: t(event.locals.locale, 'auth.error.missing') });
 		}
 
 		const row = (
 			await db.select().from(users).where(eq(users.email, email)).limit(1)
 		)[0];
 		if (!row || !(await verifyPassword(row.passwordHash, password))) {
-			return fail(400, { email, error: 'Identifiants incorrects.' });
+			return fail(400, { email, error: t(event.locals.locale, 'auth.error.badCredentials') });
 		}
 
 		const token = await createSession(row.id);

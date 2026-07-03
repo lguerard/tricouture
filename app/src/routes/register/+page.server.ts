@@ -3,6 +3,7 @@ import { eq, sql } from 'drizzle-orm';
 import { db } from '$lib/server/db';
 import { users } from '$lib/server/db/schema';
 import { createSession, hashPassword, setSessionCookie } from '$lib/server/auth';
+import { t } from '$lib/i18n';
 import type { Actions } from './$types';
 
 export const actions: Actions = {
@@ -15,17 +16,17 @@ export const actions: Actions = {
 		const password = String(form.get('password') ?? '');
 
 		if (!email || !displayName || !password) {
-			return fail(400, { email, displayName, error: 'Tous les champs sont requis.' });
+			return fail(400, { email, displayName, error: t(event.locals.locale, 'auth.error.allFieldsRequired') });
 		}
 		if (password.length < 8) {
-			return fail(400, { email, displayName, error: 'Mot de passe : 8 caractères minimum.' });
+			return fail(400, { email, displayName, error: t(event.locals.locale, 'auth.error.passwordTooShort') });
 		}
 
 		const existing = (
 			await db.select({ id: users.id }).from(users).where(eq(users.email, email)).limit(1)
 		)[0];
 		if (existing) {
-			return fail(400, { email, displayName, error: 'Cet email est déjà utilisé.' });
+			return fail(400, { email, displayName, error: t(event.locals.locale, 'auth.error.emailInUse') });
 		}
 
 		// The very first account created is an administrator.

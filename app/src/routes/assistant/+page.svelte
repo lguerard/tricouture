@@ -1,5 +1,9 @@
 <script lang="ts">
-	import { CRAFTS, CRAFT_LABELS } from '$lib/labels';
+	import { CRAFTS, craftLabel } from '$lib/labels';
+	import { t } from '$lib/i18n';
+
+	let { data } = $props();
+	const locale = $derived(data.locale);
 
 	let tab = $state<'translate' | 'generate'>('translate');
 
@@ -19,16 +23,16 @@
 				headers: { 'content-type': 'application/json' },
 				body: JSON.stringify({ text: source })
 			});
-			const data = await res.json();
-			if (!res.ok) tErr = data.error ?? 'Erreur';
-			else translation = data.result;
+			const resData = await res.json();
+			if (!res.ok) tErr = resData.error ?? t(locale, 'assistant.error');
+			else translation = resData.result;
 		} catch {
-			tErr = 'Erreur réseau';
+			tErr = t(locale, 'assistant.networkError');
 		}
 		tBusy = false;
 	}
 
-	// Génération de patron
+	// Pattern generation
 	let desc = $state('');
 	let craft = $state('tricot');
 	let gauge = $state('');
@@ -47,53 +51,82 @@
 				headers: { 'content-type': 'application/json' },
 				body: JSON.stringify({ description: desc, craft, gauge, size })
 			});
-			const data = await res.json();
-			if (!res.ok) gErr = data.error ?? 'Erreur';
-			else pattern = data.result;
+			const resData = await res.json();
+			if (!res.ok) gErr = resData.error ?? t(locale, 'assistant.error');
+			else pattern = resData.result;
 		} catch {
-			gErr = 'Erreur réseau';
+			gErr = t(locale, 'assistant.networkError');
 		}
 		gBusy = false;
 	}
 </script>
 
 <div class="container">
-	<h1>Assistant IA</h1>
-	<p class="muted">Fonctionne avec le serveur Ollama local (GPU). Voir la doc self-host pour l'activer.</p>
+	<h1>{t(locale, 'assistant.title')}</h1>
+	<p class="muted">{t(locale, 'assistant.subtitle')}</p>
 
 	<div class="tabs">
-		<button class:active={tab === 'translate'} onclick={() => (tab = 'translate')}>🌍 Traduire un patron</button>
-		<button class:active={tab === 'generate'} onclick={() => (tab = 'generate')}>✨ Générer un patron</button>
+		<button class:active={tab === 'translate'} onclick={() => (tab = 'translate')}
+			>🌍 {t(locale, 'assistant.tabTranslate')}</button
+		>
+		<button class:active={tab === 'generate'} onclick={() => (tab = 'generate')}
+			>✨ {t(locale, 'assistant.tabGenerate')}</button
+		>
 	</div>
 
 	{#if tab === 'translate'}
 		<div class="two">
 			<div class="field">
-				<label for="src">Patron source (anglais, japonais, allemand…)</label>
-				<textarea id="src" rows="14" bind:value={source} placeholder="Colle ici le texte du patron…"></textarea>
-				<button class="btn-primary" onclick={translate} disabled={tBusy || !source}>{tBusy ? 'Traduction…' : 'Traduire en français'}</button>
+				<label for="src">{t(locale, 'assistant.sourceLabel')}</label>
+				<textarea
+					id="src"
+					rows="14"
+					bind:value={source}
+					placeholder={t(locale, 'assistant.sourcePlaceholder')}
+				></textarea>
+				<button class="btn-primary" onclick={translate} disabled={tBusy || !source}
+					>{tBusy ? t(locale, 'assistant.translating') : t(locale, 'assistant.translateBtn')}</button
+				>
 				{#if tErr}<p class="error">{tErr}</p>{/if}
 			</div>
 			<div class="field">
-				<label for="out">Traduction française</label>
+				<label for="out">{t(locale, 'assistant.translationLabel')}</label>
 				<textarea id="out" rows="14" readonly value={translation}></textarea>
 			</div>
 		</div>
 	{:else}
 		<div class="two">
 			<div class="form">
-				<div class="field"><label for="d">Décris le vêtement / l'objet</label><textarea id="d" rows="4" bind:value={desc} placeholder="pull col roulé, manches raglan, ample…"></textarea></div>
 				<div class="field">
-					<label for="c">Type</label>
-					<select id="c" bind:value={craft}>{#each CRAFTS as c}<option value={c}>{CRAFT_LABELS[c]}</option>{/each}</select>
+					<label for="d">{t(locale, 'assistant.descLabel')}</label>
+					<textarea
+						id="d"
+						rows="4"
+						bind:value={desc}
+						placeholder={t(locale, 'assistant.descPlaceholder')}
+					></textarea>
 				</div>
-				<div class="field"><label for="g">Jauge (échantillon)</label><input id="g" bind:value={gauge} placeholder="22 m × 30 rgs / 10 cm" /></div>
-				<div class="field"><label for="s">Taille / mensurations</label><input id="s" bind:value={size} placeholder="M, tour de poitrine 96 cm" /></div>
-				<button class="btn-primary" onclick={genPattern} disabled={gBusy || !desc}>{gBusy ? 'Génération…' : 'Générer le patron'}</button>
+				<div class="field">
+					<label for="c">{t(locale, 'assistant.typeLabel')}</label>
+					<select id="c" bind:value={craft}
+						>{#each CRAFTS as c}<option value={c}>{craftLabel(locale, c)}</option>{/each}</select
+					>
+				</div>
+				<div class="field">
+					<label for="g">{t(locale, 'assistant.gaugeLabel')}</label>
+					<input id="g" bind:value={gauge} placeholder={t(locale, 'assistant.gaugePlaceholder')} />
+				</div>
+				<div class="field">
+					<label for="s">{t(locale, 'assistant.sizeLabel')}</label>
+					<input id="s" bind:value={size} placeholder={t(locale, 'assistant.sizePlaceholder')} />
+				</div>
+				<button class="btn-primary" onclick={genPattern} disabled={gBusy || !desc}
+					>{gBusy ? t(locale, 'assistant.generating') : t(locale, 'assistant.generateBtn')}</button
+				>
 				{#if gErr}<p class="error">{gErr}</p>{/if}
 			</div>
 			<div class="field">
-				<label for="po">Patron généré</label>
+				<label for="po">{t(locale, 'assistant.generatedLabel')}</label>
 				<textarea id="po" rows="20" readonly value={pattern}></textarea>
 			</div>
 		</div>

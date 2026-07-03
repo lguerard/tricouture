@@ -1,13 +1,14 @@
 <script lang="ts">
+	import { t } from '$lib/i18n';
 	let { data } = $props();
+	const locale = $derived(data.locale);
 </script>
 
 <div class="container">
-	<h1>Galerie des réalisations</h1>
+	<h1>{t(locale, 'gallery.title')}</h1>
 	{#if data.items.length === 0}
 		<p class="muted">
-			Rien ici pour l'instant. Tes projets terminés pourront être ajoutés à la galerie (à venir
-			dans la phase suivante).
+			{t(locale, 'gallery.empty')}
 		</p>
 	{:else}
 		<div class="grid">

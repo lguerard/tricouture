@@ -1,7 +1,9 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
-	import { CRAFT_LABELS, DIFFICULTY_LABELS } from '$lib/labels';
+	import { craftLabel, difficultyLabel } from '$lib/labels';
+	import { t } from '$lib/i18n';
 	let { data } = $props();
+	const locale = $derived(data.locale);
 	const p = $derived(data.pattern);
 
 	function isImage(mime: string) {
@@ -27,44 +29,44 @@
 				body: JSON.stringify({ patternId: p.id, question })
 			});
 			const d = await res.json();
-			if (!res.ok) aiErr = d.error ?? 'Erreur';
+			if (!res.ok) aiErr = d.error ?? t(locale, 'patterns.detail.aiError');
 			else answer = d.result;
 		} catch {
-			aiErr = 'Erreur réseau';
+			aiErr = t(locale, 'patterns.detail.aiNetworkError');
 		}
 		aiBusy = false;
 	}
 </script>
 
 <div class="container">
-	<a href="/patterns" class="muted">← Patrons</a>
+	<a href="/patterns" class="muted">{t(locale, 'patterns.detail.back')}</a>
 
 	<header class="head">
 		<div>
 			<h1>{p.title}</h1>
 			<div>
-				<span class="tag">{CRAFT_LABELS[p.craft]}</span>
-				{#each p.tags ?? [] as t}<span class="tag">{t}</span>{/each}
+				<span class="tag">{craftLabel(locale, p.craft)}</span>
+				{#each p.tags ?? [] as tag}<span class="tag">{tag}</span>{/each}
 			</div>
 			{#if !data.isOwner}
-				<span class="shared">🔗 Partagé par {data.ownerName}</span>
+				<span class="shared">{t(locale, 'patterns.detail.sharedBy', { name: data.ownerName })}</span>
 			{/if}
 		</div>
 		{#if data.isOwner}
 			<div class="owner-actions">
 				<form method="POST" action="?/toggleShare" use:enhance>
 					<button type="submit" class:on={p.isShared}>
-						{p.isShared ? '🔗 Partagé (cliquer pour arrêter)' : '🔗 Partager'}
+						{p.isShared ? t(locale, 'patterns.detail.shareOn') : t(locale, 'patterns.detail.share')}
 					</button>
 				</form>
 				<form
 					method="POST"
 					action="?/delete"
 					onsubmit={(e) => {
-						if (!confirm('Supprimer ce patron et ses fichiers ?')) e.preventDefault();
+						if (!confirm(t(locale, 'patterns.detail.deleteConfirm'))) e.preventDefault();
 					}}
 				>
-					<button type="submit">🗑 Supprimer</button>
+					<button type="submit">{t(locale, 'patterns.detail.delete')}</button>
 				</form>
 			</div>
 		{/if}
@@ -73,29 +75,29 @@
 	<div class="cols">
 		<section class="meta card">
 			<dl>
-				{#if p.garmentType}<dt>Objet</dt><dd>{p.garmentType}</dd>{/if}
-				{#if p.designer}<dt>Créateur·rice</dt><dd>{p.designer}</dd>{/if}
-				{#if p.source}<dt>Source</dt><dd>{p.source}</dd>{/if}
-				{#if p.difficulty}<dt>Difficulté</dt><dd>{DIFFICULTY_LABELS[p.difficulty]}</dd>{/if}
-				{#if p.language}<dt>Langue</dt><dd>{p.language}</dd>{/if}
-				{#if p.sizes}<dt>Tailles</dt><dd>{p.sizes}</dd>{/if}
+				{#if p.garmentType}<dt>{t(locale, 'patterns.detail.garmentType')}</dt><dd>{p.garmentType}</dd>{/if}
+				{#if p.designer}<dt>{t(locale, 'patterns.detail.designer')}</dt><dd>{p.designer}</dd>{/if}
+				{#if p.source}<dt>{t(locale, 'patterns.detail.source')}</dt><dd>{p.source}</dd>{/if}
+				{#if p.difficulty}<dt>{t(locale, 'patterns.detail.difficulty')}</dt><dd>{difficultyLabel(locale, p.difficulty)}</dd>{/if}
+				{#if p.language}<dt>{t(locale, 'patterns.detail.language')}</dt><dd>{p.language}</dd>{/if}
+				{#if p.sizes}<dt>{t(locale, 'patterns.detail.sizes')}</dt><dd>{p.sizes}</dd>{/if}
 				{#if p.gaugeStitches || p.gaugeRows}
-					<dt>Jauge</dt><dd>{p.gaugeStitches ?? '?'} m × {p.gaugeRows ?? '?'} rgs / 10 cm</dd>
+					<dt>{t(locale, 'patterns.detail.gauge')}</dt><dd>{t(locale, 'patterns.detail.gaugeValue', { stitches: p.gaugeStitches ?? '?', rows: p.gaugeRows ?? '?' })}</dd>
 				{/if}
-				{#if p.yardageRequired}<dt>Métrage</dt><dd>{p.yardageRequired} m</dd>{/if}
+				{#if p.yardageRequired}<dt>{t(locale, 'patterns.detail.yardage')}</dt><dd>{p.yardageRequired} m</dd>{/if}
 			</dl>
 			{#if p.notes}<p class="notes">{p.notes}</p>{/if}
 		</section>
 
 		<section class="files">
 			{#if data.files.length === 0}
-				<p class="muted">Aucun fichier joint.</p>
+				<p class="muted">{t(locale, 'patterns.detail.noFiles')}</p>
 			{:else}
 				{#each data.files as f}
 					<div class="file card">
 						<div class="file-head">
 							<strong>{f.filename}</strong>
-							<a href={`/media/${f.storedPath}`} target="_blank" rel="noopener">Ouvrir</a>
+							<a href={`/media/${f.storedPath}`} target="_blank" rel="noopener">{t(locale, 'patterns.detail.open')}</a>
 						</div>
 						{#if isImage(f.mimeType)}
 							<img src={`/media/${f.storedPath}`} alt={f.filename} />
@@ -109,10 +111,10 @@
 	</div>
 
 	<section class="card copilot">
-		<h2>🤖 Copilote — pose une question sur ce patron</h2>
+		<h2>{t(locale, 'patterns.detail.copilotTitle')}</h2>
 		<div class="ask">
-			<input bind:value={question} placeholder="Que veut dire k2tog ? Adapte la taille M en L…" onkeydown={(e) => e.key === 'Enter' && question && askCopilot()} />
-			<button class="btn-primary" onclick={askCopilot} disabled={aiBusy || !question}>{aiBusy ? '…' : 'Demander'}</button>
+			<input bind:value={question} placeholder={t(locale, 'patterns.detail.askPlaceholder')} onkeydown={(e) => e.key === 'Enter' && question && askCopilot()} />
+			<button class="btn-primary" onclick={askCopilot} disabled={aiBusy || !question}>{aiBusy ? '…' : t(locale, 'patterns.detail.ask')}</button>
 		</div>
 		{#if aiErr}<p class="error">{aiErr}</p>{/if}
 		{#if answer}<div class="answer">{answer}</div>{/if}

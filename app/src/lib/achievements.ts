@@ -1,4 +1,6 @@
 // Achievement presentation metadata — safe client-side (no DB access).
+import { t, type Locale } from '$lib/i18n';
+
 export type Tier = 'bronze' | 'argent' | 'or' | 'platine';
 
 export const TIER_POINTS: Record<Tier, number> = {
@@ -8,12 +10,9 @@ export const TIER_POINTS: Record<Tier, number> = {
 	platine: 100
 };
 
-export const TIER_LABEL: Record<Tier, string> = {
-	bronze: 'Bronze',
-	argent: 'Argent',
-	or: 'Or',
-	platine: 'Platine'
-};
+export function tierLabel(locale: Locale, tier: Tier): string {
+	return t(locale, `tier.${tier}`);
+}
 
 export const TIER_COLOR: Record<Tier, string> = {
 	bronze: '#a9712f',

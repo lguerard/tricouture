@@ -1,13 +1,16 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
-	import { CRAFT_LABELS, CRAFTS, DIFFICULTY_LABELS } from '$lib/labels';
-	let { form } = $props();
+	import { craftLabel, CRAFTS, difficultyLabel } from '$lib/labels';
+	import { t } from '$lib/i18n';
+	let { data, form } = $props();
+	const locale = $derived(data.locale);
+	const DIFFICULTY_LEVELS = [1, 2, 3, 4, 5];
 	let submitting = $state(false);
 </script>
 
 <div class="container narrow">
-	<a href="/patterns" class="muted">← Patrons</a>
-	<h1>Nouveau patron</h1>
+	<a href="/patterns" class="muted">{t(locale, 'patterns.new.back')}</a>
+	<h1>{t(locale, 'patterns.new.title')}</h1>
 
 	<form
 		method="POST"
@@ -21,90 +24,90 @@
 		}}
 	>
 		<div class="field">
-			<label for="title">Titre *</label>
+			<label for="title">{t(locale, 'patterns.new.titleLabel')}</label>
 			<input id="title" name="title" required />
 		</div>
 
 		<div class="two">
 			<div class="field">
-				<label for="craft">Type *</label>
+				<label for="craft">{t(locale, 'patterns.new.typeLabel')}</label>
 				<select id="craft" name="craft" required>
-					{#each CRAFTS as c}<option value={c}>{CRAFT_LABELS[c]}</option>{/each}
+					{#each CRAFTS as c}<option value={c}>{craftLabel(locale, c)}</option>{/each}
 				</select>
 			</div>
 			<div class="field">
-				<label for="garmentType">Vêtement / objet</label>
-				<input id="garmentType" name="garmentType" placeholder="pull, chaussette, robe…" />
+				<label for="garmentType">{t(locale, 'patterns.new.garmentTypeLabel')}</label>
+				<input id="garmentType" name="garmentType" placeholder={t(locale, 'patterns.new.garmentTypePlaceholder')} />
 			</div>
 		</div>
 
 		<div class="two">
 			<div class="field">
-				<label for="designer">Créateur·rice</label>
+				<label for="designer">{t(locale, 'patterns.new.designerLabel')}</label>
 				<input id="designer" name="designer" />
 			</div>
 			<div class="field">
-				<label for="source">Source</label>
-				<input id="source" name="source" placeholder="Ravelry, magazine, URL…" />
+				<label for="source">{t(locale, 'patterns.new.sourceLabel')}</label>
+				<input id="source" name="source" placeholder={t(locale, 'patterns.new.sourcePlaceholder')} />
 			</div>
 		</div>
 
 		<div class="two">
 			<div class="field">
-				<label for="difficulty">Difficulté</label>
+				<label for="difficulty">{t(locale, 'patterns.new.difficultyLabel')}</label>
 				<select id="difficulty" name="difficulty">
 					<option value="">—</option>
-					{#each Object.entries(DIFFICULTY_LABELS) as [v, l]}<option value={v}>{l}</option>{/each}
+					{#each DIFFICULTY_LEVELS as lvl}<option value={lvl}>{difficultyLabel(locale, lvl)}</option>{/each}
 				</select>
 			</div>
 			<div class="field">
-				<label for="language">Langue</label>
-				<input id="language" name="language" placeholder="fr, en, ja…" />
+				<label for="language">{t(locale, 'patterns.new.languageLabel')}</label>
+				<input id="language" name="language" placeholder={t(locale, 'patterns.new.languagePlaceholder')} />
 			</div>
 		</div>
 
 		<div class="two">
 			<div class="field">
-				<label for="sizes">Tailles</label>
-				<input id="sizes" name="sizes" placeholder="XS–XXL, 36–46…" />
+				<label for="sizes">{t(locale, 'patterns.new.sizesLabel')}</label>
+				<input id="sizes" name="sizes" placeholder={t(locale, 'patterns.new.sizesPlaceholder')} />
 			</div>
 			<div class="field">
-				<label for="yardageRequired">Métrage requis (m)</label>
+				<label for="yardageRequired">{t(locale, 'patterns.new.yardageLabel')}</label>
 				<input id="yardageRequired" name="yardageRequired" type="number" min="0" />
 			</div>
 		</div>
 
 		<div class="two">
 			<div class="field">
-				<label for="gaugeStitches">Jauge — mailles / 10 cm</label>
+				<label for="gaugeStitches">{t(locale, 'patterns.new.gaugeStitchesLabel')}</label>
 				<input id="gaugeStitches" name="gaugeStitches" type="number" min="0" />
 			</div>
 			<div class="field">
-				<label for="gaugeRows">Jauge — rangs / 10 cm</label>
+				<label for="gaugeRows">{t(locale, 'patterns.new.gaugeRowsLabel')}</label>
 				<input id="gaugeRows" name="gaugeRows" type="number" min="0" />
 			</div>
 		</div>
 
 		<div class="field">
-			<label for="tags">Tags (séparés par des virgules)</label>
-			<input id="tags" name="tags" placeholder="été, dentelle, cadeau" />
+			<label for="tags">{t(locale, 'patterns.new.tagsLabel')}</label>
+			<input id="tags" name="tags" placeholder={t(locale, 'patterns.new.tagsPlaceholder')} />
 		</div>
 
 		<div class="field">
-			<label for="notes">Notes</label>
+			<label for="notes">{t(locale, 'patterns.new.notesLabel')}</label>
 			<textarea id="notes" name="notes" rows="3"></textarea>
 		</div>
 
 		<div class="field">
-			<label for="files">Fichiers (PDF, images)</label>
+			<label for="files">{t(locale, 'patterns.new.filesLabel')}</label>
 			<input id="files" name="files" type="file" multiple accept=".pdf,image/*" />
-			<span class="muted small">Le texte des PDF est indexé pour la recherche.</span>
+			<span class="muted small">{t(locale, 'patterns.new.filesHint')}</span>
 		</div>
 
 		{#if form?.error}<p class="error">{form.error}</p>{/if}
 
 		<button class="btn-primary" type="submit" disabled={submitting}>
-			{submitting ? 'Enregistrement…' : 'Enregistrer le patron'}
+			{submitting ? t(locale, 'patterns.new.submitting') : t(locale, 'patterns.new.submit')}
 		</button>
 	</form>
 </div>

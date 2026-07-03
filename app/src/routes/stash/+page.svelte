@@ -1,18 +1,20 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
-	import { YARN_WEIGHTS, TOOL_TYPES, TOOL_TYPE_LABELS } from '$lib/labels';
+	import { YARN_WEIGHTS, toolTypeOptions, toolTypeLabel } from '$lib/labels';
 	import { isCapacitor, scanBarcode } from '$lib/capacitor';
+	import { t } from '$lib/i18n';
 	let { data } = $props();
+	const locale = $derived(data.locale);
 
 	type Tab = 'yarn' | 'fabric' | 'notion' | 'tool';
 	let tab = $state<Tab>('yarn');
 	let adding = $state(false);
 
-	const tabs: { id: Tab; label: string; count: number }[] = $derived([
-		{ id: 'yarn', label: '🧶 Laine', count: data.yarnList.length },
-		{ id: 'fabric', label: '🧵 Tissu', count: data.fabricList.length },
-		{ id: 'notion', label: '🔘 Mercerie', count: data.notionList.length },
-		{ id: 'tool', label: '🪡 Outils', count: data.toolList.length }
+	const tabs: { id: Tab; icon: string; key: string; count: number }[] = $derived([
+		{ id: 'yarn', icon: '🧶', key: 'stash.tab.yarn', count: data.yarnList.length },
+		{ id: 'fabric', icon: '🧵', key: 'stash.tab.fabric', count: data.fabricList.length },
+		{ id: 'notion', icon: '🔘', key: 'stash.tab.notion', count: data.notionList.length },
+		{ id: 'tool', icon: '🪡', key: 'stash.tab.tool', count: data.toolList.length }
 	]);
 
 	const refresh = () => {
@@ -22,7 +24,7 @@
 		};
 	};
 
-	// Aperçu coloris SD
+	// SD colorway preview
 	let previewYarnId = $state<string | null>(null);
 	let previewBusy = $state(false);
 	let previewSrc = $state<string | null>(null);
@@ -41,31 +43,31 @@
 			});
 			const d = await res.json();
 			if (!res.ok) {
-				previewError = d.message ?? 'Aperçu indisponible';
+				previewError = d.message ?? t(locale, 'stash.previewUnavailable');
 			} else {
 				previewSrc = `data:image/png;base64,${d.image_base64}`;
 			}
 		} catch {
-			previewError = 'Erreur réseau';
+			previewError = t(locale, 'stash.networkError');
 		}
 		previewBusy = false;
 	}
 
-	// Scan code-barres via Capacitor (Android natif).
+	// Barcode scan via Capacitor (native Android).
 	let barcodeBusy = $state(false);
 	async function scanBarcodeNative() {
 		barcodeBusy = true;
 		const code = await scanBarcode();
 		barcodeBusy = false;
 		if (!code) return;
-		// Pré-remplit le champ "notes" avec le code scanné pour référence manuelle.
-		// TODO: brancher sur une API de lookup (Open Food Facts, Ravelry…).
+		// Pre-fills the "notes" field with the scanned code for manual reference.
+		// TODO: wire up a lookup API (Open Food Facts, Ravelry…).
 		const el = document.getElementById('yarn-notes') as HTMLInputElement | null;
 		if (el) el.value = code;
-		scanMsg = `Code scanné : ${code}`;
+		scanMsg = t(locale, 'stash.codeScanned', { code });
 	}
 
-	// Scan d'étiquette : envoie la photo au service vision, pré-remplit le formulaire.
+	// Label scan: sends the photo to the vision service, pre-fills the form.
 	let scanBusy = $state(false);
 	let scanMsg = $state('');
 	async function scanLabel(e: Event) {
@@ -80,7 +82,7 @@
 			const res = await fetch('/api/ai/scan-label', { method: 'POST', body: fd });
 			const data = await res.json();
 			if (!res.ok) {
-				scanMsg = data.error ?? 'Scan indisponible';
+				scanMsg = data.error ?? t(locale, 'stash.scanUnavailable');
 			} else {
 				const f = data.fields ?? {};
 				const set = (id: string, v: unknown) => {
@@ -91,27 +93,27 @@
 				set('fi', f.fiber);
 				set('yp', f.yardsPerSkein);
 				set('wc', f.weightCategory);
-				scanMsg = 'Champs pré-remplis ✓ (vérifie puis ajoute)';
+				scanMsg = t(locale, 'stash.fieldsPrefilled');
 			}
 		} catch {
-			scanMsg = 'Erreur réseau';
+			scanMsg = t(locale, 'stash.networkError');
 		}
 		scanBusy = false;
 	}
 </script>
 
 <div class="container">
-	<h1>Mon stock</h1>
+	<h1>{t(locale, 'stash.title')}</h1>
 
 	<div class="tabs">
-		{#each tabs as t}
-			<button class="tab" class:active={tab === t.id} onclick={() => (tab = t.id)}>
-				{t.label} <span class="count">{t.count}</span>
+		{#each tabs as tb}
+			<button class="tab" class:active={tab === tb.id} onclick={() => (tab = tb.id)}>
+				{tb.icon} {t(locale, tb.key)} <span class="count">{tb.count}</span>
 			</button>
 		{/each}
 		<div class="spacer"></div>
 		<button class="btn-primary" onclick={() => (adding = !adding)}>
-			{adding ? 'Fermer' : '+ Ajouter'}
+			{adding ? t(locale, 'stash.close') : t(locale, 'stash.addItem')}
 		</button>
 	</div>
 
@@ -121,79 +123,79 @@
 				<div class="scan">
 					{#if isCapacitor()}
 						<button type="button" class="scan-btn" onclick={scanBarcodeNative} disabled={barcodeBusy}>
-							{barcodeBusy ? 'Scan…' : '📦 Scanner le code-barres'}
+							{barcodeBusy ? t(locale, 'stash.scanning') : `📦 ${t(locale, 'stash.scanBarcode')}`}
 						</button>
 					{/if}
 					<label class="scan-btn">
-						📷 Scanner l'étiquette
+						📷 {t(locale, 'stash.scanLabel')}
 						<input type="file" accept="image/*" capture="environment" onchange={scanLabel} hidden />
 					</label>
-					{#if scanBusy}<span class="muted small">Analyse…</span>{/if}
+					{#if scanBusy}<span class="muted small">{t(locale, 'stash.analyzing')}</span>{/if}
 					{#if scanMsg}<span class="muted small">{scanMsg}</span>{/if}
 				</div>
 				<form method="POST" action="?/addYarn" enctype="multipart/form-data" use:enhance={refresh}>
 					<div class="row3">
-						<div class="field"><label for="b">Marque</label><input id="b" name="brand" /></div>
-						<div class="field"><label for="n">Nom</label><input id="n" name="name" /></div>
-						<div class="field"><label for="cw">Coloris</label><input id="cw" name="colorway" /></div>
+						<div class="field"><label for="b">{t(locale, 'stash.yarn.brand')}</label><input id="b" name="brand" /></div>
+						<div class="field"><label for="n">{t(locale, 'stash.yarn.name')}</label><input id="n" name="name" /></div>
+						<div class="field"><label for="cw">{t(locale, 'stash.yarn.colorway')}</label><input id="cw" name="colorway" /></div>
 					</div>
 					<div class="row3">
-						<div class="field"><label for="ch">Couleur</label><input id="ch" name="colorHex" type="color" value="#cccccc" /></div>
-						<div class="field"><label for="dl">Bain (dye lot)</label><input id="dl" name="dyeLot" /></div>
+						<div class="field"><label for="ch">{t(locale, 'stash.yarn.color')}</label><input id="ch" name="colorHex" type="color" value="#cccccc" /></div>
+						<div class="field"><label for="dl">{t(locale, 'stash.yarn.dyeLot')}</label><input id="dl" name="dyeLot" /></div>
 						<div class="field">
-							<label for="wc">Épaisseur</label>
+							<label for="wc">{t(locale, 'stash.yarn.weight')}</label>
 							<select id="wc" name="weightCategory">
-								<option value="">—</option>
+								<option value="">{t(locale, 'stash.optionNone')}</option>
 								{#each YARN_WEIGHTS as w}<option value={w}>{w}</option>{/each}
 							</select>
 						</div>
 					</div>
 					<div class="row3">
-						<div class="field"><label for="fi">Fibre</label><input id="fi" name="fiber" placeholder="100% mérinos" /></div>
-						<div class="field"><label for="yp">Métrage / pelote (m)</label><input id="yp" name="yardsPerSkein" type="number" /></div>
-						<div class="field"><label for="sk">Pelotes</label><input id="sk" name="skeins" type="number" step="0.5" value="1" /></div>
+						<div class="field"><label for="fi">{t(locale, 'stash.yarn.fiber')}</label><input id="fi" name="fiber" placeholder={t(locale, 'stash.yarn.fiberPlaceholder')} /></div>
+						<div class="field"><label for="yp">{t(locale, 'stash.yarn.yardsPerSkein')}</label><input id="yp" name="yardsPerSkein" type="number" /></div>
+						<div class="field"><label for="sk">{t(locale, 'stash.yarn.skeins')}</label><input id="sk" name="skeins" type="number" step="0.5" value="1" /></div>
 					</div>
-					<div class="field"><label for="ph">Photo</label><input id="ph" name="photo" type="file" accept="image/*" /></div>
-					<div class="field"><label for="yarn-notes">Notes / code-barres</label><input id="yarn-notes" name="notes" /></div>
-					<button class="btn-primary" type="submit">Ajouter la laine</button>
+					<div class="field"><label for="ph">{t(locale, 'stash.yarn.photo')}</label><input id="ph" name="photo" type="file" accept="image/*" /></div>
+					<div class="field"><label for="yarn-notes">{t(locale, 'stash.yarn.notes')}</label><input id="yarn-notes" name="notes" /></div>
+					<button class="btn-primary" type="submit">{t(locale, 'stash.yarn.submit')}</button>
 				</form>
 			{:else if tab === 'fabric'}
 				<form method="POST" action="?/addFabric" use:enhance={refresh}>
 					<div class="row3">
-						<div class="field"><label for="fn">Nom</label><input id="fn" name="name" /></div>
-						<div class="field"><label for="ft">Type</label><input id="ft" name="fabricType" placeholder="jersey, lin…" /></div>
-						<div class="field"><label for="fc">Couleur</label><input id="fc" name="colorHex" type="color" value="#cccccc" /></div>
+						<div class="field"><label for="fn">{t(locale, 'stash.fabric.name')}</label><input id="fn" name="name" /></div>
+						<div class="field"><label for="ft">{t(locale, 'stash.fabric.type')}</label><input id="ft" name="fabricType" placeholder={t(locale, 'stash.fabric.typePlaceholder')} /></div>
+						<div class="field"><label for="fc">{t(locale, 'stash.fabric.color')}</label><input id="fc" name="colorHex" type="color" value="#cccccc" /></div>
 					</div>
 					<div class="row3">
-						<div class="field"><label for="fcomp">Composition</label><input id="fcomp" name="composition" /></div>
-						<div class="field"><label for="fl">Longueur (cm)</label><input id="fl" name="lengthCm" type="number" /></div>
-						<div class="field"><label for="fw">Laize (cm)</label><input id="fw" name="widthCm" type="number" /></div>
+						<div class="field"><label for="fcomp">{t(locale, 'stash.fabric.composition')}</label><input id="fcomp" name="composition" /></div>
+						<div class="field"><label for="fl">{t(locale, 'stash.fabric.length')}</label><input id="fl" name="lengthCm" type="number" /></div>
+						<div class="field"><label for="fw">{t(locale, 'stash.fabric.width')}</label><input id="fw" name="widthCm" type="number" /></div>
 					</div>
-					<button class="btn-primary" type="submit">Ajouter le tissu</button>
+					<button class="btn-primary" type="submit">{t(locale, 'stash.fabric.submit')}</button>
 				</form>
 			{:else if tab === 'notion'}
 				<form method="POST" action="?/addNotion" use:enhance={refresh}>
 					<div class="row3">
-						<div class="field"><label for="nn">Nom *</label><input id="nn" name="name" required /></div>
-						<div class="field"><label for="nc">Catégorie</label><input id="nc" name="category" placeholder="bouton, fermeture…" /></div>
-						<div class="field"><label for="nq">Quantité</label><input id="nq" name="quantity" type="number" value="1" /></div>
+						<div class="field"><label for="nn">{t(locale, 'stash.notion.name')}</label><input id="nn" name="name" required /></div>
+						<div class="field"><label for="nc">{t(locale, 'stash.notion.category')}</label><input id="nc" name="category" placeholder={t(locale, 'stash.notion.categoryPlaceholder')} /></div>
+						<div class="field"><label for="nq">{t(locale, 'stash.notion.quantity')}</label><input id="nq" name="quantity" type="number" value="1" /></div>
 					</div>
-					<button class="btn-primary" type="submit">Ajouter</button>
+					<button class="btn-primary" type="submit">{t(locale, 'stash.notion.submit')}</button>
 				</form>
 			{:else}
 				<form method="POST" action="?/addTool" use:enhance={refresh}>
 					<div class="row3">
 						<div class="field">
-							<label for="tt">Type *</label>
+							<label for="tt">{t(locale, 'stash.tool.type')}</label>
 							<select id="tt" name="type" required>
-								{#each TOOL_TYPES as t}<option value={t.value}>{t.label}</option>{/each}
+								{#each toolTypeOptions(locale) as opt}<option value={opt.value}>{opt.label}</option>{/each}
 							</select>
 						</div>
-						<div class="field"><label for="ts">Taille (mm)</label><input id="ts" name="sizeMm" type="number" step="0.25" /></div>
-						<div class="field"><label for="tl">Câble (cm)</label><input id="tl" name="lengthCm" type="number" /></div>
+						<div class="field"><label for="ts">{t(locale, 'stash.tool.size')}</label><input id="ts" name="sizeMm" type="number" step="0.25" /></div>
+						<div class="field"><label for="tl">{t(locale, 'stash.tool.cable')}</label><input id="tl" name="lengthCm" type="number" /></div>
 					</div>
-					<div class="field"><label for="tq">Quantité</label><input id="tq" name="quantity" type="number" value="1" /></div>
-					<button class="btn-primary" type="submit">Ajouter l'outil</button>
+					<div class="field"><label for="tq">{t(locale, 'stash.tool.quantity')}</label><input id="tq" name="quantity" type="number" value="1" /></div>
+					<button class="btn-primary" type="submit">{t(locale, 'stash.tool.submit')}</button>
 				</form>
 			{/if}
 		</div>
@@ -204,16 +206,16 @@
 			{#each data.yarnList as y}
 				<div class="card stash-item">
 					{#if previewYarnId === y.id && previewSrc}
-						<img src={previewSrc} alt="aperçu coloris IA" class="preview-img" />
+						<img src={previewSrc} alt={t(locale, 'stash.yarn.previewAlt')} class="preview-img" />
 					{:else if y.photoPath}
-						<img src={`/media/${y.photoPath}`} alt={y.name ?? 'laine'} />
+						<img src={`/media/${y.photoPath}`} alt={y.name ?? t(locale, 'stash.yarn.altFallback')} />
 					{:else}
 						<div class="swatch" style={`background:${y.colorHex ?? '#eee'}`}></div>
 					{/if}
-					<strong>{[y.brand, y.name].filter(Boolean).join(' ') || y.colorway || 'Laine'}</strong>
+					<strong>{[y.brand, y.name].filter(Boolean).join(' ') || y.colorway || t(locale, 'stash.yarn.fallbackName')}</strong>
 					<span class="muted small">{[y.colorway, y.weightCategory].filter(Boolean).join(' · ')}</span>
 					<span class="muted small">{y.fiber ?? ''}</span>
-					<span class="small">{y.skeins} pelote{y.skeins > 1 ? 's' : ''}{y.dyeLot ? ` · bain ${y.dyeLot}` : ''}</span>
+					<span class="small">{y.skeins} {y.skeins > 1 ? t(locale, 'stash.yarn.skeinPlural') : t(locale, 'stash.yarn.skein')}{y.dyeLot ? ` · ${t(locale, 'stash.yarn.dyeLotPrefix')} ${y.dyeLot}` : ''}</span>
 					{#if previewYarnId === y.id && previewError}
 						<span class="muted small">{previewError}</span>
 					{/if}
@@ -224,11 +226,11 @@
 							disabled={previewBusy && previewYarnId === y.id}
 							onclick={() => generatePreview(y.id, y.colorHex ?? '#888', [y.brand, y.name, y.colorway].filter(Boolean).join(' '))}
 						>
-							{previewBusy && previewYarnId === y.id ? '⏳ Génération…' : '🎨 Aperçu IA'}
+							{previewBusy && previewYarnId === y.id ? `⏳ ${t(locale, 'stash.yarn.generating')}` : `🎨 ${t(locale, 'stash.yarn.previewBtn')}`}
 						</button>
 						<form method="POST" action="?/delete" use:enhance={refresh}>
 							<input type="hidden" name="kind" value="yarn" /><input type="hidden" name="id" value={y.id} />
-							<button class="del" type="submit">Supprimer</button>
+							<button class="del" type="submit">{t(locale, 'stash.delete')}</button>
 						</form>
 					</div>
 				</div>
@@ -239,12 +241,12 @@
 			{#each data.fabricList as f}
 				<div class="card stash-item">
 					<div class="swatch" style={`background:${f.colorHex ?? '#eee'}`}></div>
-					<strong>{f.name ?? f.fabricType ?? 'Tissu'}</strong>
+					<strong>{f.name ?? f.fabricType ?? t(locale, 'stash.fabric.fallbackName')}</strong>
 					<span class="muted small">{f.composition ?? ''}</span>
-					<span class="small">{[f.lengthCm && `${f.lengthCm} cm`, f.widthCm && `laize ${f.widthCm}`].filter(Boolean).join(' · ')}</span>
+					<span class="small">{[f.lengthCm && `${f.lengthCm} cm`, f.widthCm && `${t(locale, 'stash.fabric.widthPrefix')} ${f.widthCm}`].filter(Boolean).join(' · ')}</span>
 					<form method="POST" action="?/delete" use:enhance={refresh}>
 						<input type="hidden" name="kind" value="fabric" /><input type="hidden" name="id" value={f.id} />
-						<button class="del" type="submit">Supprimer</button>
+						<button class="del" type="submit">{t(locale, 'stash.delete')}</button>
 					</form>
 				</div>
 			{/each}
@@ -255,24 +257,24 @@
 				<div class="card stash-item">
 					<strong>{n.name}</strong>
 					<span class="muted small">{n.category ?? ''}</span>
-					<span class="small">Qté : {n.quantity}</span>
+					<span class="small">{t(locale, 'stash.qtyPrefix')} {n.quantity}</span>
 					<form method="POST" action="?/delete" use:enhance={refresh}>
 						<input type="hidden" name="kind" value="notion" /><input type="hidden" name="id" value={n.id} />
-						<button class="del" type="submit">Supprimer</button>
+						<button class="del" type="submit">{t(locale, 'stash.delete')}</button>
 					</form>
 				</div>
 			{/each}
 		</div>
 	{:else}
 		<div class="grid">
-			{#each data.toolList as t}
+			{#each data.toolList as tl}
 				<div class="card stash-item">
-					<strong>{TOOL_TYPE_LABELS[t.type]}</strong>
-					<span class="small">{[t.sizeMm && `${t.sizeMm} mm`, t.lengthCm && `${t.lengthCm} cm`].filter(Boolean).join(' · ')}</span>
-					<span class="muted small">Qté : {t.quantity}{t.inUseProjectId ? ' · en cours' : ''}</span>
+					<strong>{toolTypeLabel(locale, tl.type)}</strong>
+					<span class="small">{[tl.sizeMm && `${tl.sizeMm} mm`, tl.lengthCm && `${tl.lengthCm} cm`].filter(Boolean).join(' · ')}</span>
+					<span class="muted small">{t(locale, 'stash.qtyPrefix')} {tl.quantity}{tl.inUseProjectId ? ` · ${t(locale, 'stash.inUse')}` : ''}</span>
 					<form method="POST" action="?/delete" use:enhance={refresh}>
-						<input type="hidden" name="kind" value="tool" /><input type="hidden" name="id" value={t.id} />
-						<button class="del" type="submit">Supprimer</button>
+						<input type="hidden" name="kind" value="tool" /><input type="hidden" name="id" value={tl.id} />
+						<button class="del" type="submit">{t(locale, 'stash.delete')}</button>
 					</form>
 				</div>
 			{/each}

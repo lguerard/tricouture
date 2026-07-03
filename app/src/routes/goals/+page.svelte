@@ -1,14 +1,14 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import { t } from '$lib/i18n';
 	let { data } = $props();
 	let adding = $state(false);
+	const locale = $derived(data.locale);
 
-	const KINDS: Record<string, string> = {
-		projets_an: 'Projets dans l’année',
-		stash_busting: 'Vider le stock',
-		defi_mensuel: 'Défi mensuel',
-		autre: 'Autre'
-	};
+	const KIND_VALUES = ['projets_an', 'stash_busting', 'defi_mensuel', 'autre'];
+	const KINDS = $derived(
+		Object.fromEntries(KIND_VALUES.map((v) => [v, t(locale, `goals.kind.${v}`)]))
+	);
 	function pct(c: number, t: number) {
 		return Math.min(100, Math.round((c / Math.max(1, t)) * 100));
 	}
@@ -16,30 +16,30 @@
 
 <div class="container">
 	<header class="head">
-		<h1>Objectifs & défis</h1>
-		<button class="btn-primary" onclick={() => (adding = !adding)}>{adding ? 'Fermer' : '+ Objectif'}</button>
+		<h1>{t(locale, 'goals.title')}</h1>
+		<button class="btn-primary" onclick={() => (adding = !adding)}>{adding ? t(locale, 'goals.close') : t(locale, 'goals.addBtn')}</button>
 	</header>
 
 	{#if adding}
 		<form class="card add" method="POST" action="?/add" use:enhance={() => async ({ update }) => { await update({ reset: true }); adding = false; }}>
 			<div class="row">
-				<div class="field"><label for="t">Titre *</label><input id="t" name="title" required /></div>
+				<div class="field"><label for="t">{t(locale, 'goals.labelTitle')}</label><input id="t" name="title" required /></div>
 				<div class="field">
-					<label for="k">Type</label>
+					<label for="k">{t(locale, 'goals.labelType')}</label>
 					<select id="k" name="kind">{#each Object.entries(KINDS) as [v, l]}<option value={v}>{l}</option>{/each}</select>
 				</div>
-				<div class="field"><label for="tv">Cible</label><input id="tv" name="targetValue" type="number" min="1" value="1" /></div>
+				<div class="field"><label for="tv">{t(locale, 'goals.labelTarget')}</label><input id="tv" name="targetValue" type="number" min="1" value="1" /></div>
 			</div>
 			<div class="row">
-				<div class="field"><label for="ps">Début</label><input id="ps" name="periodStart" type="date" /></div>
-				<div class="field"><label for="pe">Fin</label><input id="pe" name="periodEnd" type="date" /></div>
+				<div class="field"><label for="ps">{t(locale, 'goals.labelStart')}</label><input id="ps" name="periodStart" type="date" /></div>
+				<div class="field"><label for="pe">{t(locale, 'goals.labelEnd')}</label><input id="pe" name="periodEnd" type="date" /></div>
 			</div>
-			<button class="btn-primary" type="submit">Créer</button>
+			<button class="btn-primary" type="submit">{t(locale, 'goals.create')}</button>
 		</form>
 	{/if}
 
 	{#if data.list.length === 0}
-		<p class="muted">Aucun objectif. Fixe-toi un défi 💪</p>
+		<p class="muted">{t(locale, 'goals.empty')}</p>
 	{:else}
 		<div class="grid">
 			{#each data.list as g}

@@ -1,37 +1,39 @@
 <script lang="ts">
-	import { STATUS_LABELS } from '$lib/labels';
+	import { statusLabel } from '$lib/labels';
+	import { t } from '$lib/i18n';
 	let { data } = $props();
+	const locale = $derived(data.locale);
 </script>
 
 <div class="container">
-	<h1>Bonjour {data.user?.displayName} 👋</h1>
+	<h1>{t(locale, 'dash.hello', { name: data.user?.displayName ?? '' })}</h1>
 
 	<div class="grid stats">
 		<a class="card stat" href="/patterns">
 			<span class="num">{data.patternCount}</span>
-			<span class="muted">patrons</span>
+			<span class="muted">{t(locale, 'dash.patterns')}</span>
 		</a>
 		<a class="card stat" href="/projects/board">
 			<span class="num">{data.wip}</span>
-			<span class="muted">projets en cours</span>
+			<span class="muted">{t(locale, 'dash.wip')}</span>
 		</a>
 		<a class="card stat" href="/stash">
 			<span class="num">{data.yarnCount}</span>
-			<span class="muted">laines en stock</span>
+			<span class="muted">{t(locale, 'dash.yarns')}</span>
 		</a>
 	</div>
 
-	<h2>Projets récents</h2>
+	<h2>{t(locale, 'dash.recent')}</h2>
 	{#if data.recentProjects.length === 0}
-		<p class="muted">Aucun projet pour l'instant. <a href="/projects/board">Créer un projet</a></p>
+		<p class="muted">{t(locale, 'dash.none')} <a href="/projects/board">{t(locale, 'dash.create')}</a></p>
 	{:else}
 		<div class="grid">
 			{#each data.recentProjects as p}
 				<a class="card proj" href={`/projects/${p.id}`}>
 					<strong>{p.title}</strong>
-					<span class="tag">{STATUS_LABELS[p.status]}</span>
+					<span class="tag">{statusLabel(locale, p.status)}</span>
 					<div class="bar"><div class="fill" style={`width:${p.progressPct}%`}></div></div>
-					<span class="muted small">{p.progressPct}%{p.deadline ? ` · échéance ${p.deadline}` : ''}</span>
+					<span class="muted small">{p.progressPct}%{p.deadline ? ` · ${t(locale, 'dash.deadline')} ${p.deadline}` : ''}</span>
 				</a>
 			{/each}
 		</div>

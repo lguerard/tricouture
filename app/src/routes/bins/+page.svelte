@@ -1,35 +1,37 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import { t } from '$lib/i18n';
 	let { data } = $props();
 	let adding = $state(false);
+	const locale = $derived(data.locale);
 </script>
 
 <div class="container">
 	<header class="head">
-		<h1>Bacs de rangement</h1>
-		<button class="btn-primary" onclick={() => (adding = !adding)}>{adding ? 'Fermer' : '+ Bac'}</button>
+		<h1>{t(locale, 'bins.title')}</h1>
+		<button class="btn-primary" onclick={() => (adding = !adding)}>{adding ? t(locale, 'bins.close') : t(locale, 'bins.addBtn')}</button>
 	</header>
-	<p class="muted">Imprime le QR et colle-le sur le bac. Scanne-le depuis l'app mobile pour voir son contenu.</p>
+	<p class="muted">{t(locale, 'bins.subtitle')}</p>
 
 	{#if adding}
 		<form class="card add" method="POST" action="?/add" use:enhance={() => async ({ update }) => { await update({ reset: true }); adding = false; }}>
 			<div class="row">
-				<div class="field"><label for="l">Nom du bac *</label><input id="l" name="label" required placeholder="Bac laine hiver" /></div>
-				<div class="field"><label for="loc">Emplacement</label><input id="loc" name="location" placeholder="placard chambre" /></div>
+				<div class="field"><label for="l">{t(locale, 'bins.labelName')}</label><input id="l" name="label" required placeholder={t(locale, 'bins.placeholderName')} /></div>
+				<div class="field"><label for="loc">{t(locale, 'bins.labelLocation')}</label><input id="loc" name="location" placeholder={t(locale, 'bins.placeholderLocation')} /></div>
 			</div>
-			<button class="btn-primary" type="submit">Créer</button>
+			<button class="btn-primary" type="submit">{t(locale, 'bins.create')}</button>
 		</form>
 	{/if}
 
 	<div class="grid">
 		{#each data.bins as b}
 			<div class="card bin">
-				<img src={b.qrDataUrl} alt={`QR ${b.label}`} />
+				<img src={b.qrDataUrl} alt={t(locale, 'bins.qrAlt', { label: b.label })} />
 				<strong>{b.label}</strong>
 				{#if b.location}<span class="muted small">{b.location}</span>{/if}
-				<span class="small">{b.itemCount} article{b.itemCount > 1 ? 's' : ''}</span>
+				<span class="small">{t(locale, b.itemCount > 1 ? 'bins.itemsMany' : 'bins.itemsOne', { n: b.itemCount })}</span>
 				<div class="actions">
-					<button onclick={() => window.print()}>🖨 Imprimer</button>
+					<button onclick={() => window.print()}>🖨 {t(locale, 'bins.print')}</button>
 					<form method="POST" action="?/delete" use:enhance><input type="hidden" name="id" value={b.id} /><button class="del" type="submit">🗑</button></form>
 				</div>
 			</div>

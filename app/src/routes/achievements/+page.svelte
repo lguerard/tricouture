@@ -1,11 +1,14 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { TIER_LABEL, TIER_COLOR, type Tier } from '$lib/achievements';
+	import { tierLabel, TIER_COLOR, type Tier } from '$lib/achievements';
+	import { t } from '$lib/i18n';
 	let { data } = $props();
+
+	const locale = $derived(data.locale);
 
 	const completion = $derived(Math.round((data.unlockedCount / data.totalCount) * 100));
 
-	// Répartition par rareté.
+	// Breakdown by rarity.
 	const tiers: Tier[] = ['bronze', 'argent', 'or', 'platine'];
 	const byTier = $derived(
 		tiers.map((t) => ({
@@ -15,7 +18,7 @@
 		}))
 	);
 
-	// Regroupement par catégorie (verrouillés affichés avec progression).
+	// Grouped by category (locked ones shown with progress).
 	const categories = $derived.by(() => {
 		const map = new Map<string, typeof data.list>();
 		for (const a of data.list) {
@@ -25,7 +28,7 @@
 		return [...map.entries()];
 	});
 
-	// Toast facon Steam pour les succès fraîchement débloqués.
+	// Steam-style toast for freshly unlocked achievements.
 	let toasts = $state<typeof data.newlyUnlocked>([]);
 	onMount(() => {
 		if (data.newlyUnlocked.length) {
@@ -36,14 +39,18 @@
 
 	function fmtDate(d: string | Date | null) {
 		if (!d) return '';
-		return new Date(d).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' });
+		return new Date(d).toLocaleDateString(locale === 'fr' ? 'fr-FR' : 'en-US', {
+			day: 'numeric',
+			month: 'short',
+			year: 'numeric'
+		});
 	}
 </script>
 
 <div class="container">
-	<h1>Succès</h1>
+	<h1>{t(locale, 'achievements.title')}</h1>
 
-	<!-- Bandeau récap facon gamerscore -->
+	<!-- Gamerscore-style recap banner -->
 	<div class="card hero">
 		<div class="score">
 			<span class="pts">{data.earnedPoints}</span>
@@ -51,31 +58,39 @@
 		</div>
 		<div class="bigbar">
 			<div class="bigfill" style={`width:${completion}%`}></div>
-			<span class="biglabel">{data.unlockedCount} / {data.totalCount} succès · {completion}%</span>
+			<span class="biglabel"
+				>{t(locale, 'achievements.progressLabel', {
+					unlocked: data.unlockedCount,
+					total: data.totalCount,
+					completion
+				})}</span
+			>
 		</div>
 		<div class="tierline">
 			{#each byTier as bt}
 				<span class="tchip" style={`--c:${TIER_COLOR[bt.tier]}`}>
-					<span class="dot"></span>{TIER_LABEL[bt.tier]} {bt.unlocked}/{bt.total}
+					<span class="dot"></span>{tierLabel(locale, bt.tier)} {bt.unlocked}/{bt.total}
 				</span>
 			{/each}
 		</div>
 	</div>
 
 	{#each categories as [cat, items]}
-		<h2 class="cat">{cat}</h2>
+		<h2 class="cat">{t(locale, `achv.cat.${cat}`)}</h2>
 		<div class="grid ach-grid">
 			{#each items as a}
 				<div class="ach card" class:locked={!a.unlocked} style={`--c:${TIER_COLOR[a.tier]}`}>
 					<div class="ico">{a.icon}</div>
 					<div class="body">
 						<div class="top">
-							<strong>{a.label}</strong>
-							<span class="pill">{TIER_LABEL[a.tier]} · {a.points}</span>
+							<strong>{t(locale, `achv.${a.code}.label`)}</strong>
+							<span class="pill">{tierLabel(locale, a.tier)} · {a.points}</span>
 						</div>
-						<span class="muted small">{a.description}</span>
+						<span class="muted small">{t(locale, `achv.${a.code}.description`)}</span>
 						{#if a.unlocked}
-							<span class="done">✓ Débloqué {fmtDate(a.unlockedAt)}</span>
+							<span class="done"
+								>{t(locale, 'achievements.unlockedOn', { date: fmtDate(a.unlockedAt) })}</span
+							>
 						{:else}
 							<div class="pbar"><div class="pfill" style={`width:${Math.round((a.current / a.target) * 100)}%`}></div></div>
 							<span class="muted small">{a.current} / {a.target}</span>
@@ -89,12 +104,14 @@
 
 <!-- Toasts -->
 <div class="toasts">
-	{#each toasts as t}
-		<div class="toast" style={`--c:${TIER_COLOR[t.tier]}`}>
-			<div class="ticon">{t.icon}</div>
+	{#each toasts as toast}
+		<div class="toast" style={`--c:${TIER_COLOR[toast.tier]}`}>
+			<div class="ticon">{toast.icon}</div>
 			<div>
-				<div class="muted small">Succès débloqué · {t.points} pts</div>
-				<strong>{t.label}</strong>
+				<div class="muted small">
+					{t(locale, 'achievements.toastUnlocked', { points: toast.points })}
+				</div>
+				<strong>{t(locale, `achv.${toast.code}.label`)}</strong>
 			</div>
 		</div>
 	{/each}

@@ -2,10 +2,12 @@
 	import { dndzone, type DndEvent } from 'svelte-dnd-action';
 	import { flip } from 'svelte/animate';
 	import { goto } from '$app/navigation';
-	import { STATUS_LABELS } from '$lib/labels';
+	import { statusLabel } from '$lib/labels';
+	import { t } from '$lib/i18n';
 	import type { ProjectStatus } from '$lib/server/db/schema';
 
 	let { data } = $props();
+	const locale = $derived(data.locale);
 
 	type Card = (typeof data.columns)['idee'][number];
 	let cols = $state<Record<ProjectStatus, Card[]>>(structuredClone(data.columns));
@@ -33,14 +35,14 @@
 
 <div class="container wide">
 	<header class="head">
-		<h1>Projets</h1>
-		<a class="btn btn-primary" href="/projects/new">+ Nouveau projet</a>
+		<h1>{t(locale, 'projects.board.title')}</h1>
+		<a class="btn btn-primary" href="/projects/new">{t(locale, 'projects.board.newProject')}</a>
 	</header>
 
 	<div class="board">
 		{#each data.order as status}
 			<section class="column">
-				<h2>{STATUS_LABELS[status]} <span class="count">{cols[status].length}</span></h2>
+				<h2>{statusLabel(locale, status)} <span class="count">{cols[status].length}</span></h2>
 				<div
 					class="dropzone"
 					use:dndzone={{ items: cols[status], flipDurationMs: flipMs, dropTargetStyle: {} }}
@@ -48,24 +50,30 @@
 					onfinalize={(e) => finalize(status, e)}
 				>
 					{#each cols[status] as card (card.id)}
+						{@const dl = daysLeft(card.deadline)}
 						<div class="kcard" animate:flip={{ duration: flipMs }}>
 							<button class="open" onclick={() => goto(`/projects/${card.id}`)}>
 								<strong>{card.title}</strong>
 							</button>
 							<div class="bar"><div class="fill" style={`width:${card.progressPct}%`}></div></div>
 							<div class="meta">
-								<span class="muted small">{card.progressPct}%{card.totalRows ? ` · rg ${card.currentRow}/${card.totalRows}` : ''}</span>
-								{#if daysLeft(card.deadline) !== null}
-									{@const dl = daysLeft(card.deadline)}
-									<span class="badge" class:late={dl !== null && dl < 0} class:soon={dl !== null && dl >= 0 && dl <= 7}>
-										{dl !== null && dl < 0 ? `${-dl} j de retard` : `J−${dl}`}
+								<span class="muted small">
+									{card.progressPct}%{card.totalRows
+										? ` · ${t(locale, 'projects.board.rowsShort', { current: card.currentRow, total: card.totalRows })}`
+										: ''}
+								</span>
+								{#if dl !== null}
+									<span class="badge" class:late={dl < 0} class:soon={dl >= 0 && dl <= 7}>
+										{dl < 0
+											? t(locale, 'projects.board.lateDays', { n: -dl })
+											: t(locale, 'projects.board.dueIn', { n: dl })}
 									</span>
 								{/if}
 							</div>
 						</div>
 					{/each}
 					{#if cols[status].length === 0}
-						<p class="empty muted small">Glisse une carte ici</p>
+						<p class="empty muted small">{t(locale, 'projects.board.emptyColumn')}</p>
 					{/if}
 				</div>
 			</section>

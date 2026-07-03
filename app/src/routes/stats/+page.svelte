@@ -1,27 +1,30 @@
 <script lang="ts">
+	import { t } from '$lib/i18n';
+
 	let { data } = $props();
 	const s = $derived(data.stats);
+	const locale = $derived(data.locale);
 </script>
 
 <div class="container">
-	<h1>Mon année en mailles — {s.year}</h1>
+	<h1>{t(locale, 'stats.title', { year: s.year })}</h1>
 
 	<div class="hero grid">
-		<div class="card stat"><span class="num">{s.finishedThisYear}</span><span>projets terminés</span></div>
-		<div class="card stat"><span class="num">{s.metersThisYear}</span><span>mètres tricotés</span></div>
-		<div class="card stat"><span class="num">{s.hoursThisYear}</span><span>heures de craft</span></div>
-		<div class="card stat green"><span class="num">{s.savingsThisYearEur} €</span><span>économisés</span></div>
+		<div class="card stat"><span class="num">{s.finishedThisYear}</span><span>{t(locale, 'stats.finishedThisYear')}</span></div>
+		<div class="card stat"><span class="num">{s.metersThisYear}</span><span>{t(locale, 'stats.metersThisYear')}</span></div>
+		<div class="card stat"><span class="num">{s.hoursThisYear}</span><span>{t(locale, 'stats.hoursThisYear')}</span></div>
+		<div class="card stat green"><span class="num">{s.savingsThisYearEur} €</span><span>{t(locale, 'stats.savingsThisYear')}</span></div>
 	</div>
 
-	<h2>Compteurs à vie</h2>
+	<h2>{t(locale, 'stats.lifetimeCounters')}</h2>
 	<div class="grid">
-		<div class="card mini"><strong>{s.finishedLifetime}</strong> projets finis au total</div>
-		<div class="card mini"><strong>{s.patternCount}</strong> patrons</div>
-		<div class="card mini"><strong>{s.yarnCount}</strong> laines en stock</div>
-		<div class="card mini"><strong>{s.activeWip}</strong> projets en cours</div>
+		<div class="card mini"><strong>{s.finishedLifetime}</strong> {t(locale, 'stats.finishedLifetime')}</div>
+		<div class="card mini"><strong>{s.patternCount}</strong> {t(locale, 'dash.patterns')}</div>
+		<div class="card mini"><strong>{s.yarnCount}</strong> {t(locale, 'dash.yarns')}</div>
+		<div class="card mini"><strong>{s.activeWip}</strong> {t(locale, 'dash.wip')}</div>
 	</div>
 
-	<h2>Succès</h2>
+	<h2>{t(locale, 'nav.achievements')}</h2>
 	<a class="card ach-summary" href="/achievements">
 		<div class="ach-score">
 			<span class="num">{data.ach.earnedPoints}</span>
@@ -30,7 +33,9 @@
 		<div class="ach-bar">
 			<div class="ach-fill" style={`width:${Math.round((data.ach.unlockedCount / data.ach.totalCount) * 100)}%`}></div>
 		</div>
-		<span class="muted small">{data.ach.unlockedCount} / {data.ach.totalCount} succès débloqués · voir tout →</span>
+		<span class="muted small"
+			>{t(locale, 'stats.achUnlockedLine', { unlocked: data.ach.unlockedCount, total: data.ach.totalCount })}</span
+		>
 	</a>
 </div>
 

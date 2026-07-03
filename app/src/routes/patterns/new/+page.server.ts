@@ -5,6 +5,7 @@ import { patterns, patternFiles } from '$lib/server/db/schema';
 import { saveUpload } from '$lib/server/storage';
 import { extractPdfText } from '$lib/server/pdf';
 import { embed, aiConfigured } from '$lib/server/ai/ollama';
+import { t } from '$lib/i18n';
 import type { Actions } from './$types';
 import type { Craft } from '$lib/server/db/schema';
 
@@ -25,7 +26,7 @@ export const actions: Actions = {
 		const title = String(form.get('title') ?? '').trim();
 		const craft = parseCraft(String(form.get('craft') ?? ''));
 		if (!title || !craft) {
-			return fail(400, { error: 'Titre et type de craft requis.' });
+			return fail(400, { error: t(event.locals.locale, 'patterns.new.error.missingFields') });
 		}
 
 		const tags = String(form.get('tags') ?? '')
