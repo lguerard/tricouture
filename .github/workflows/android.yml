@@ -103,7 +103,6 @@ jobs:
       #   KEY_ALIAS            – key alias (e.g. tricouture)
       #   KEY_PASSWORD         – key password
       - name: Sign release APK
-        if: ${{ secrets.KEYSTORE_BASE64 != '' }}
         working-directory: mobile/android
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
@@ -111,6 +110,10 @@ jobs:
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "No KEYSTORE_BASE64 secret set — skipping release signing."
+            exit 0
+          fi
           echo "$KEYSTORE_BASE64" | base64 -d > /tmp/tricouture.jks
           ./gradlew assembleRelease \
             -Pandroid.injected.signing.store.file=/tmp/tricouture.jks \
@@ -121,7 +124,7 @@ jobs:
           rm -f /tmp/tricouture.jks
 
       - name: Upload release APK artifact
-        if: ${{ secrets.KEYSTORE_BASE64 != '' }}
+        if: ${{ hashFiles('mobile/android/app/build/outputs/apk/release/app-release.apk') != '' }}
         uses: actions/upload-artifact@v4
         with:
           name: tricouture-android-release
