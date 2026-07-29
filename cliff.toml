@@ -38,6 +38,8 @@ filter_unconventional = true
 split_commits = false
 # Groups by type; the icon is preserved in the message.
 commit_parsers = [
+  # Merge commits are noise in a changelog — the merged commits are already listed.
+  { message = "^Merge ", skip = true },
   { message = "^feat", group = "✨ Features" },
   { message = "^fix", group = "🐛 Bug fixes" },
   { message = "^docs", group = "📝 Documentation" },
