@@ -39,7 +39,10 @@ split_commits = false
 # Groups by type; the icon is preserved in the message.
 commit_parsers = [
   # Merge commits are noise in a changelog — the merged commits are already listed.
+  # Anchored to the message start so a commit that merely mentions "merge dev
+  # ... main" in its own text isn't swept up too.
   { message = "^Merge ", skip = true },
+  { message = "(?i)^chore:\\s*merge dev.*main", skip = true },
   { message = "^feat", group = "✨ Features" },
   { message = "^fix", group = "🐛 Bug fixes" },
   { message = "^docs", group = "📝 Documentation" },
