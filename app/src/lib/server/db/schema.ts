@@ -124,6 +124,7 @@ export const yarns = pgTable(
 		dyeLot: varchar('dye_lot', { length: 80 }), // dye lot number
 		weightCategory: varchar('weight_category', { length: 40 }), // fingering, worsted...
 		fiber: varchar('fiber', { length: 160 }), // e.g. 100% merino wool
+		motif: varchar('motif', { length: 40 }), // solid, stripes, floral... (see MOTIF_VALUES)
 		yardsPerSkein: integer('yards_per_skein'), // meters per skein
 		gramsPerSkein: integer('grams_per_skein'),
 		skeins: real('skeins').notNull().default(1), // quantity (skeins)
@@ -147,6 +148,7 @@ export const fabrics = pgTable(
 		fabricType: varchar('fabric_type', { length: 120 }), // jersey, cotton, linen...
 		composition: varchar('composition', { length: 160 }),
 		colorHex: varchar('color_hex', { length: 7 }),
+		motif: varchar('motif', { length: 40 }), // solid, stripes, floral... (see MOTIF_VALUES)
 		lengthCm: integer('length_cm'),
 		widthCm: integer('width_cm'), // fabric width
 		photoPath: text('photo_path'),
@@ -188,6 +190,7 @@ export const tools = pgTable(
 		quantity: integer('quantity').notNull().default(1),
 		// project currently using this tool (null = available)
 		inUseProjectId: uuid('in_use_project_id'),
+		photoPath: text('photo_path'),
 		binId: uuid('bin_id'),
 		notes: text('notes'),
 		createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()

@@ -15,6 +15,13 @@
       "when": 1782802685633,
       "tag": "0001_vector_indexes",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1787991801091,
+      "tag": "0002_petite_loners",
+      "breakpoints": true
     }
   ]
 }
