@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
-	import { YARN_WEIGHTS, toolTypeOptions, toolTypeLabel } from '$lib/labels';
+	import { YARN_WEIGHTS, MOTIF_VALUES, motifLabel, COLOR_NAMES, toolTypeOptions, toolTypeLabel } from '$lib/labels';
 	import { isCapacitor, scanBarcode } from '$lib/capacitor';
 	import { t } from '$lib/i18n';
 	let { data } = $props();
@@ -21,6 +21,10 @@
 		return async ({ update }: { update: (opts?: { reset?: boolean }) => Promise<void> }) => {
 			await update({ reset: true });
 			adding = false;
+			fetchedPhoto = null;
+			scanMsg = '';
+			importUrl = '';
+			showUrlImport = false;
 		};
 	};
 
@@ -53,23 +57,111 @@
 		previewBusy = false;
 	}
 
-	// Barcode scan via Capacitor (native Android).
+	// Fields pre-fill: shared by label OCR, barcode lookup, and URL import — across all 4 tabs.
+	// Maps a generic field key (as returned by the lookup APIs) to the DOM id in each tab's form.
+	const FIELD_IDS: Record<Tab, Record<string, string>> = {
+		yarn: { brand: 'b', name: 'n', colorway: 'cw', colorHex: 'ch', fiber: 'fi', motif: 'mo', yardsPerSkein: 'yp', weightCategory: 'wc' },
+		fabric: { name: 'fn', fabricType: 'ft', composition: 'fcomp', colorHex: 'fc', motif: 'fmo', widthCm: 'fw' },
+		notion: { name: 'nn', category: 'nc' },
+		tool: { type: 'tt', sizeMm: 'ts', lengthCm: 'tl' }
+	};
+	// Color/motif fields only exist on yarn and fabric.
+	const COLOR_MOTIF_IDS: Record<string, { color: string; motif: string }> = {
+		yarn: { color: 'ch', motif: 'mo' },
+		fabric: { color: 'fc', motif: 'fmo' }
+	};
+
+	let scanMsg = $state('');
+	let fetchedPhoto = $state<string | null>(null);
+	function applyFields(f: Record<string, unknown>) {
+		const set = (id: string, v: unknown) => {
+			if (v == null || v === '') return;
+			const el = document.getElementById(id) as HTMLInputElement | HTMLSelectElement | null;
+			if (el) el.value = String(v);
+		};
+		for (const [key, id] of Object.entries(FIELD_IDS[tab])) set(id, f[key]);
+	}
+
+	// Photo analysis: guesses colorHex (dominant color) + motif (zero-shot CLIP, if the
+	// vision service has it installed) from an actual photo of the item. Only fills fields
+	// that are still empty/default so it never overwrites an explicit choice or a value
+	// already guessed from product page text.
+	let analyzing = $state(false);
+	async function analyzePhoto(file: Blob) {
+		const ids = COLOR_MOTIF_IDS[tab];
+		if (!ids) return;
+		const colorEl = document.getElementById(ids.color) as HTMLInputElement | null;
+		const motifEl = document.getElementById(ids.motif) as HTMLSelectElement | null;
+		const needsColor = !!colorEl && (!colorEl.value || colorEl.value.toLowerCase() === '#cccccc');
+		const needsMotif = !!motifEl && !motifEl.value;
+		if (!needsColor && !needsMotif) return;
+		analyzing = true;
+		try {
+			const fd = new FormData();
+			fd.append('file', file, 'photo.jpg');
+			const res = await fetch('/api/ai/analyze-photo', { method: 'POST', body: fd });
+			if (res.ok) {
+				const d = await res.json();
+				if (needsColor && d.colorHex && colorEl) colorEl.value = d.colorHex;
+				if (needsMotif && d.motif && motifEl) motifEl.value = d.motif;
+				if (d.colorHex || d.motif) scanMsg = t(locale, 'stash.fieldsPrefilled');
+			}
+		} catch {
+			// vision service unavailable — leave fields as-is
+		}
+		analyzing = false;
+	}
+	async function analyzeDataUrl(dataUrl: string) {
+		try {
+			const blob = await (await fetch(dataUrl)).blob();
+			await analyzePhoto(blob);
+		} catch {
+			// ignore
+		}
+	}
+
+	// Barcode scan via Capacitor (native Android), then a UPC lookup for brand/fiber/photo.
 	let barcodeBusy = $state(false);
 	async function scanBarcodeNative() {
 		barcodeBusy = true;
+		scanMsg = '';
+		fetchedPhoto = null;
 		const code = await scanBarcode();
+		if (!code) {
+			barcodeBusy = false;
+			return;
+		}
+		// Yarn keeps the raw code in "notes" for manual reference (other tabs have no notes field).
+		if (tab === 'yarn') {
+			const el = document.getElementById('yarn-notes') as HTMLInputElement | null;
+			if (el) el.value = code;
+		}
+		try {
+			const res = await fetch('/api/ai/lookup-barcode', {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({ code, kind: tab })
+			});
+			const data = await res.json();
+			if (res.ok) {
+				applyFields(data.fields ?? {});
+				if (data.photoDataUrl) {
+					fetchedPhoto = data.photoDataUrl;
+					await analyzeDataUrl(data.photoDataUrl);
+				}
+				scanMsg = t(locale, 'stash.fieldsPrefilled');
+			} else {
+				scanMsg = t(locale, 'stash.codeScanned', { code });
+			}
+		} catch {
+			scanMsg = t(locale, 'stash.codeScanned', { code });
+		}
 		barcodeBusy = false;
-		if (!code) return;
-		// Pre-fills the "notes" field with the scanned code for manual reference.
-		// TODO: wire up a lookup API (Open Food Facts, Ravelry…).
-		const el = document.getElementById('yarn-notes') as HTMLInputElement | null;
-		if (el) el.value = code;
-		scanMsg = t(locale, 'stash.codeScanned', { code });
 	}
 
 	// Label scan: sends the photo to the vision service, pre-fills the form.
+	// The vision service guesses yarn-shaped fields; for fabric, "fiber" reads as composition.
 	let scanBusy = $state(false);
-	let scanMsg = $state('');
 	async function scanLabel(e: Event) {
 		const input = e.target as HTMLInputElement;
 		const file = input.files?.[0];
@@ -84,15 +176,9 @@
 			if (!res.ok) {
 				scanMsg = data.error ?? t(locale, 'stash.scanUnavailable');
 			} else {
-				const f = data.fields ?? {};
-				const set = (id: string, v: unknown) => {
-					if (v == null) return;
-					const el = document.getElementById(id) as HTMLInputElement | HTMLSelectElement | null;
-					if (el) el.value = String(v);
-				};
-				set('fi', f.fiber);
-				set('yp', f.yardsPerSkein);
-				set('wc', f.weightCategory);
+				const raw = data.fields ?? {};
+				applyFields(tab === 'fabric' ? { name: raw.name, composition: raw.fiber } : raw);
+				await analyzePhoto(file);
 				scanMsg = t(locale, 'stash.fieldsPrefilled');
 			}
 		} catch {
@@ -100,6 +186,84 @@
 		}
 		scanBusy = false;
 	}
+
+	// Import from a shop product page URL: scrapes JSON-LD/OpenGraph, pre-fills fields + photo.
+	let showUrlImport = $state(false);
+	let importUrl = $state('');
+	let importBusy = $state(false);
+	async function importFromUrl() {
+		const url = importUrl.trim();
+		if (!url) return;
+		importBusy = true;
+		scanMsg = '';
+		fetchedPhoto = null;
+		try {
+			const res = await fetch('/api/ai/lookup-url', {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({ url, kind: tab })
+			});
+			const data = await res.json();
+			if (!res.ok) {
+				scanMsg = data.error ?? t(locale, 'stash.scanUnavailable');
+			} else {
+				applyFields(data.fields ?? {});
+				if (data.photoDataUrl) {
+					fetchedPhoto = data.photoDataUrl;
+					await analyzeDataUrl(data.photoDataUrl);
+				}
+				scanMsg = t(locale, 'stash.fieldsPrefilled');
+				showUrlImport = false;
+			}
+		} catch {
+			scanMsg = t(locale, 'stash.networkError');
+		}
+		importBusy = false;
+	}
+
+	// Smart search: color name/hex, material/fiber, motif, or any plain text — client-side,
+	// works instantly on the already-loaded stash without needing AI.
+	let searchQuery = $state('');
+
+	function normalize(s: string): string {
+		return s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
+	}
+
+	function hexDistance(a: string, b: string): number {
+		const pa = parseInt(a.replace('#', ''), 16);
+		const pb = parseInt(b.replace('#', ''), 16);
+		const dr = ((pa >> 16) & 255) - ((pb >> 16) & 255);
+		const dg = ((pa >> 8) & 255) - ((pb >> 8) & 255);
+		const db = (pa & 255) - (pb & 255);
+		return Math.sqrt(dr * dr + dg * dg + db * db);
+	}
+
+	// Matches free-text fields, or (if the query is a color name/hex) the item's colorHex.
+	function matchesSearch(fields: (string | null | undefined)[], colorHex: string | null | undefined, query: string): boolean {
+		if (!query) return true;
+		const q = normalize(query);
+		if (fields.some((f) => f && normalize(f).includes(q))) return true;
+		if (!colorHex) return false;
+		const target = COLOR_NAMES[q] ?? (/^#?[0-9a-f]{6}$/i.test(q) ? (q.startsWith('#') ? q : `#${q}`) : null);
+		return target != null && hexDistance(target, colorHex) < 110;
+	}
+
+	const filteredYarns = $derived(
+		data.yarnList.filter((y) =>
+			matchesSearch([y.brand, y.name, y.colorway, y.fiber, y.weightCategory, y.motif && motifLabel(locale, y.motif), y.dyeLot, y.notes], y.colorHex, searchQuery)
+		)
+	);
+	const filteredFabrics = $derived(
+		data.fabricList.filter((f) =>
+			matchesSearch([f.name, f.fabricType, f.composition, f.motif && motifLabel(locale, f.motif)], f.colorHex, searchQuery)
+		)
+	);
+	const filteredNotions = $derived(
+		data.notionList.filter((n) => matchesSearch([n.name, n.category], null, searchQuery))
+	);
+	const filteredTools = $derived(
+		data.toolList.filter((tl) => matchesSearch([toolTypeLabel(locale, tl.type)], null, searchQuery))
+	);
 </script>
 
 <div class="container">
@@ -117,22 +281,42 @@
 		</button>
 	</div>
 
+	<input type="search" class="search-box" placeholder={t(locale, 'stash.searchPlaceholder')} bind:value={searchQuery} />
+
 	{#if adding}
 		<div class="card add">
-			{#if tab === 'yarn'}
-				<div class="scan">
-					{#if isCapacitor()}
-						<button type="button" class="scan-btn" onclick={scanBarcodeNative} disabled={barcodeBusy}>
-							{barcodeBusy ? t(locale, 'stash.scanning') : `📦 ${t(locale, 'stash.scanBarcode')}`}
-						</button>
-					{/if}
+			<div class="scan">
+				{#if isCapacitor()}
+					<button type="button" class="scan-btn" onclick={scanBarcodeNative} disabled={barcodeBusy}>
+						{barcodeBusy ? t(locale, 'stash.scanning') : `📦 ${t(locale, 'stash.scanBarcode')}`}
+					</button>
+				{/if}
+				{#if tab === 'yarn' || tab === 'fabric'}
 					<label class="scan-btn">
 						📷 {t(locale, 'stash.scanLabel')}
 						<input type="file" accept="image/*" capture="environment" onchange={scanLabel} hidden />
 					</label>
-					{#if scanBusy}<span class="muted small">{t(locale, 'stash.analyzing')}</span>{/if}
-					{#if scanMsg}<span class="muted small">{scanMsg}</span>{/if}
+				{/if}
+				<button type="button" class="scan-btn" onclick={() => (showUrlImport = !showUrlImport)}>
+					🔗 {t(locale, 'stash.importUrl')}
+				</button>
+				{#if scanBusy || analyzing}<span class="muted small">{t(locale, 'stash.analyzing')}</span>{/if}
+				{#if scanMsg}<span class="muted small">{scanMsg}</span>{/if}
+			</div>
+			{#if showUrlImport}
+				<div class="url-import">
+					<input
+						type="url"
+						placeholder={t(locale, 'stash.importUrlPlaceholder')}
+						bind:value={importUrl}
+						onkeydown={(e) => e.key === 'Enter' && (e.preventDefault(), importFromUrl())}
+					/>
+					<button type="button" class="btn-primary" onclick={importFromUrl} disabled={importBusy}>
+						{importBusy ? t(locale, 'stash.analyzing') : t(locale, 'stash.importUrlSubmit')}
+					</button>
 				</div>
+			{/if}
+			{#if tab === 'yarn'}
 				<form method="POST" action="?/addYarn" enctype="multipart/form-data" use:enhance={refresh}>
 					<div class="row3">
 						<div class="field"><label for="b">{t(locale, 'stash.yarn.brand')}</label><input id="b" name="brand" /></div>
@@ -155,12 +339,38 @@
 						<div class="field"><label for="yp">{t(locale, 'stash.yarn.yardsPerSkein')}</label><input id="yp" name="yardsPerSkein" type="number" /></div>
 						<div class="field"><label for="sk">{t(locale, 'stash.yarn.skeins')}</label><input id="sk" name="skeins" type="number" step="0.5" value="1" /></div>
 					</div>
-					<div class="field"><label for="ph">{t(locale, 'stash.yarn.photo')}</label><input id="ph" name="photo" type="file" accept="image/*" /></div>
+					<div class="row3">
+						<div class="field">
+							<label for="mo">{t(locale, 'stash.yarn.motif')}</label>
+							<select id="mo" name="motif">
+								<option value="">{t(locale, 'stash.optionNone')}</option>
+								{#each MOTIF_VALUES as m}<option value={m}>{motifLabel(locale, m)}</option>{/each}
+							</select>
+						</div>
+					</div>
+					<div class="field">
+						<label for="ph">{t(locale, 'stash.yarn.photo')}</label>
+						<input
+							id="ph"
+							name="photo"
+							type="file"
+							accept="image/*"
+							onchange={(e) => {
+								fetchedPhoto = null;
+								const f = (e.target as HTMLInputElement).files?.[0];
+								if (f) analyzePhoto(f);
+							}}
+						/>
+						{#if fetchedPhoto}
+							<img src={fetchedPhoto} alt={t(locale, 'stash.yarn.previewAlt')} class="fetched-photo" />
+							<input type="hidden" name="photoDataUrl" value={fetchedPhoto} />
+						{/if}
+					</div>
 					<div class="field"><label for="yarn-notes">{t(locale, 'stash.yarn.notes')}</label><input id="yarn-notes" name="notes" /></div>
 					<button class="btn-primary" type="submit">{t(locale, 'stash.yarn.submit')}</button>
 				</form>
 			{:else if tab === 'fabric'}
-				<form method="POST" action="?/addFabric" use:enhance={refresh}>
+				<form method="POST" action="?/addFabric" enctype="multipart/form-data" use:enhance={refresh}>
 					<div class="row3">
 						<div class="field"><label for="fn">{t(locale, 'stash.fabric.name')}</label><input id="fn" name="name" /></div>
 						<div class="field"><label for="ft">{t(locale, 'stash.fabric.type')}</label><input id="ft" name="fabricType" placeholder={t(locale, 'stash.fabric.typePlaceholder')} /></div>
@@ -171,6 +381,33 @@
 						<div class="field"><label for="fl">{t(locale, 'stash.fabric.length')}</label><input id="fl" name="lengthCm" type="number" /></div>
 						<div class="field"><label for="fw">{t(locale, 'stash.fabric.width')}</label><input id="fw" name="widthCm" type="number" /></div>
 					</div>
+					<div class="row3">
+						<div class="field">
+							<label for="fmo">{t(locale, 'stash.fabric.motif')}</label>
+							<select id="fmo" name="motif">
+								<option value="">{t(locale, 'stash.optionNone')}</option>
+								{#each MOTIF_VALUES as m}<option value={m}>{motifLabel(locale, m)}</option>{/each}
+							</select>
+						</div>
+					</div>
+					<div class="field">
+						<label for="fph">{t(locale, 'stash.yarn.photo')}</label>
+						<input
+							id="fph"
+							name="photo"
+							type="file"
+							accept="image/*"
+							onchange={(e) => {
+								fetchedPhoto = null;
+								const f = (e.target as HTMLInputElement).files?.[0];
+								if (f) analyzePhoto(f);
+							}}
+						/>
+						{#if fetchedPhoto}
+							<img src={fetchedPhoto} alt={t(locale, 'stash.yarn.previewAlt')} class="fetched-photo" />
+							<input type="hidden" name="photoDataUrl" value={fetchedPhoto} />
+						{/if}
+					</div>
 					<button class="btn-primary" type="submit">{t(locale, 'stash.fabric.submit')}</button>
 				</form>
 			{:else if tab === 'notion'}
@@ -180,10 +417,14 @@
 						<div class="field"><label for="nc">{t(locale, 'stash.notion.category')}</label><input id="nc" name="category" placeholder={t(locale, 'stash.notion.categoryPlaceholder')} /></div>
 						<div class="field"><label for="nq">{t(locale, 'stash.notion.quantity')}</label><input id="nq" name="quantity" type="number" value="1" /></div>
 					</div>
+					{#if fetchedPhoto}
+						<img src={fetchedPhoto} alt={t(locale, 'stash.yarn.previewAlt')} class="fetched-photo" />
+						<input type="hidden" name="photoDataUrl" value={fetchedPhoto} />
+					{/if}
 					<button class="btn-primary" type="submit">{t(locale, 'stash.notion.submit')}</button>
 				</form>
 			{:else}
-				<form method="POST" action="?/addTool" use:enhance={refresh}>
+				<form method="POST" action="?/addTool" enctype="multipart/form-data" use:enhance={refresh}>
 					<div class="row3">
 						<div class="field">
 							<label for="tt">{t(locale, 'stash.tool.type')}</label>
@@ -195,6 +436,14 @@
 						<div class="field"><label for="tl">{t(locale, 'stash.tool.cable')}</label><input id="tl" name="lengthCm" type="number" /></div>
 					</div>
 					<div class="field"><label for="tq">{t(locale, 'stash.tool.quantity')}</label><input id="tq" name="quantity" type="number" value="1" /></div>
+					<div class="field">
+						<label for="tph">{t(locale, 'stash.yarn.photo')}</label>
+						<input id="tph" name="photo" type="file" accept="image/*" onchange={() => (fetchedPhoto = null)} />
+						{#if fetchedPhoto}
+							<img src={fetchedPhoto} alt={t(locale, 'stash.yarn.previewAlt')} class="fetched-photo" />
+							<input type="hidden" name="photoDataUrl" value={fetchedPhoto} />
+						{/if}
+					</div>
 					<button class="btn-primary" type="submit">{t(locale, 'stash.tool.submit')}</button>
 				</form>
 			{/if}
@@ -202,8 +451,9 @@
 	{/if}
 
 	{#if tab === 'yarn'}
+		{#if filteredYarns.length === 0}<p class="muted">{t(locale, 'stash.noResults')}</p>{/if}
 		<div class="grid">
-			{#each data.yarnList as y}
+			{#each filteredYarns as y}
 				<div class="card stash-item">
 					{#if previewYarnId === y.id && previewSrc}
 						<img src={previewSrc} alt={t(locale, 'stash.yarn.previewAlt')} class="preview-img" />
@@ -214,7 +464,7 @@
 					{/if}
 					<strong>{[y.brand, y.name].filter(Boolean).join(' ') || y.colorway || t(locale, 'stash.yarn.fallbackName')}</strong>
 					<span class="muted small">{[y.colorway, y.weightCategory].filter(Boolean).join(' · ')}</span>
-					<span class="muted small">{y.fiber ?? ''}</span>
+					<span class="muted small">{[y.fiber, y.motif && motifLabel(locale, y.motif)].filter(Boolean).join(' · ')}</span>
 					<span class="small">{y.skeins} {y.skeins > 1 ? t(locale, 'stash.yarn.skeinPlural') : t(locale, 'stash.yarn.skein')}{y.dyeLot ? ` · ${t(locale, 'stash.yarn.dyeLotPrefix')} ${y.dyeLot}` : ''}</span>
 					{#if previewYarnId === y.id && previewError}
 						<span class="muted small">{previewError}</span>
@@ -237,12 +487,17 @@
 			{/each}
 		</div>
 	{:else if tab === 'fabric'}
+		{#if filteredFabrics.length === 0}<p class="muted">{t(locale, 'stash.noResults')}</p>{/if}
 		<div class="grid">
-			{#each data.fabricList as f}
+			{#each filteredFabrics as f}
 				<div class="card stash-item">
-					<div class="swatch" style={`background:${f.colorHex ?? '#eee'}`}></div>
+					{#if f.photoPath}
+						<img src={`/media/${f.photoPath}`} alt={f.name ?? t(locale, 'stash.fabric.fallbackName')} />
+					{:else}
+						<div class="swatch" style={`background:${f.colorHex ?? '#eee'}`}></div>
+					{/if}
 					<strong>{f.name ?? f.fabricType ?? t(locale, 'stash.fabric.fallbackName')}</strong>
-					<span class="muted small">{f.composition ?? ''}</span>
+					<span class="muted small">{[f.composition, f.motif && motifLabel(locale, f.motif)].filter(Boolean).join(' · ')}</span>
 					<span class="small">{[f.lengthCm && `${f.lengthCm} cm`, f.widthCm && `${t(locale, 'stash.fabric.widthPrefix')} ${f.widthCm}`].filter(Boolean).join(' · ')}</span>
 					<form method="POST" action="?/delete" use:enhance={refresh}>
 						<input type="hidden" name="kind" value="fabric" /><input type="hidden" name="id" value={f.id} />
@@ -252,9 +507,13 @@
 			{/each}
 		</div>
 	{:else if tab === 'notion'}
+		{#if filteredNotions.length === 0}<p class="muted">{t(locale, 'stash.noResults')}</p>{/if}
 		<div class="grid">
-			{#each data.notionList as n}
+			{#each filteredNotions as n}
 				<div class="card stash-item">
+					{#if n.photoPath}
+						<img src={`/media/${n.photoPath}`} alt={n.name} />
+					{/if}
 					<strong>{n.name}</strong>
 					<span class="muted small">{n.category ?? ''}</span>
 					<span class="small">{t(locale, 'stash.qtyPrefix')} {n.quantity}</span>
@@ -266,9 +525,13 @@
 			{/each}
 		</div>
 	{:else}
+		{#if filteredTools.length === 0}<p class="muted">{t(locale, 'stash.noResults')}</p>{/if}
 		<div class="grid">
-			{#each data.toolList as tl}
+			{#each filteredTools as tl}
 				<div class="card stash-item">
+					{#if tl.photoPath}
+						<img src={`/media/${tl.photoPath}`} alt={toolTypeLabel(locale, tl.type)} />
+					{/if}
 					<strong>{toolTypeLabel(locale, tl.type)}</strong>
 					<span class="small">{[tl.sizeMm && `${tl.sizeMm} mm`, tl.lengthCm && `${tl.lengthCm} cm`].filter(Boolean).join(' · ')}</span>
 					<span class="muted small">{t(locale, 'stash.qtyPrefix')} {tl.quantity}{tl.inUseProjectId ? ` · ${t(locale, 'stash.inUse')}` : ''}</span>
@@ -305,6 +568,10 @@
 	.spacer {
 		flex: 1;
 	}
+	.search-box {
+		width: 100%;
+		margin-bottom: 1rem;
+	}
 	.add {
 		margin-bottom: 1.2rem;
 	}
@@ -324,6 +591,22 @@
 		padding: 0.5rem 0.9rem;
 		border-radius: var(--radius);
 		font-size: 0.95rem;
+	}
+	.url-import {
+		display: flex;
+		gap: 0.5rem;
+		margin-bottom: 0.8rem;
+	}
+	.url-import input {
+		flex: 1;
+	}
+	.fetched-photo {
+		width: 100%;
+		max-width: 200px;
+		height: 120px;
+		object-fit: cover;
+		border-radius: var(--radius);
+		margin-top: 0.4rem;
 	}
 	.row3 {
 		display: grid;
