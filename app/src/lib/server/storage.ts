@@ -32,6 +32,34 @@ export async function saveUpload(
 	};
 }
 
+const EXT_BY_MIME: Record<string, string> = {
+	'image/jpeg': '.jpg',
+	'image/png': '.png',
+	'image/webp': '.webp',
+	'image/gif': '.gif'
+};
+
+// Saves a `data:<mime>;base64,<...>` string (e.g. a photo fetched server-side
+// from a shop URL / barcode lookup) the same way saveUpload stores a File.
+export async function saveDataUrl(
+	ownerId: string,
+	dataUrl: string,
+	subdir = ''
+): Promise<{ storedPath: string; sizeBytes: number; mimeType: string } | null> {
+	const m = dataUrl.match(/^data:([\w.+-]+\/[\w.+-]+);base64,(.+)$/);
+	if (!m) return null;
+	const mimeType = m[1].toLowerCase();
+	const ext = EXT_BY_MIME[mimeType];
+	if (!ext) return null;
+	const buf = Buffer.from(m[2], 'base64');
+	if (buf.length === 0 || buf.length > 5_000_000) return null;
+	const rel = join(ownerId, subdir, `${randomUUID()}${ext}`).split(sep).join('/');
+	const abs = absolutePath(rel);
+	await mkdir(join(abs, '..'), { recursive: true });
+	await writeFile(abs, buf);
+	return { storedPath: rel, sizeBytes: buf.length, mimeType };
+}
+
 export async function deleteStored(relative: string): Promise<void> {
 	try {
 		await unlink(absolutePath(relative));
