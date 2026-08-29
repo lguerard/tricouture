@@ -272,7 +272,10 @@ export const projects = pgTable(
 	})
 );
 
-// Materials consumed by a project (yarn mainly)
+// Materials consumed by a project (yarn — tricot/crochet).
+// Each row is added when the person logs yarn used for progress on the
+// project; the same amount is deducted from the yarn's stash quantity
+// (yarns.skeins) so the stash always reflects what is actually left.
 export const projectYarns = pgTable(
 	'project_yarns',
 	{
@@ -284,6 +287,21 @@ export const projectYarns = pgTable(
 		skeinsUsed: real('skeins_used').notNull().default(0)
 	},
 	(t) => ({ projectIdx: index('project_yarns_project_idx').on(t.projectId) })
+);
+
+// Materials consumed by a project (fabric — couture). Mirrors projectYarns:
+// logging usage here deducts the same length from fabrics.lengthCm.
+export const projectFabrics = pgTable(
+	'project_fabrics',
+	{
+		id: uuid('id').primaryKey().defaultRandom(),
+		projectId: uuid('project_id')
+			.notNull()
+			.references(() => projects.id, { onDelete: 'cascade' }),
+		fabricId: uuid('fabric_id').references(() => fabrics.id, { onDelete: 'set null' }),
+		lengthUsedCm: integer('length_used_cm').notNull().default(0)
+	},
+	(t) => ({ projectIdx: index('project_fabrics_project_idx').on(t.projectId) })
 );
 
 // Progress photos (timeline)
@@ -422,5 +440,7 @@ export type Pattern = typeof patterns.$inferSelect;
 export type PatternFile = typeof patternFiles.$inferSelect;
 export type Yarn = typeof yarns.$inferSelect;
 export type Project = typeof projects.$inferSelect;
+export type ProjectYarn = typeof projectYarns.$inferSelect;
+export type ProjectFabric = typeof projectFabrics.$inferSelect;
 export type ProjectStatus = (typeof projectStatus.enumValues)[number];
 export type Craft = (typeof craft.enumValues)[number];
