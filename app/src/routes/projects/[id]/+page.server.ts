@@ -1,7 +1,15 @@
 import { error, fail, redirect } from '@sveltejs/kit';
-import { and, eq } from 'drizzle-orm';
+import { and, desc, eq, sql } from 'drizzle-orm';
 import { db } from '$lib/server/db';
-import { projects, patterns, paceLogs } from '$lib/server/db/schema';
+import {
+	projects,
+	patterns,
+	paceLogs,
+	yarns,
+	fabrics,
+	projectYarns,
+	projectFabrics
+} from '$lib/server/db/schema';
 import type { Actions, PageServerLoad } from './$types';
 import type { projectStatus } from '$lib/server/db/schema';
 
@@ -23,7 +31,8 @@ function progressFrom(currentRow: number, totalRows: number | null, fallback: nu
 }
 
 export const load: PageServerLoad = async ({ locals, params }) => {
-	const project = await owned(locals.user!.id, params.id);
+	const uid = locals.user!.id;
+	const project = await owned(uid, params.id);
 	if (!project) throw error(404, 'Project not found');
 
 	const pattern = project.patternId
@@ -42,7 +51,56 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 	const remaining = project.totalRows ? Math.max(0, project.totalRows - project.currentRow) : null;
 	const hoursLeft = rowsPerHour && remaining !== null ? remaining / rowsPerHour : null;
 
-	return { project, pattern, pace, rowsPerHour, remaining, hoursLeft };
+	// Stash-backed materials: what's available to log, and what this project
+	// has already consumed (each consumption already deducted from the stash).
+	const [yarnStash, fabricStash, usedYarns, usedFabrics] = await Promise.all([
+		db
+			.select({
+				id: yarns.id,
+				brand: yarns.brand,
+				name: yarns.name,
+				colorway: yarns.colorway,
+				skeins: yarns.skeins
+			})
+			.from(yarns)
+			.where(eq(yarns.ownerId, uid))
+			.orderBy(desc(yarns.createdAt)),
+		db
+			.select({
+				id: fabrics.id,
+				name: fabrics.name,
+				fabricType: fabrics.fabricType,
+				lengthCm: fabrics.lengthCm
+			})
+			.from(fabrics)
+			.where(eq(fabrics.ownerId, uid))
+			.orderBy(desc(fabrics.createdAt)),
+		db
+			.select({
+				id: projectYarns.id,
+				yarnId: projectYarns.yarnId,
+				skeinsUsed: projectYarns.skeinsUsed,
+				brand: yarns.brand,
+				name: yarns.name,
+				colorway: yarns.colorway
+			})
+			.from(projectYarns)
+			.leftJoin(yarns, eq(projectYarns.yarnId, yarns.id))
+			.where(eq(projectYarns.projectId, project.id)),
+		db
+			.select({
+				id: projectFabrics.id,
+				fabricId: projectFabrics.fabricId,
+				lengthUsedCm: projectFabrics.lengthUsedCm,
+				name: fabrics.name,
+				fabricType: fabrics.fabricType
+			})
+			.from(projectFabrics)
+			.leftJoin(fabrics, eq(projectFabrics.fabricId, fabrics.id))
+			.where(eq(projectFabrics.projectId, project.id))
+	]);
+
+	return { project, pattern, pace, rowsPerHour, remaining, hoursLeft, yarnStash, fabricStash, usedYarns, usedFabrics };
 };
 
 export const actions: Actions = {
@@ -104,6 +162,138 @@ export const actions: Actions = {
 			.update(projects)
 			.set({ timeSpentMinutes: p.timeSpentMinutes + minutes, updatedAt: new Date() })
 			.where(eq(projects.id, p.id));
+		return { ok: true };
+	},
+
+	// Log yarn consumed by the project's progress and deduct it from the
+	// stash in the same transaction, so the stash always reflects reality.
+	useYarn: async ({ locals, params, request }) => {
+		const uid = locals.user!.id;
+		const p = await owned(uid, params.id);
+		if (!p) return fail(404, { error: 'Not found' });
+		const form = await request.formData();
+		const yarnId = String(form.get('yarnId') ?? '');
+		const amount = parseFloat(String(form.get('skeinsUsed') ?? ''));
+		if (!yarnId || !Number.isFinite(amount) || amount <= 0) {
+			return fail(400, { error: 'Quantité invalide' });
+		}
+		const yarn = (
+			await db.select().from(yarns).where(and(eq(yarns.id, yarnId), eq(yarns.ownerId, uid))).limit(1)
+		)[0];
+		if (!yarn) return fail(404, { error: 'Laine introuvable' });
+
+		await db.transaction(async (tx) => {
+			await tx
+				.update(yarns)
+				.set({ skeins: sql`greatest(${yarns.skeins} - ${amount}, 0)` })
+				.where(eq(yarns.id, yarnId));
+
+			const existing = (
+				await tx
+					.select()
+					.from(projectYarns)
+					.where(and(eq(projectYarns.projectId, p.id), eq(projectYarns.yarnId, yarnId)))
+					.limit(1)
+			)[0];
+			if (existing) {
+				await tx
+					.update(projectYarns)
+					.set({ skeinsUsed: existing.skeinsUsed + amount })
+					.where(eq(projectYarns.id, existing.id));
+			} else {
+				await tx.insert(projectYarns).values({ projectId: p.id, yarnId, skeinsUsed: amount });
+			}
+		});
+		return { ok: true };
+	},
+
+	// Undo a logged yarn usage: remove the link and return the quantity to stash.
+	undoYarnUse: async ({ locals, params, request }) => {
+		const uid = locals.user!.id;
+		const p = await owned(uid, params.id);
+		if (!p) return fail(404, { error: 'Not found' });
+		const linkId = String((await request.formData()).get('id') ?? '');
+		const link = (
+			await db.select().from(projectYarns).where(and(eq(projectYarns.id, linkId), eq(projectYarns.projectId, p.id))).limit(1)
+		)[0];
+		if (!link) return fail(404, { error: 'Not found' });
+
+		await db.transaction(async (tx) => {
+			if (link.yarnId) {
+				await tx
+					.update(yarns)
+					.set({ skeins: sql`${yarns.skeins} + ${link.skeinsUsed}` })
+					.where(and(eq(yarns.id, link.yarnId), eq(yarns.ownerId, uid)));
+			}
+			await tx.delete(projectYarns).where(eq(projectYarns.id, link.id));
+		});
+		return { ok: true };
+	},
+
+	// Same mechanism as useYarn, for fabric (couture) measured in centimeters.
+	useFabric: async ({ locals, params, request }) => {
+		const uid = locals.user!.id;
+		const p = await owned(uid, params.id);
+		if (!p) return fail(404, { error: 'Not found' });
+		const form = await request.formData();
+		const fabricId = String(form.get('fabricId') ?? '');
+		const amount = parseInt(String(form.get('lengthUsedCm') ?? ''), 10);
+		if (!fabricId || !Number.isFinite(amount) || amount <= 0) {
+			return fail(400, { error: 'Quantité invalide' });
+		}
+		const fabric = (
+			await db.select().from(fabrics).where(and(eq(fabrics.id, fabricId), eq(fabrics.ownerId, uid))).limit(1)
+		)[0];
+		if (!fabric) return fail(404, { error: 'Tissu introuvable' });
+
+		await db.transaction(async (tx) => {
+			await tx
+				.update(fabrics)
+				.set({ lengthCm: sql`greatest(coalesce(${fabrics.lengthCm}, 0) - ${amount}, 0)` })
+				.where(eq(fabrics.id, fabricId));
+
+			const existing = (
+				await tx
+					.select()
+					.from(projectFabrics)
+					.where(and(eq(projectFabrics.projectId, p.id), eq(projectFabrics.fabricId, fabricId)))
+					.limit(1)
+			)[0];
+			if (existing) {
+				await tx
+					.update(projectFabrics)
+					.set({ lengthUsedCm: existing.lengthUsedCm + amount })
+					.where(eq(projectFabrics.id, existing.id));
+			} else {
+				await tx.insert(projectFabrics).values({ projectId: p.id, fabricId, lengthUsedCm: amount });
+			}
+		});
+		return { ok: true };
+	},
+
+	undoFabricUse: async ({ locals, params, request }) => {
+		const uid = locals.user!.id;
+		const p = await owned(uid, params.id);
+		if (!p) return fail(404, { error: 'Not found' });
+		const linkId = String((await request.formData()).get('id') ?? '');
+		const link = (
+			await db
+				.select()
+				.from(projectFabrics)
+				.where(and(eq(projectFabrics.id, linkId), eq(projectFabrics.projectId, p.id)))
+				.limit(1)
+		)[0];
+		if (!link) return fail(404, { error: 'Not found' });
+
+		await db.transaction(async (tx) => {
+			if (link.fabricId) {
+				await tx
+					.update(fabrics)
+					.set({ lengthCm: sql`coalesce(${fabrics.lengthCm}, 0) + ${link.lengthUsedCm}` })
+					.where(and(eq(fabrics.id, link.fabricId), eq(fabrics.ownerId, uid)));
+			}
+			await tx.delete(projectFabrics).where(eq(projectFabrics.id, link.id));
+		});
 		return { ok: true };
 	},
 

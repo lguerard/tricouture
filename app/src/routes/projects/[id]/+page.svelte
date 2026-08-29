@@ -219,6 +219,93 @@
 				<button class="btn-primary" type="submit">{t(locale, 'projects.detail.save')}</button>
 			</form>
 		</section>
+
+		<!-- Materials used: logging consumption here deducts from the real stash. -->
+		<section class="card detail materials">
+			<h2>{t(locale, 'projects.detail.materialsTitle')}</h2>
+			<p class="muted small">{t(locale, 'projects.detail.materialsHint')}</p>
+			<div class="mat-cols">
+				<div class="mat-col">
+					<h3>{t(locale, 'projects.detail.yarnSectionTitle')}</h3>
+					{#if data.usedYarns.length === 0}
+						<p class="muted small">{t(locale, 'projects.detail.noYarnUsed')}</p>
+					{:else}
+						<ul class="used-list">
+							{#each data.usedYarns as u}
+								<li>
+									<span>
+										{[u.brand, u.name, u.colorway].filter(Boolean).join(' ') || t(locale, 'projects.detail.deletedYarn')}
+										— {t(locale, 'projects.detail.skeinsAmount', { n: u.skeinsUsed })}
+									</span>
+									<form method="POST" action="?/undoYarnUse" use:enhance>
+										<input type="hidden" name="id" value={u.id} />
+										<button type="submit" class="undo" title={t(locale, 'projects.detail.undoUse')}>↩</button>
+									</form>
+								</li>
+							{/each}
+						</ul>
+					{/if}
+					{#if data.yarnStash.length === 0}
+						<p class="muted small">
+							{t(locale, 'projects.detail.noYarnsInStash')} <a href="/stash">{t(locale, 'projects.detail.goToStash')}</a>
+						</p>
+					{:else}
+						<form method="POST" action="?/useYarn" use:enhance={() => async ({ update }) => update({ reset: true })} class="use-form">
+							<select name="yarnId" required>
+								<option value="">{t(locale, 'projects.detail.selectYarn')}</option>
+								{#each data.yarnStash as y}
+									<option value={y.id}>
+										{[y.brand, y.name, y.colorway].filter(Boolean).join(' ')} ({t(locale, 'projects.detail.stashRemainingSkeins', { n: y.skeins })})
+									</option>
+								{/each}
+							</select>
+							<input name="skeinsUsed" type="number" min="0" step="0.1" placeholder={t(locale, 'projects.detail.skeinsUsedPlaceholder')} required />
+							<button type="submit">{t(locale, 'projects.detail.useMaterial')}</button>
+						</form>
+					{/if}
+				</div>
+
+				<div class="mat-col">
+					<h3>{t(locale, 'projects.detail.fabricSectionTitle')}</h3>
+					{#if data.usedFabrics.length === 0}
+						<p class="muted small">{t(locale, 'projects.detail.noFabricUsed')}</p>
+					{:else}
+						<ul class="used-list">
+							{#each data.usedFabrics as u}
+								<li>
+									<span>
+										{[u.name, u.fabricType].filter(Boolean).join(' ') || t(locale, 'projects.detail.deletedFabric')}
+										— {t(locale, 'projects.detail.lengthAmount', { n: u.lengthUsedCm })}
+									</span>
+									<form method="POST" action="?/undoFabricUse" use:enhance>
+										<input type="hidden" name="id" value={u.id} />
+										<button type="submit" class="undo" title={t(locale, 'projects.detail.undoUse')}>↩</button>
+									</form>
+								</li>
+							{/each}
+						</ul>
+					{/if}
+					{#if data.fabricStash.length === 0}
+						<p class="muted small">
+							{t(locale, 'projects.detail.noFabricsInStash')} <a href="/stash">{t(locale, 'projects.detail.goToStash')}</a>
+						</p>
+					{:else}
+						<form method="POST" action="?/useFabric" use:enhance={() => async ({ update }) => update({ reset: true })} class="use-form">
+							<select name="fabricId" required>
+								<option value="">{t(locale, 'projects.detail.selectFabric')}</option>
+								{#each data.fabricStash as f}
+									<option value={f.id}>
+										{[f.name, f.fabricType].filter(Boolean).join(' ')} ({t(locale, 'projects.detail.stashRemainingCm', { n: f.lengthCm ?? 0 })})
+									</option>
+								{/each}
+							</select>
+							<input name="lengthUsedCm" type="number" min="0" step="1" placeholder={t(locale, 'projects.detail.lengthUsedPlaceholder')} required />
+							<button type="submit">{t(locale, 'projects.detail.useMaterial')}</button>
+						</form>
+					{/if}
+				</div>
+			</div>
+		</section>
 	</div>
 </div>
 
@@ -302,6 +389,63 @@
 		display: grid;
 		grid-template-columns: 1fr 1fr;
 		gap: 0.8rem;
+	}
+	.materials {
+		margin-top: 1.2rem;
+	}
+	.mat-cols {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: 1.2rem;
+		margin-top: 0.6rem;
+	}
+	.mat-col h3 {
+		font-size: 0.95rem;
+		margin: 0 0 0.4rem;
+	}
+	.used-list {
+		list-style: none;
+		margin: 0 0 0.6rem;
+		padding: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 0.3rem;
+	}
+	.used-list li {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		gap: 0.5rem;
+		background: var(--accent-soft);
+		border-radius: var(--radius);
+		padding: 0.35rem 0.6rem;
+		font-size: 0.85rem;
+	}
+	.used-list .undo {
+		background: none;
+		border: none;
+		cursor: pointer;
+		font-size: 1rem;
+		padding: 0 0.2rem;
+	}
+	.use-form {
+		display: flex;
+		gap: 0.4rem;
+		flex-wrap: wrap;
+	}
+	.use-form select {
+		flex: 2;
+		min-width: 160px;
+	}
+	.use-form input {
+		flex: 1;
+		min-width: 90px;
+		width: auto;
+	}
+	@media (max-width: 720px) {
+		.mat-cols {
+			grid-template-columns: 1fr;
+		}
 	}
 	.savings {
 		background: #e7f4ec;
