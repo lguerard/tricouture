@@ -52,8 +52,11 @@
 				<span class="shared">{t(locale, 'patterns.detail.sharedBy', { name: data.ownerName })}</span>
 			{/if}
 		</div>
-		{#if data.isOwner}
-			<div class="owner-actions">
+		<div class="owner-actions">
+			<a class="btn btn-primary" href={`/projects/new?pattern=${p.id}`}>
+				{t(locale, 'patterns.detail.startProject')}
+			</a>
+			{#if data.isOwner}
 				<form method="POST" action="?/toggleShare" use:enhance>
 					<button type="submit" class:on={p.isShared}>
 						{p.isShared ? t(locale, 'patterns.detail.shareOn') : t(locale, 'patterns.detail.share')}
@@ -68,8 +71,8 @@
 				>
 					<button type="submit">{t(locale, 'patterns.detail.delete')}</button>
 				</form>
-			</div>
-		{/if}
+			{/if}
+		</div>
 	</header>
 
 	<div class="cols">
