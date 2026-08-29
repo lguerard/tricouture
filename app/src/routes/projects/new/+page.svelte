@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { statusLabel, STATUS_ORDER } from '$lib/labels';
+	import { statusLabel, STATUS_ORDER, craftLabel } from '$lib/labels';
 	import { t } from '$lib/i18n';
 	let { data, form } = $props();
 	const locale = $derived(data.locale);
@@ -19,7 +19,9 @@
 			<select id="patternId" name="patternId">
 				<option value="">{t(locale, 'projects.new.none')}</option>
 				{#each data.patternOptions as p}
-					<option value={p.id} selected={data.presetPattern === p.id}>{p.title}</option>
+					<option value={p.id} selected={data.presetPattern === p.id}>
+						{p.title} — {craftLabel(locale, p.craft)}{p.mine ? '' : ` (${t(locale, 'projects.new.sharedPattern')})`}
+					</option>
 				{/each}
 			</select>
 		</div>

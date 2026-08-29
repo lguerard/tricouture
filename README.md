@@ -60,8 +60,14 @@ besoin :
 
 ### Projets
 
-- **Tableau Kanban** glisser-déposer (Idée → En cours → Bloqué → Terminé).
+- Un projet peut être **démarré directement depuis un patron** (bouton
+  « Démarrer un projet », y compris depuis un patron partagé).
+- **Tableau Kanban** glisser-déposer (Idée → En cours → Bloqué → Terminé),
+  accessible depuis le web comme depuis l'app Android (même interface).
 - **Compteur de rangs** (boutons + **commande vocale** mains-libres).
+- **Matières utilisées** : la laine et le tissu consommés se déclarent
+  depuis la fiche projet et sont **déduits automatiquement du stock**
+  (et recrédités si on annule), pour que l'inventaire reste fiable.
 - **Prédiction d'échéance** basée sur la vitesse réelle.
 - Suivi du temps, du coût et des **économies** vs prêt-à-porter.
 
