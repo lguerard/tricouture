@@ -86,8 +86,12 @@ function decodeEntities(s: string): string {
 
 export const POST: RequestHandler = async ({ request }) => {
 	const body = await request.json().catch(() => null);
-	let target = await publicUrlOrNull(String(body?.url ?? '').trim());
-	if (!target) return json({ error: 'unsupported-url' }, { status: 400 });
+	const entry = await publicUrlOrNull(String(body?.url ?? '').trim());
+	if (!entry) return json({ error: 'unsupported-url' }, { status: 400 });
+	// Annotated, not inferred: `target` is reassigned inside the redirect loop
+	// from a value whose own type depends on `target`, and TypeScript then gives
+	// up and widens both back to `URL | null`.
+	let target: URL = entry;
 
 	let html = '';
 	for (let hop = 0; hop <= MAX_HOPS; hop++) {
@@ -106,7 +110,9 @@ export const POST: RequestHandler = async ({ request }) => {
 			const next = res.headers.get('location');
 			// Each hop is re-checked: a public host redirecting to 127.0.0.1 is
 			// exactly how this kind of endpoint gets abused.
-			const checked = next ? await publicUrlOrNull(new URL(next, target).href) : null;
+			const checked: URL | null = next
+				? await publicUrlOrNull(new URL(next, target).href)
+				: null;
 			if (!checked) return json({ error: 'unsupported-url' }, { status: 400 });
 			target = checked;
 			continue;
