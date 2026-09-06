@@ -1,6 +1,6 @@
 import { and, or, eq, desc, sql } from 'drizzle-orm';
 import { db } from '$lib/server/db';
-import { patterns, users } from '$lib/server/db/schema';
+import { patterns, patternFiles, users } from '$lib/server/db/schema';
 import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ locals, url }) => {
@@ -39,6 +39,12 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 			tags: patterns.tags,
 			ownerId: patterns.ownerId,
 			isShared: patterns.isShared,
+			source: patterns.source,
+			// A pattern is either a file or a link (sometimes both). EXISTS rather
+			// than a join: one row per pattern, whatever the number of files.
+			hasFile: sql<boolean>`exists (
+				select 1 from ${patternFiles} where ${patternFiles.patternId} = ${patterns.id}
+			)`,
 			ownerName: users.displayName
 		})
 		.from(patterns)
@@ -48,9 +54,12 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		.limit(200);
 
 	// Tag ownership for display (without exposing the raw ownerId to the client).
-	const mapped = rows.map(({ ownerId, ...r }) => ({
+	const mapped = rows.map(({ ownerId, source, ...r }) => ({
 		...r,
-		mine: ownerId === uid
+		mine: ownerId === uid,
+		// Only whether it is a link, not the link itself: the list does not
+		// display it, and the fiche is one click away.
+		hasLink: /^https?:\/\//i.test((source ?? '').trim())
 	}));
 
 	return { rows: mapped, q, craftFilter, scope };

@@ -42,6 +42,12 @@
 					{:else if p.isShared}
 						<span class="shared mine">{t(locale, 'patterns.list.shared')}</span>
 					{/if}
+					{#if p.hasFile || p.hasLink}
+						<span class="formats">
+							{#if p.hasFile}<span class="tag fmt">{t(locale, 'patterns.list.hasPdf')}</span>{/if}
+							{#if p.hasLink}<span class="tag fmt">{t(locale, 'patterns.list.hasLink')}</span>{/if}
+						</span>
+					{/if}
 					{#if p.garmentType || p.designer}
 						<span class="muted small">{[p.garmentType, p.designer].filter(Boolean).join(' · ')}</span>
 					{/if}
@@ -99,5 +105,14 @@
 	}
 	.shared.mine {
 		color: var(--muted);
+	}
+
+	.formats {
+		display: flex;
+		gap: 0.3rem;
+	}
+	.tag.fmt {
+		background: #eef3fb;
+		font-size: 0.72rem;
 	}
 </style>
