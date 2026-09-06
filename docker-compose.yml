@@ -16,6 +16,10 @@ services:
       VISION_URL: ${VISION_URL:-}
       WHISPER_URL: ${WHISPER_URL:-}
       SD_URL: ${SD_URL:-}
+      # adapter-node plafonne les corps de requête à 512 Ko par défaut : un seul
+      # PDF de patron un peu lourd suffit à déclencher un 413, et un import en
+      # lot le dépasse à coup sûr. 100 Mo par défaut, ajustable dans le .env.
+      BODY_SIZE_LIMIT: ${BODY_SIZE_LIMIT:-104857600}
       NODE_ENV: production
     ports:
       - "3000:3000"
