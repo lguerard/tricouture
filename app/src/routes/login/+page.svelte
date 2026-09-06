@@ -26,7 +26,8 @@
 		<button class="btn-primary" type="submit" style="width:100%">{t(l, 'auth.signin')}</button>
 	</form>
 
-	<p class="muted alt">{t(l, 'auth.noAccount')} <a href="/register">{t(l, 'auth.createAccount')}</a></p>
+	<p class="muted alt"><a href="/forgot-password">{t(l, 'auth.forgotPassword')}</a></p>
+	<p class="muted alt tight">{t(l, 'auth.noAccount')} <a href="/register">{t(l, 'auth.createAccount')}</a></p>
 </div>
 
 <style>
@@ -41,5 +42,8 @@
 	.alt {
 		margin-top: 1rem;
 		text-align: center;
+	}
+	.tight {
+		margin-top: 0.4rem;
 	}
 </style>

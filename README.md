@@ -170,7 +170,9 @@ docker compose up -d --build
 ```
 
 Ouvre <http://localhost:3000> puis crée ton compte sur `/register`
-(le **premier compte créé devient administrateur**).
+(le **premier compte créé devient administrateur**). Le mot de passe se change
+ensuite depuis *Mon compte*, et se réinitialise via un lien généré par un
+administrateur — voir [Mots de passe](#mots-de-passe).
 
 > Les migrations de base sont appliquées automatiquement au démarrage.
 
@@ -222,6 +224,40 @@ Tricouture est **multi-utilisateur** par conception :
 fichiers** (la route média autorise la lecture des fichiers d'un patron
 partagé). La **suppression** et la **modification du partage** restent
 réservées au propriétaire.
+
+### Mots de passe
+
+**Changer son mot de passe :** *Mon compte* dans le menu. Il faut saisir le
+mot de passe actuel. Les **autres appareils sont déconnectés** ; le navigateur
+utilisé pour le changement reste connecté.
+
+**Mot de passe oublié.** Tricouture n'envoie aucun e-mail (pas de SMTP sur un
+serveur auto-hébergé) : la réinitialisation passe par un **lien à usage
+unique**, valable 24 h.
+
+1. Un administrateur ouvre *Utilisateurs* → **Lien de réinitialisation** en
+   face du compte concerné, copie le lien affiché et le transmet par le canal
+   de son choix. Il n'est plus réaffiché ensuite.
+2. La personne ouvre le lien, choisit un nouveau mot de passe, et toutes ses
+   sessions en cours sont invalidées.
+
+**Si plus personne n'a d'accès administrateur**, le déblocage se fait depuis le
+serveur :
+
+```bash
+# lister les comptes
+docker compose exec app node scripts/reset-password.js
+
+# générer un lien de réinitialisation à usage unique
+docker compose exec app node scripts/reset-password.js toi@exemple.fr
+
+# ou fixer directement le mot de passe
+docker compose exec app node scripts/reset-password.js toi@exemple.fr 'nouveau-mdp'
+```
+
+Seul le **hash SHA-256** du jeton est stocké en base : une sauvegarde de la
+base ne contient aucun lien exploitable. Un changement de mot de passe, par
+l'interface comme par le script, annule les liens en attente pour ce compte.
 
 > Statut : logique validée par la vérification de types et la compilation.
 > Un test de bout en bout nécessite une instance lancée (Postgres) — voir
