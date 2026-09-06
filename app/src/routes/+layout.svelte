@@ -19,7 +19,10 @@
 		{ href: '/bins', key: 'nav.bins', icon: '📦' },
 		{ href: '/recipients', key: 'nav.recipients', icon: '🎁' },
 		{ href: '/assistant', key: 'nav.assistant', icon: '🤖' },
-		{ href: '/gallery', key: 'nav.gallery', icon: '🖼️' }
+		{ href: '/gallery', key: 'nav.gallery', icon: '🖼️' },
+		{ href: '/account', key: 'nav.account', icon: '👤' },
+		// Reset links and roles: administrators only.
+		...(data.user?.isAdmin ? [{ href: '/admin/users', key: 'nav.users', icon: '🔐' }] : [])
 	]);
 
 	const current = $derived($page.url.pathname);

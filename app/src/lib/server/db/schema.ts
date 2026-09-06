@@ -51,6 +51,24 @@ export const sessions = pgTable('sessions', {
 	createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
 });
 
+// One-shot password reset links. There is no SMTP on a self-hosted box, so an
+// administrator generates the link from /admin/users and passes it on by
+// whatever channel they like. Only the token hash is stored, same as sessions:
+// a database dump therefore does not hand out working reset links.
+export const passwordResetTokens = pgTable(
+	'password_reset_tokens',
+	{
+		id: text('id').primaryKey(), // sha256 of the raw token
+		userId: uuid('user_id')
+			.notNull()
+			.references(() => users.id, { onDelete: 'cascade' }),
+		expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+		usedAt: timestamp('used_at', { withTimezone: true }),
+		createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
+	},
+	(t) => ({ userIdx: index('password_reset_tokens_user_idx').on(t.userId) })
+);
+
 /* ------------------------------------------------------------------ */
 /* Patterns                                                           */
 /* ------------------------------------------------------------------ */
@@ -436,6 +454,7 @@ export const storageBins = pgTable(
 /* ------------------------------------------------------------------ */
 
 export type User = typeof users.$inferSelect;
+export type PasswordResetToken = typeof passwordResetTokens.$inferSelect;
 export type Pattern = typeof patterns.$inferSelect;
 export type PatternFile = typeof patternFiles.$inferSelect;
 export type Yarn = typeof yarns.$inferSelect;

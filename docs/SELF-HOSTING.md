@@ -136,6 +136,37 @@ Ouvre **http://localhost:3000** (ou `http://IP_DU_SERVEUR:3000` depuis le résea
 Va sur `/register`. **Le tout premier compte créé devient administrateur.**
 Crée ensuite les comptes des autres membres du foyer si besoin (multi-utilisateur natif).
 
+### 5.1 Changer un mot de passe
+
+*Mon compte* dans le menu latéral : mot de passe actuel + nouveau mot de passe
+(8 caractères minimum). Les autres appareils sont déconnectés, le navigateur
+courant reste connecté.
+
+### 5.2 Réinitialiser un mot de passe oublié
+
+Il n'y a **pas de SMTP** sur un serveur auto-hébergé, donc pas d'e-mail de
+réinitialisation. À la place, un administrateur génère un **lien à usage
+unique** (valable 24 h) depuis *Utilisateurs* → **Lien de réinitialisation**,
+et le transmet par le canal de son choix (Signal, SMS, de vive voix…). Le lien
+n'est affiché qu'une fois.
+
+Si **plus aucun administrateur** ne peut se connecter, le déblocage se fait
+depuis le serveur :
+
+```bash
+# lister les comptes existants
+docker compose exec app node scripts/reset-password.js
+
+# générer un lien de réinitialisation à usage unique
+docker compose exec app node scripts/reset-password.js toi@exemple.fr
+
+# ou fixer directement un nouveau mot de passe
+docker compose exec app node scripts/reset-password.js toi@exemple.fr 'nouveau-mdp'
+```
+
+Le lien imprimé utilise `ORIGIN` : vérifie que cette variable pointe bien sur
+l'URL publique, sinon le lien affiché ne sera pas ouvrable depuis l'extérieur.
+
 ---
 
 ## 6. Activer l'IA locale (GPU) — optionnel

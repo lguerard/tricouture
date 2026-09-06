@@ -3,10 +3,25 @@ import { readToken, validateSession } from '$lib/server/auth';
 import { isLocale, DEFAULT_LOCALE } from '$lib/i18n';
 
 // Routes accessible without authentication.
-const PUBLIC_PREFIXES = ['/login', '/register', '/api/locale'];
+const PUBLIC_PREFIXES = [
+	'/login',
+	'/register',
+	'/forgot-password',
+	'/reset-password',
+	'/api/locale'
+];
+
+// Public routes that make no sense once signed in, so signed-in visitors are
+// bounced to the dashboard. /reset-password is deliberately absent: an
+// administrator may well be signed in while testing a link they just handed out.
+const SIGNED_OUT_ONLY = ['/login', '/register', '/forgot-password'];
+
+function matches(prefixes: string[], pathname: string): boolean {
+	return prefixes.some((p) => pathname === p || pathname.startsWith(p + '/'));
+}
 
 function isPublic(pathname: string): boolean {
-	return PUBLIC_PREFIXES.some((p) => pathname === p || pathname.startsWith(p + '/'));
+	return matches(PUBLIC_PREFIXES, pathname);
 }
 
 export const handle: Handle = async ({ event, resolve }) => {
@@ -33,7 +48,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 	if (!event.locals.user && !isPublic(pathname)) {
 		throw redirect(303, `/login?next=${encodeURIComponent(pathname)}`);
 	}
-	if (event.locals.user && isPublic(pathname)) {
+	if (event.locals.user && matches(SIGNED_OUT_ONLY, pathname)) {
 		throw redirect(303, '/');
 	}
 

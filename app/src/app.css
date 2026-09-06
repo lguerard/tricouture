@@ -113,6 +113,11 @@ label {
 	font-size: 0.9rem;
 }
 
+.ok {
+	color: var(--ok);
+	font-size: 0.9rem;
+}
+
 .tag {
 	display: inline-block;
 	background: var(--accent-soft);

@@ -25,6 +25,8 @@ export const dict: Record<Locale, Table> = {
 		'nav.recipients': 'Destinataires',
 		'nav.assistant': 'Assistant IA',
 		'nav.gallery': 'Galerie',
+		'nav.account': 'Mon compte',
+		'nav.users': 'Utilisateurs',
 		'nav.logout': 'Déconnexion',
 		'common.language': 'Langue',
 
@@ -41,6 +43,53 @@ export const dict: Record<Locale, Table> = {
 		'auth.passwordHint': 'Mot de passe (8+ caractères)',
 		'auth.create': 'Créer le compte',
 		'auth.haveAccount': 'Déjà inscrit ?',
+		'auth.forgotPassword': 'Mot de passe oublié ?',
+
+		// Mon compte
+		'account.title': 'Mon compte',
+		'account.subtitle': 'Modifie ton mot de passe.',
+		'account.changePassword': 'Changer le mot de passe',
+		'account.currentPassword': 'Mot de passe actuel',
+		'account.confirmPassword': 'Confirme le nouveau mot de passe',
+		'account.passwordChanged': 'Mot de passe modifié.',
+		'account.logoutNote':
+			'Tes autres appareils seront déconnectés ; ce navigateur reste connecté.',
+
+		// Mot de passe oublié
+		'forgot.title': 'Mot de passe oublié',
+		'forgot.intro': "Tricouture n'envoie pas d'e-mail. Deux façons de récupérer l'accès :",
+		'forgot.step.admin':
+			"Demande à un administrateur de générer un lien de réinitialisation depuis Utilisateurs, puis de te l'envoyer.",
+		'forgot.step.cli':
+			"Si tu es toi-même le seul administrateur, lance cette commande sur le serveur — elle affiche un lien à usage unique :",
+
+		// Réinitialisation
+		'reset.title': 'Nouveau mot de passe',
+		'reset.subtitle': 'Choisis un nouveau mot de passe pour {email}.',
+		'reset.submit': 'Enregistrer le mot de passe',
+		'reset.done': 'Mot de passe enregistré. Tu peux te connecter.',
+		'reset.invalidToken': 'Ce lien est invalide, expiré ou déjà utilisé.',
+		'reset.askAdmin': 'Demande un nouveau lien à un administrateur.',
+		'reset.backToLogin': 'Retour à la connexion',
+
+		// Administration
+		'admin.title': 'Utilisateurs',
+		'admin.subtitle':
+			"Génère un lien de réinitialisation à usage unique (valable 24 h) et transmets-le par le canal de ton choix.",
+		'admin.role': 'Rôle',
+		'admin.admin': 'Administrateur',
+		'admin.member': 'Membre',
+		'admin.generateLink': 'Lien de réinitialisation',
+		'admin.promote': 'Passer administrateur',
+		'admin.demote': 'Retirer les droits',
+		'admin.linkFor': 'Lien pour {email}',
+		'admin.linkNote':
+			"Valable 24 h, utilisable une seule fois. Il ne sera plus réaffiché : copie-le maintenant.",
+		'admin.copy': 'Copier',
+		'admin.copied': 'Copié !',
+		'admin.forbidden': 'Réservé aux administrateurs.',
+		'admin.userNotFound': 'Utilisateur introuvable.',
+		'admin.lastAdmin': 'Impossible : il doit rester au moins un administrateur.',
 
 		// Dashboard
 		'dash.hello': 'Bonjour {name} 👋',
@@ -89,6 +138,9 @@ export const dict: Record<Locale, Table> = {
 		'auth.error.allFieldsRequired': 'Tous les champs sont requis.',
 		'auth.error.passwordTooShort': 'Mot de passe : 8 caractères minimum.',
 		'auth.error.emailInUse': 'Cet email est déjà utilisé.',
+		'auth.error.passwordMismatch': 'Les deux mots de passe ne correspondent pas.',
+		'auth.error.currentPasswordWrong': 'Mot de passe actuel incorrect.',
+		'auth.error.passwordUnchanged': 'Le nouveau mot de passe est identique à l\'ancien.',
 		'achievements.title': 'Succès',
 		'achievements.progressLabel': '{unlocked} / {total} succès · {completion}%',
 		'achievements.unlockedOn': '✓ Débloqué {date}',
@@ -460,6 +512,8 @@ export const dict: Record<Locale, Table> = {
 		'nav.recipients': 'Recipients',
 		'nav.assistant': 'AI assistant',
 		'nav.gallery': 'Gallery',
+		'nav.account': 'My account',
+		'nav.users': 'Users',
 		'nav.logout': 'Log out',
 		'common.language': 'Language',
 
@@ -476,6 +530,51 @@ export const dict: Record<Locale, Table> = {
 		'auth.passwordHint': 'Password (8+ characters)',
 		'auth.create': 'Create account',
 		'auth.haveAccount': 'Already registered?',
+		'auth.forgotPassword': 'Forgot your password?',
+
+		// My account
+		'account.title': 'My account',
+		'account.subtitle': 'Change your password.',
+		'account.changePassword': 'Change password',
+		'account.currentPassword': 'Current password',
+		'account.confirmPassword': 'Confirm the new password',
+		'account.passwordChanged': 'Password changed.',
+		'account.logoutNote': 'Your other devices will be signed out; this browser stays signed in.',
+
+		// Forgot password
+		'forgot.title': 'Forgot password',
+		'forgot.intro': 'Tricouture sends no e-mail. Two ways to get back in:',
+		'forgot.step.admin':
+			'Ask an administrator to generate a reset link from Users and send it to you.',
+		'forgot.step.cli':
+			'If you are the only administrator, run this on the server — it prints a one-shot link:',
+
+		// Reset
+		'reset.title': 'New password',
+		'reset.subtitle': 'Choose a new password for {email}.',
+		'reset.submit': 'Save password',
+		'reset.done': 'Password saved. You can sign in.',
+		'reset.invalidToken': 'This link is invalid, expired or already used.',
+		'reset.askAdmin': 'Ask an administrator for a new link.',
+		'reset.backToLogin': 'Back to sign in',
+
+		// Administration
+		'admin.title': 'Users',
+		'admin.subtitle':
+			'Generate a one-shot reset link (valid 24 h) and pass it on through whichever channel you like.',
+		'admin.role': 'Role',
+		'admin.admin': 'Administrator',
+		'admin.member': 'Member',
+		'admin.generateLink': 'Reset link',
+		'admin.promote': 'Make administrator',
+		'admin.demote': 'Revoke admin rights',
+		'admin.linkFor': 'Link for {email}',
+		'admin.linkNote': 'Valid 24 h, usable once. It will not be shown again: copy it now.',
+		'admin.copy': 'Copy',
+		'admin.copied': 'Copied!',
+		'admin.forbidden': 'Administrators only.',
+		'admin.userNotFound': 'User not found.',
+		'admin.lastAdmin': 'Not possible: at least one administrator must remain.',
 
 		// Dashboard
 		'dash.hello': 'Hello {name} 👋',
@@ -524,6 +623,9 @@ export const dict: Record<Locale, Table> = {
 		'auth.error.allFieldsRequired': 'All fields are required.',
 		'auth.error.passwordTooShort': 'Password: 8 characters minimum.',
 		'auth.error.emailInUse': 'This email is already in use.',
+		'auth.error.passwordMismatch': 'The two passwords do not match.',
+		'auth.error.currentPasswordWrong': 'Current password is incorrect.',
+		'auth.error.passwordUnchanged': 'The new password is the same as the old one.',
 		'achievements.title': 'Achievements',
 		'achievements.progressLabel': '{unlocked} / {total} achievements · {completion}%',
 		'achievements.unlockedOn': '✓ Unlocked {date}',

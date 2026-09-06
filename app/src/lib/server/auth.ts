@@ -1,14 +1,16 @@
 import { randomBytes, scrypt as scryptCb, timingSafeEqual, createHash } from 'node:crypto';
 import { promisify } from 'node:util';
-import { eq } from 'drizzle-orm';
+import { and, eq, isNull, gt } from 'drizzle-orm';
 import type { RequestEvent } from '@sveltejs/kit';
 import { db } from './db';
-import { users, sessions } from './db/schema';
+import { users, sessions, passwordResetTokens } from './db/schema';
 
 const scrypt = promisify(scryptCb);
 
 const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 30; // 30 days
+const RESET_TTL_MS = 1000 * 60 * 60 * 24; // 24 hours
 export const SESSION_COOKIE = 'session';
+export const MIN_PASSWORD_LENGTH = 8;
 
 export interface SessionUser {
 	id: string;
@@ -23,6 +25,12 @@ export async function hashPassword(password: string): Promise<string> {
 	const salt = randomBytes(16);
 	const derived = (await scrypt(password.normalize('NFKC'), salt, 64)) as Buffer;
 	return `scrypt:${salt.toString('hex')}:${derived.toString('hex')}`;
+}
+
+// Same rule everywhere a password is set: registration, self-service change,
+// reset link and the CLI script.
+export function passwordProblem(password: string): 'tooShort' | null {
+	return password.length < MIN_PASSWORD_LENGTH ? 'tooShort' : null;
 }
 
 export async function verifyPassword(stored: string, password: string): Promise<boolean> {
@@ -80,6 +88,89 @@ export async function validateSession(token: string): Promise<SessionUser | null
 
 export async function invalidateSession(token: string): Promise<void> {
 	await db.delete(sessions).where(eq(sessions.id, hashToken(token)));
+}
+
+// Drops every session of a user. Called whenever the password changes, so a
+// stolen cookie stops working the moment the password is changed or reset.
+// `keepToken` lets the person who just changed their own password stay logged in.
+export async function invalidateAllSessions(userId: string, keepToken?: string | null): Promise<void> {
+	await db.delete(sessions).where(eq(sessions.userId, userId));
+	if (keepToken) {
+		await db.insert(sessions).values({
+			id: hashToken(keepToken),
+			userId,
+			expiresAt: new Date(Date.now() + SESSION_TTL_MS)
+		});
+	}
+}
+
+/* ---------------------- password reset ---------------------- */
+
+// Replaces the password and logs every other device out.
+export async function setPassword(
+	userId: string,
+	password: string,
+	keepToken?: string | null
+): Promise<void> {
+	const passwordHash = await hashPassword(password);
+	await db.update(users).set({ passwordHash }).where(eq(users.id, userId));
+	await invalidateAllSessions(userId, keepToken);
+	// Any other pending reset link for this user is now void.
+	await db.delete(passwordResetTokens).where(eq(passwordResetTokens.userId, userId));
+}
+
+// Returns the raw token — shown once to the administrator, never stored.
+export async function createPasswordResetToken(userId: string): Promise<string> {
+	const token = randomBytes(32).toString('hex');
+	// A user only ever needs one live link; drop the previous ones.
+	await db.delete(passwordResetTokens).where(eq(passwordResetTokens.userId, userId));
+	await db.insert(passwordResetTokens).values({
+		id: hashToken(token),
+		userId,
+		expiresAt: new Date(Date.now() + RESET_TTL_MS)
+	});
+	return token;
+}
+
+export interface ResetTokenTarget {
+	userId: string;
+	email: string;
+	displayName: string;
+}
+
+// Looks the token up without spending it (used to render the form).
+export async function findPasswordResetToken(token: string): Promise<ResetTokenTarget | null> {
+	if (!token) return null;
+	const rows = await db
+		.select({ userId: users.id, email: users.email, displayName: users.displayName })
+		.from(passwordResetTokens)
+		.innerJoin(users, eq(passwordResetTokens.userId, users.id))
+		.where(
+			and(
+				eq(passwordResetTokens.id, hashToken(token)),
+				isNull(passwordResetTokens.usedAt),
+				gt(passwordResetTokens.expiresAt, new Date())
+			)
+		)
+		.limit(1);
+	return rows[0] ?? null;
+}
+
+// Spends the token and applies the new password in one go. Returns false when
+// the token was already used, expired or never existed.
+export async function consumePasswordResetToken(
+	token: string,
+	newPassword: string
+): Promise<boolean> {
+	const target = await findPasswordResetToken(token);
+	if (!target) return false;
+	// Marked used first: setPassword() then deletes it along with the rest.
+	await db
+		.update(passwordResetTokens)
+		.set({ usedAt: new Date() })
+		.where(eq(passwordResetTokens.id, hashToken(token)));
+	await setPassword(target.userId, newPassword);
+	return true;
 }
 
 /* ---------------------- request helpers ---------------------- */
