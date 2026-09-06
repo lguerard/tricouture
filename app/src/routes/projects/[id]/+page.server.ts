@@ -10,9 +10,21 @@ import {
 	projectYarns,
 	projectFabrics
 } from '$lib/server/db/schema';
+import {
+	accessFor,
+	canEdit,
+	dropSharesOf,
+	listShares,
+	revokeShare,
+	shareableUsers,
+	upsertShare,
+	type Access
+} from '$lib/server/access';
 import type { Actions, PageServerLoad } from './$types';
 import type { projectStatus } from '$lib/server/db/schema';
 
+// Owner only: deleting a project and managing who it is shared with are not
+// things a collaborator gets to do.
 async function owned(uid: string, id: string) {
 	return (
 		await db
@@ -21,6 +33,24 @@ async function owned(uid: string, id: string) {
 			.where(and(eq(projects.id, id), eq(projects.ownerId, uid)))
 			.limit(1)
 	)[0];
+}
+
+// The project plus what this account may do with it, or null when it may not
+// even see it. Callers answer 404 on null rather than 403: a 403 would confirm
+// the id exists and let someone enumerate other accounts' projects.
+async function withAccess(uid: string, id: string) {
+	const project = (await db.select().from(projects).where(eq(projects.id, id)).limit(1))[0];
+	if (!project) return null;
+	const access = await accessFor(uid, 'project', project.id, project.ownerId);
+	return access ? { project, access } : null;
+}
+
+// Everything that changes the project itself: owner, or someone it was shared
+// with in 'edit'. Logging yarn or fabric from here still draws on the acting
+// account's own stash -- the queries below filter materials by yarns.ownerId.
+async function editable(uid: string, id: string) {
+	const found = await withAccess(uid, id);
+	return found && canEdit(found.access) ? found.project : undefined;
 }
 
 function progressFrom(currentRow: number, totalRows: number | null, fallback: number): number {
@@ -32,8 +62,9 @@ function progressFrom(currentRow: number, totalRows: number | null, fallback: nu
 
 export const load: PageServerLoad = async ({ locals, params }) => {
 	const uid = locals.user!.id;
-	const project = await owned(uid, params.id);
-	if (!project) throw error(404, 'Project not found');
+	const found = await withAccess(uid, params.id);
+	if (!found) throw error(404, 'Project not found');
+	const { project, access } = found;
 
 	const pattern = project.patternId
 		? (await db.select({ id: patterns.id, title: patterns.title }).from(patterns).where(eq(patterns.id, project.patternId)).limit(1))[0]
@@ -100,13 +131,35 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 			.where(eq(projectFabrics.projectId, project.id))
 	]);
 
-	return { project, pattern, pace, rowsPerHour, remaining, hoursLeft, yarnStash, fabricStash, usedYarns, usedFabrics };
+	// The share panel is the owner's business only: a collaborator has no reason
+	// to see the other people an object was shared with, nor the list of every
+	// account on the server.
+	const isOwner = access === 'owner';
+	const [sharedWith, people] = isOwner
+		? await Promise.all([listShares('project', project.id), shareableUsers(uid)])
+		: [[], []];
+
+	return {
+		project,
+		access,
+		sharedWith,
+		people,
+		pattern,
+		pace,
+		rowsPerHour,
+		remaining,
+		hoursLeft,
+		yarnStash,
+		fabricStash,
+		usedYarns,
+		usedFabrics
+	};
 };
 
 export const actions: Actions = {
 	row: async ({ locals, params, request }) => {
 		const uid = locals.user!.id;
-		const p = await owned(uid, params.id);
+		const p = await editable(uid, params.id);
 		if (!p) return fail(404, { error: 'Not found' });
 		const delta = parseInt(String((await request.formData()).get('delta') ?? '0'), 10) || 0;
 		const currentRow = Math.max(0, p.currentRow + delta);
@@ -119,7 +172,7 @@ export const actions: Actions = {
 
 	update: async ({ locals, params, request }) => {
 		const uid = locals.user!.id;
-		const p = await owned(uid, params.id);
+		const p = await editable(uid, params.id);
 		if (!p) return fail(404, { error: 'Not found' });
 		const form = await request.formData();
 		const status = String(form.get('status') ?? p.status) as (typeof projectStatus.enumValues)[number];
@@ -149,7 +202,7 @@ export const actions: Actions = {
 
 	logPace: async ({ locals, params, request }) => {
 		const uid = locals.user!.id;
-		const p = await owned(uid, params.id);
+		const p = await editable(uid, params.id);
 		if (!p) return fail(404, { error: 'Not found' });
 		const form = await request.formData();
 		const rowsDone = parseInt(String(form.get('rowsDone') ?? ''), 10);
@@ -169,7 +222,7 @@ export const actions: Actions = {
 	// stash in the same transaction, so the stash always reflects reality.
 	useYarn: async ({ locals, params, request }) => {
 		const uid = locals.user!.id;
-		const p = await owned(uid, params.id);
+		const p = await editable(uid, params.id);
 		if (!p) return fail(404, { error: 'Not found' });
 		const form = await request.formData();
 		const yarnId = String(form.get('yarnId') ?? '');
@@ -210,7 +263,7 @@ export const actions: Actions = {
 	// Undo a logged yarn usage: remove the link and return the quantity to stash.
 	undoYarnUse: async ({ locals, params, request }) => {
 		const uid = locals.user!.id;
-		const p = await owned(uid, params.id);
+		const p = await editable(uid, params.id);
 		if (!p) return fail(404, { error: 'Not found' });
 		const linkId = String((await request.formData()).get('id') ?? '');
 		const link = (
@@ -233,7 +286,7 @@ export const actions: Actions = {
 	// Same mechanism as useYarn, for fabric (couture) measured in centimeters.
 	useFabric: async ({ locals, params, request }) => {
 		const uid = locals.user!.id;
-		const p = await owned(uid, params.id);
+		const p = await editable(uid, params.id);
 		if (!p) return fail(404, { error: 'Not found' });
 		const form = await request.formData();
 		const fabricId = String(form.get('fabricId') ?? '');
@@ -273,7 +326,7 @@ export const actions: Actions = {
 
 	undoFabricUse: async ({ locals, params, request }) => {
 		const uid = locals.user!.id;
-		const p = await owned(uid, params.id);
+		const p = await editable(uid, params.id);
 		if (!p) return fail(404, { error: 'Not found' });
 		const linkId = String((await request.formData()).get('id') ?? '');
 		const link = (
@@ -301,7 +354,39 @@ export const actions: Actions = {
 		const uid = locals.user!.id;
 		const p = await owned(uid, params.id);
 		if (!p) return fail(404, { error: 'Not found' });
+		// The shares table has no foreign key to projects (one per shareable table
+		// would mean one shares table per type), so its rows are dropped here.
+		await dropSharesOf('project', p.id);
 		await db.delete(projects).where(eq(projects.id, p.id));
 		throw redirect(303, '/projects/board');
+	},
+
+	// --- Sharing (owner only) -------------------------------------------------
+
+	share: async ({ locals, params, request }) => {
+		const uid = locals.user!.id;
+		const p = await owned(uid, params.id);
+		if (!p) return fail(404, { error: 'Not found' });
+
+		const form = await request.formData();
+		const userId = String(form.get('userId') ?? '');
+		const role = String(form.get('role') ?? 'view');
+		if (!userId) return fail(400, { error: 'Pick someone to share with' });
+		if (role !== 'view' && role !== 'edit') return fail(400, { error: 'Unknown role' });
+
+		await upsertShare(uid, 'project', p.id, userId, role);
+		return { shared: true };
+	},
+
+	unshare: async ({ locals, params, request }) => {
+		const uid = locals.user!.id;
+		const p = await owned(uid, params.id);
+		if (!p) return fail(404, { error: 'Not found' });
+
+		const userId = String((await request.formData()).get('userId') ?? '');
+		if (!userId) return fail(400, { error: 'Missing recipient' });
+
+		await revokeShare('project', p.id, userId);
+		return { unshared: true };
 	}
 };

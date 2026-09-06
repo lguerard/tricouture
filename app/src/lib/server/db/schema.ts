@@ -73,6 +73,44 @@ export const passwordResetTokens = pgTable(
 /* Patterns                                                           */
 /* ------------------------------------------------------------------ */
 
+// Explicit, per-object sharing. Everything in this app belongs to the account
+// that created it and is invisible to everyone else; a row here is the only
+// thing that opens one object to one other account. Two roles, chosen when the
+// share is created: 'view' (read-only) and 'edit' (change it, but never delete
+// it and never re-share it -- those stay with the owner).
+//
+// resourceType/resourceId is a loose reference on purpose: a foreign key per
+// table would mean one shares table per resource type. The rows are cleaned up
+// with the owner (cascade below) and, for the object itself, by the delete
+// paths in the routes.
+export const shareRole = pgEnum('share_role', ['view', 'edit']);
+
+export const shares = pgTable(
+	'shares',
+	{
+		id: uuid('id').primaryKey().defaultRandom(),
+		resourceType: varchar('resource_type', { length: 32 }).notNull(),
+		resourceId: uuid('resource_id').notNull(),
+		// Who shared it. Kept alongside the resource's own owner_id so a share
+		// can be audited (and revoked in bulk) without joining every table.
+		ownerId: uuid('owner_id')
+			.notNull()
+			.references(() => users.id, { onDelete: 'cascade' }),
+		// Who receives access.
+		userId: uuid('user_id')
+			.notNull()
+			.references(() => users.id, { onDelete: 'cascade' }),
+		role: shareRole('role').notNull().default('view'),
+		createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
+	},
+	(t) => ({
+		// One share per (object, recipient): re-sharing updates the role.
+		uniq: uniqueIndex('shares_resource_user_idx').on(t.resourceType, t.resourceId, t.userId),
+		// The hot path: "everything of this type shared with me".
+		recipientIdx: index('shares_user_type_idx').on(t.userId, t.resourceType)
+	})
+);
+
 export const patterns = pgTable(
 	'patterns',
 	{

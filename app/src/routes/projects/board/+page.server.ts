@@ -1,6 +1,7 @@
-import { eq, asc } from 'drizzle-orm';
+import { asc } from 'drizzle-orm';
 import { db } from '$lib/server/db';
 import { projects } from '$lib/server/db/schema';
+import { visibleTo } from '$lib/server/access';
 import { STATUS_ORDER } from '$lib/labels';
 import type { PageServerLoad } from './$types';
 import type { ProjectStatus } from '$lib/server/db/schema';
@@ -16,10 +17,11 @@ export const load: PageServerLoad = async ({ locals }) => {
 			currentRow: projects.currentRow,
 			totalRows: projects.totalRows,
 			deadline: projects.deadline,
-			boardPosition: projects.boardPosition
+			boardPosition: projects.boardPosition,
+			ownerId: projects.ownerId
 		})
 		.from(projects)
-		.where(eq(projects.ownerId, uid))
+		.where(visibleTo(uid, 'project', projects.ownerId, projects.id))
 		.orderBy(asc(projects.boardPosition));
 
 	const columns: Record<ProjectStatus, typeof rows> = {
