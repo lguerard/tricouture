@@ -6,6 +6,39 @@
 	const locale = $derived(data.locale);
 	const DIFFICULTY_LEVELS = [1, 2, 3, 4, 5];
 	let submitting = $state(false);
+
+	// Pre-fill from the pattern's link: reads the page's title and author so
+	// they do not have to be retyped. Only fills fields left empty -- what the
+	// person typed themselves always wins over what a web page claims.
+	let fetching = $state(false);
+	let fetchError = $state('');
+
+	async function fillFromLink() {
+		const src = document.querySelector<HTMLInputElement>('#source');
+		const url = src?.value.trim();
+		if (!url) return;
+		fetching = true;
+		fetchError = '';
+		try {
+			const res = await fetch('/api/patterns/from-url', {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({ url })
+			});
+			if (!res.ok) throw new Error(String(res.status));
+			const meta = await res.json();
+			const title = document.querySelector<HTMLInputElement>('#title');
+			const designer = document.querySelector<HTMLInputElement>('#designer');
+			if (title && !title.value.trim() && meta.title) title.value = meta.title;
+			if (designer && !designer.value.trim() && meta.designer) designer.value = meta.designer;
+			if (src && meta.source) src.value = meta.source;
+			if (!meta.title && !meta.designer) fetchError = t(locale, 'patterns.new.fetchEmpty');
+		} catch {
+			fetchError = t(locale, 'patterns.new.fetchFailed');
+		} finally {
+			fetching = false;
+		}
+	}
 </script>
 
 <div class="container narrow">
@@ -48,7 +81,13 @@
 			</div>
 			<div class="field">
 				<label for="source">{t(locale, 'patterns.new.sourceLabel')}</label>
-				<input id="source" name="source" placeholder={t(locale, 'patterns.new.sourcePlaceholder')} />
+				<div class="source-row">
+					<input id="source" name="source" placeholder={t(locale, 'patterns.new.sourcePlaceholder')} />
+					<button type="button" onclick={fillFromLink} disabled={fetching}>
+						{fetching ? t(locale, 'patterns.new.fetching') : t(locale, 'patterns.new.fetchFromLink')}
+					</button>
+				</div>
+				{#if fetchError}<span class="muted small">{fetchError}</span>{/if}
 			</div>
 		</div>
 
@@ -128,5 +167,14 @@
 		.two {
 			grid-template-columns: 1fr;
 		}
+	}
+
+	.source-row {
+		display: flex;
+		gap: 0.4rem;
+	}
+	.source-row input {
+		flex: 1;
+		min-width: 0;
 	}
 </style>
