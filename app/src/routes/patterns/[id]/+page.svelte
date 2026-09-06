@@ -6,6 +6,20 @@
 	const locale = $derived(data.locale);
 	const p = $derived(data.pattern);
 
+	// A pattern usually arrives as a PDF (uploaded above) or as a link — a
+	// Ravelry page, a designer's shop, a blog post. Both go through the same
+	// "Source" field, so a value that is a URL is turned into a real link
+	// instead of text the person has to select and copy.
+	// Only http(s): a javascript: or data: value in an href would run on click.
+	function asUrl(v: string): string | null {
+		try {
+			const u = new URL(v.trim());
+			return u.protocol === 'http:' || u.protocol === 'https:' ? u.href : null;
+		} catch {
+			return null;
+		}
+	}
+
 	function isImage(mime: string) {
 		return mime.startsWith('image/');
 	}
@@ -80,7 +94,16 @@
 			<dl>
 				{#if p.garmentType}<dt>{t(locale, 'patterns.detail.garmentType')}</dt><dd>{p.garmentType}</dd>{/if}
 				{#if p.designer}<dt>{t(locale, 'patterns.detail.designer')}</dt><dd>{p.designer}</dd>{/if}
-				{#if p.source}<dt>{t(locale, 'patterns.detail.source')}</dt><dd>{p.source}</dd>{/if}
+				{#if p.source}
+					<dt>{t(locale, 'patterns.detail.source')}</dt>
+					<dd>
+						{#if asUrl(p.source)}
+							<a href={asUrl(p.source)} target="_blank" rel="noopener noreferrer">{p.source}</a>
+						{:else}
+							{p.source}
+						{/if}
+					</dd>
+				{/if}
 				{#if p.difficulty}<dt>{t(locale, 'patterns.detail.difficulty')}</dt><dd>{difficultyLabel(locale, p.difficulty)}</dd>{/if}
 				{#if p.language}<dt>{t(locale, 'patterns.detail.language')}</dt><dd>{p.language}</dd>{/if}
 				{#if p.sizes}<dt>{t(locale, 'patterns.detail.sizes')}</dt><dd>{p.sizes}</dd>{/if}
