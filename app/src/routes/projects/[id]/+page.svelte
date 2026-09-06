@@ -7,6 +7,11 @@
 	let { data } = $props();
 	const p = $derived(data.project);
 	const locale = $derived(data.locale);
+	// 'owner' | 'edit' | 'view' — a shared project is someone else's: only its
+	// owner sees the sharing panel and the delete button.
+	const access = $derived(data.access);
+	const isOwner = $derived(access === 'owner');
+	const readOnly = $derived(access === 'view');
 
 	onMount(() => {
 		if (p.deadline && p.status !== 'fini') {
@@ -76,16 +81,26 @@
 
 	<header class="head">
 		<h1>{p.title}</h1>
-		<form
-			method="POST"
-			action="?/delete"
-			onsubmit={(e) => {
-				if (!confirm(t(locale, 'projects.detail.confirmDelete'))) e.preventDefault();
-			}}
-		>
-			<button type="submit">{t(locale, 'projects.detail.delete')}</button>
-		</form>
+		{#if isOwner}
+			<form
+				method="POST"
+				action="?/delete"
+				onsubmit={(e) => {
+					if (!confirm(t(locale, 'projects.detail.confirmDelete'))) e.preventDefault();
+				}}
+			>
+				<button type="submit">{t(locale, 'projects.detail.delete')}</button>
+			</form>
+		{/if}
 	</header>
+
+	{#if !isOwner}
+		<p class="shared-banner">
+			{t(locale, 'projects.share.sharedWithMe')}{readOnly
+				? ` — ${t(locale, 'projects.share.readOnly')}`
+				: ''}
+		</p>
+	{/if}
 
 	{#if data.pattern}
 		<p class="muted">
@@ -306,6 +321,64 @@
 				</div>
 			</div>
 		</section>
+
+	{#if isOwner}
+		<section class="card detail share">
+			<h2>{t(locale, 'projects.share.title')}</h2>
+
+			{#if data.sharedWith.length === 0}
+				<p class="muted">{t(locale, 'projects.share.none')}</p>
+			{:else}
+				<ul class="share-list">
+					{#each data.sharedWith as s (s.userId)}
+						<li>
+							<span>
+								{s.displayName}
+								<span class="muted small">{s.email}</span>
+							</span>
+							<span class="small">
+								{s.role === 'edit'
+									? t(locale, 'projects.share.roleEdit')
+									: t(locale, 'projects.share.roleView')}
+							</span>
+							<form method="POST" action="?/unshare" use:enhance>
+								<input type="hidden" name="userId" value={s.userId} />
+								<button type="submit">{t(locale, 'projects.share.revoke')}</button>
+							</form>
+						</li>
+					{/each}
+				</ul>
+			{/if}
+
+			{#if data.people.length === 0}
+				<p class="muted small">{t(locale, 'projects.share.noAccounts')}</p>
+			{:else}
+				<form
+					method="POST"
+					action="?/share"
+					use:enhance={() => async ({ update }) => update({ reset: true })}
+					class="share-form"
+				>
+					<label>
+						{t(locale, 'projects.share.with')}
+						<select name="userId" required>
+							{#each data.people as u (u.id)}
+								<option value={u.id}>{u.displayName} — {u.email}</option>
+							{/each}
+						</select>
+					</label>
+					<label>
+						{t(locale, 'projects.share.role')}
+						<select name="role">
+							<option value="view">{t(locale, 'projects.share.roleView')}</option>
+							<option value="edit">{t(locale, 'projects.share.roleEdit')}</option>
+						</select>
+					</label>
+					<button type="submit">{t(locale, 'projects.share.submit')}</button>
+				</form>
+			{/if}
+		</section>
+	{/if}
 	</div>
 </div>
 
@@ -460,5 +533,32 @@
 		.cols {
 			grid-template-columns: 1fr;
 		}
+	}
+
+	.shared-banner {
+		background: #eef3fb;
+		border-radius: var(--radius);
+		padding: 0.5rem 0.7rem;
+		font-size: 0.9rem;
+	}
+	.share-list {
+		list-style: none;
+		padding: 0;
+		margin: 0 0 0.8rem;
+		display: grid;
+		gap: 0.4rem;
+	}
+	.share-list li {
+		display: flex;
+		align-items: center;
+		gap: 0.6rem;
+		justify-content: space-between;
+		flex-wrap: wrap;
+	}
+	.share-form {
+		display: flex;
+		gap: 0.6rem;
+		align-items: flex-end;
+		flex-wrap: wrap;
 	}
 </style>
