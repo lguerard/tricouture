@@ -276,6 +276,37 @@ export function extractProduct(html: string, baseUrl: string): ScrapedProduct {
 
 // --- SSRF-guarded fetch (user-supplied shop URLs must never reach internal network) ---
 
+// Identifies the app to the sites it fetches. Sending no User-Agent at all is
+// what most anti-bot filters reject first, and it leaves shop owners no way to
+// tell who is calling: an honest UA is both more polite and more likely to pass.
+export const SCRAPER_USER_AGENT = 'tricouture/1.0 (+https://github.com/lguerard/tricouture)';
+
+// Carries the HTTP status so callers can tell "the site refused us" (403/503,
+// typically an anti-bot filter) from "the page had nothing to extract".
+export class HttpStatusError extends Error {
+	constructor(readonly status: number) {
+		super(`HTTP ${status}`);
+		this.name = 'HttpStatusError';
+	}
+}
+
+// Cloudflare and friends serve an interstitial that runs JavaScript before
+// letting a real browser through. It can arrive with a 403 *or* a 200, so the
+// status alone is not enough to detect it.
+const CHALLENGE_MARKERS = [
+	'just a moment...',
+	'attention required!',
+	'cf-browser-verification',
+	'__cf_chl',
+	'/cdn-cgi/challenge-platform',
+	'checking your browser before accessing'
+];
+
+export function looksLikeBotChallenge(html: string): boolean {
+	const head = html.slice(0, 4000).toLowerCase();
+	return CHALLENGE_MARKERS.some((m) => head.includes(m));
+}
+
 function isPrivateIp(ip: string): boolean {
 	const kind = isIP(ip);
 	if (kind === 4) {
@@ -339,7 +370,10 @@ export async function fetchSafe(
 			res = await fetch(url, {
 				redirect: 'manual',
 				signal: controller.signal,
-				headers: opts.accept ? { accept: opts.accept } : undefined
+				headers: {
+					'user-agent': SCRAPER_USER_AGENT,
+					...(opts.accept ? { accept: opts.accept } : {})
+				}
 			});
 		} finally {
 			clearTimeout(timer);
@@ -351,7 +385,7 @@ export async function fetchSafe(
 			current = new URL(loc, url).toString();
 			continue;
 		}
-		if (!res.ok) throw new Error(`HTTP ${res.status}`);
+		if (!res.ok) throw new HttpStatusError(res.status);
 
 		const reader = res.body?.getReader();
 		if (!reader) {

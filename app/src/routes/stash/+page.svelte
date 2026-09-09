@@ -126,8 +126,17 @@
 		barcodeBusy = true;
 		scanMsg = '';
 		fetchedPhoto = null;
+		// Hors application Android, scanBarcode() renvoie null tout de suite (ML Kit
+		// n'existe que derrière Capacitor). Sortir sans rien dire donnait un bouton
+		// qui semble cassé : on explique au lieu de se taire.
+		if (!isCapacitor()) {
+			scanMsg = t(locale, 'stash.barcodeAppOnly');
+			barcodeBusy = false;
+			return;
+		}
 		const code = await scanBarcode();
 		if (!code) {
+			scanMsg = t(locale, 'stash.barcodeNoCode');
 			barcodeBusy = false;
 			return;
 		}
@@ -205,7 +214,14 @@
 			});
 			const data = await res.json();
 			if (!res.ok) {
-				scanMsg = data.error ?? t(locale, 'stash.scanUnavailable');
+				// Codes renvoyés par /api/ai/lookup-url ; tout le reste est un
+				// message déjà lisible (URL invalide, réponse trop volumineuse…).
+				const codes: Record<string, string> = {
+					blocked: 'stash.importBlocked',
+					nometa: 'stash.importNoMetadata'
+				};
+				const key = codes[data.error as string];
+				scanMsg = key ? t(locale, key) : (data.error ?? t(locale, 'stash.scanUnavailable'));
 			} else {
 				applyFields(data.fields ?? {});
 				if (data.photoDataUrl) {
