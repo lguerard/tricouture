@@ -511,6 +511,12 @@
 					{:else}
 						<div class="swatch" style={`background:${y.colorHex ?? '#eee'}`}></div>
 					{/if}
+					{#if y.photoPath}
+						<form method="POST" action="?/removePhoto" use:enhance={refresh} class="photo-rm">
+							<input type="hidden" name="kind" value="yarn" /><input type="hidden" name="id" value={y.id} />
+							<button class="btn-ghost small" type="submit">{t(locale, 'stash.removePhoto')}</button>
+						</form>
+					{/if}
 					<strong>{[y.brand, y.name].filter(Boolean).join(' ') || y.colorway || t(locale, 'stash.yarn.fallbackName')}</strong>
 					<span class="muted small">{[y.colorway, y.weightCategory].filter(Boolean).join(' · ')}</span>
 					<span class="muted small">{[y.fiber, y.motif && motifLabel(locale, y.motif)].filter(Boolean).join(' · ')}</span>
@@ -545,6 +551,12 @@
 					{:else}
 						<div class="swatch" style={`background:${f.colorHex ?? '#eee'}`}></div>
 					{/if}
+					{#if f.photoPath}
+						<form method="POST" action="?/removePhoto" use:enhance={refresh} class="photo-rm">
+							<input type="hidden" name="kind" value="fabric" /><input type="hidden" name="id" value={f.id} />
+							<button class="btn-ghost small" type="submit">{t(locale, 'stash.removePhoto')}</button>
+						</form>
+					{/if}
 					<strong>{f.name ?? f.fabricType ?? t(locale, 'stash.fabric.fallbackName')}</strong>
 					<span class="muted small">{[f.composition, f.motif && motifLabel(locale, f.motif)].filter(Boolean).join(' · ')}</span>
 					<span class="small">{[f.lengthCm && `${f.lengthCm} cm`, f.widthCm && `${t(locale, 'stash.fabric.widthPrefix')} ${f.widthCm}`].filter(Boolean).join(' · ')}</span>
@@ -563,6 +575,12 @@
 					{#if n.photoPath}
 						<img src={`/media/${n.photoPath}`} alt={n.name} />
 					{/if}
+					{#if n.photoPath}
+						<form method="POST" action="?/removePhoto" use:enhance={refresh} class="photo-rm">
+							<input type="hidden" name="kind" value="notion" /><input type="hidden" name="id" value={n.id} />
+							<button class="btn-ghost small" type="submit">{t(locale, 'stash.removePhoto')}</button>
+						</form>
+					{/if}
 					<strong>{n.name}</strong>
 					<span class="muted small">{n.category ?? ''}</span>
 					<span class="small">{t(locale, 'stash.qtyPrefix')} {n.quantity}</span>
@@ -580,6 +598,12 @@
 				<div class="card stash-item">
 					{#if tl.photoPath}
 						<img src={`/media/${tl.photoPath}`} alt={toolTypeLabel(locale, tl.type)} />
+					{/if}
+					{#if tl.photoPath}
+						<form method="POST" action="?/removePhoto" use:enhance={refresh} class="photo-rm">
+							<input type="hidden" name="kind" value="tool" /><input type="hidden" name="id" value={tl.id} />
+							<button class="btn-ghost small" type="submit">{t(locale, 'stash.removePhoto')}</button>
+						</form>
 					{/if}
 					<strong>{toolTypeLabel(locale, tl.type)}</strong>
 					<span class="small">{[tl.sizeMm && `${tl.sizeMm} mm`, tl.lengthCm && `${tl.lengthCm} cm`].filter(Boolean).join(' · ')}</span>
@@ -656,6 +680,9 @@
 		object-fit: cover;
 		border-radius: var(--radius);
 		margin-top: 0.4rem;
+	}
+	.photo-rm {
+		margin: -0.15rem 0 0.15rem;
 	}
 	.add-error {
 		color: #b91c1c;

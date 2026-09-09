@@ -146,6 +146,56 @@ export const actions: Actions = {
 		return { ok: true };
 	},
 
+	// Retire la photo d'un article sans toucher au reste : le fichier est
+	// supprime du disque et la colonne remise a NULL, la carte retombe sur la
+	// pastille de couleur. Meme structure explicite que `delete` ci-dessous --
+	// les quatre tables sont des objets Drizzle distincts, les factoriser
+	// derriere une union coute plus en contorsions de typage que ca ne rapporte.
+	removePhoto: async ({ locals, request }) => {
+		const uid = locals.user!.id;
+		const form = await request.formData();
+		const kind = String(form.get('kind') ?? '');
+		const id = String(form.get('id') ?? '');
+		if (!id) return fail(400, { error: 'missingId' });
+
+		if (kind === 'yarn') {
+			const row = (
+				await db.select({ photoPath: yarns.photoPath }).from(yarns)
+					.where(and(eq(yarns.id, id), eq(yarns.ownerId, uid))).limit(1)
+			)[0];
+			if (!row) return fail(404, { error: 'notFound' });
+			if (row.photoPath) await deleteStored(row.photoPath);
+			await db.update(yarns).set({ photoPath: null }).where(and(eq(yarns.id, id), eq(yarns.ownerId, uid)));
+		} else if (kind === 'fabric') {
+			const row = (
+				await db.select({ photoPath: fabrics.photoPath }).from(fabrics)
+					.where(and(eq(fabrics.id, id), eq(fabrics.ownerId, uid))).limit(1)
+			)[0];
+			if (!row) return fail(404, { error: 'notFound' });
+			if (row.photoPath) await deleteStored(row.photoPath);
+			await db.update(fabrics).set({ photoPath: null }).where(and(eq(fabrics.id, id), eq(fabrics.ownerId, uid)));
+		} else if (kind === 'notion') {
+			const row = (
+				await db.select({ photoPath: notions.photoPath }).from(notions)
+					.where(and(eq(notions.id, id), eq(notions.ownerId, uid))).limit(1)
+			)[0];
+			if (!row) return fail(404, { error: 'notFound' });
+			if (row.photoPath) await deleteStored(row.photoPath);
+			await db.update(notions).set({ photoPath: null }).where(and(eq(notions.id, id), eq(notions.ownerId, uid)));
+		} else if (kind === 'tool') {
+			const row = (
+				await db.select({ photoPath: tools.photoPath }).from(tools)
+					.where(and(eq(tools.id, id), eq(tools.ownerId, uid))).limit(1)
+			)[0];
+			if (!row) return fail(404, { error: 'notFound' });
+			if (row.photoPath) await deleteStored(row.photoPath);
+			await db.update(tools).set({ photoPath: null }).where(and(eq(tools.id, id), eq(tools.ownerId, uid)));
+		} else {
+			return fail(400, { error: 'unknownKind' });
+		}
+		return { ok: true };
+	},
+
 	delete: async ({ locals, request }) => {
 		const uid = locals.user!.id;
 		const form = await request.formData();
