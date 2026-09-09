@@ -3,7 +3,7 @@
 	import { YARN_WEIGHTS, MOTIF_VALUES, motifLabel, COLOR_NAMES, toolTypeOptions, toolTypeLabel } from '$lib/labels';
 	import { isCapacitor, scanBarcode } from '$lib/capacitor';
 	import { t } from '$lib/i18n';
-	let { data } = $props();
+	let { data, form } = $props();
 	const locale = $derived(data.locale);
 
 	type Tab = 'yarn' | 'fabric' | 'notion' | 'tool';
@@ -17,9 +17,21 @@
 		{ id: 'tool', icon: '🪡', key: 'stash.tab.tool', count: data.toolList.length }
 	]);
 
+	// Ne referme le panneau QUE si l'ajout a reussi. Avant, un fail() du serveur
+	// (nom manquant, type d'outil invalide, photo dans un format inaffichable)
+	// fermait quand meme le formulaire en effacant la saisie : l'echec etait
+	// rigoureusement indistinguable d'un ajout reussi.
 	const refresh = () => {
-		return async ({ update }: { update: (opts?: { reset?: boolean }) => Promise<void> }) => {
-			await update({ reset: true });
+		return async ({
+			update,
+			result
+		}: {
+			update: (opts?: { reset?: boolean }) => Promise<void>;
+			result: { type: string };
+		}) => {
+			const ok = result.type === 'success';
+			await update({ reset: ok });
+			if (!ok) return;
 			adding = false;
 			fetchedPhoto = null;
 			scanMsg = '';
@@ -27,6 +39,16 @@
 			showUrlImport = false;
 		};
 	};
+
+	// Codes renvoyes par les actions du serveur -> message traduit.
+	const ADD_ERRORS: Record<string, string> = {
+		photoFormat: 'stash.errPhotoFormat',
+		notionName: 'stash.errNotionName',
+		toolType: 'stash.errToolType'
+	};
+	const addError = $derived(
+		form?.error ? t(locale, ADD_ERRORS[form.error as string] ?? 'stash.errGeneric') : ''
+	);
 
 	// SD colorway preview
 	let previewYarnId = $state<string | null>(null);
@@ -318,6 +340,7 @@
 				</button>
 				{#if scanBusy || analyzing}<span class="muted small">{t(locale, 'stash.analyzing')}</span>{/if}
 				{#if scanMsg}<span class="muted small">{scanMsg}</span>{/if}
+				{#if addError}<span class="add-error">{addError}</span>{/if}
 			</div>
 			{#if showUrlImport}
 				<div class="url-import">
@@ -370,7 +393,7 @@
 							id="ph"
 							name="photo"
 							type="file"
-							accept="image/*"
+							accept="image/jpeg,image/png,image/webp,image/gif"
 							onchange={(e) => {
 								fetchedPhoto = null;
 								const f = (e.target as HTMLInputElement).files?.[0];
@@ -412,7 +435,7 @@
 							id="fph"
 							name="photo"
 							type="file"
-							accept="image/*"
+							accept="image/jpeg,image/png,image/webp,image/gif"
 							onchange={(e) => {
 								fetchedPhoto = null;
 								const f = (e.target as HTMLInputElement).files?.[0];
@@ -427,11 +450,21 @@
 					<button class="btn-primary" type="submit">{t(locale, 'stash.fabric.submit')}</button>
 				</form>
 			{:else if tab === 'notion'}
-				<form method="POST" action="?/addNotion" use:enhance={refresh}>
+				<form method="POST" action="?/addNotion" enctype="multipart/form-data" use:enhance={refresh}>
 					<div class="row3">
 						<div class="field"><label for="nn">{t(locale, 'stash.notion.name')}</label><input id="nn" name="name" required /></div>
 						<div class="field"><label for="nc">{t(locale, 'stash.notion.category')}</label><input id="nc" name="category" placeholder={t(locale, 'stash.notion.categoryPlaceholder')} /></div>
 						<div class="field"><label for="nq">{t(locale, 'stash.notion.quantity')}</label><input id="nq" name="quantity" type="number" value="1" /></div>
+					</div>
+					<div class="field">
+						<label for="nph">{t(locale, 'stash.yarn.photo')}</label>
+						<input
+							id="nph"
+							name="photo"
+							type="file"
+							accept="image/jpeg,image/png,image/webp,image/gif"
+							onchange={() => (fetchedPhoto = null)}
+						/>
 					</div>
 					{#if fetchedPhoto}
 						<img src={fetchedPhoto} alt={t(locale, 'stash.yarn.previewAlt')} class="fetched-photo" />
@@ -454,7 +487,7 @@
 					<div class="field"><label for="tq">{t(locale, 'stash.tool.quantity')}</label><input id="tq" name="quantity" type="number" value="1" /></div>
 					<div class="field">
 						<label for="tph">{t(locale, 'stash.yarn.photo')}</label>
-						<input id="tph" name="photo" type="file" accept="image/*" onchange={() => (fetchedPhoto = null)} />
+						<input id="tph" name="photo" type="file" accept="image/jpeg,image/png,image/webp,image/gif" onchange={() => (fetchedPhoto = null)} />
 						{#if fetchedPhoto}
 							<img src={fetchedPhoto} alt={t(locale, 'stash.yarn.previewAlt')} class="fetched-photo" />
 							<input type="hidden" name="photoDataUrl" value={fetchedPhoto} />
@@ -623,6 +656,10 @@
 		object-fit: cover;
 		border-radius: var(--radius);
 		margin-top: 0.4rem;
+	}
+	.add-error {
+		color: #b91c1c;
+		font-size: 0.85rem;
 	}
 	.row3 {
 		display: grid;

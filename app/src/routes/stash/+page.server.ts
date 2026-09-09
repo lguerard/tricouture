@@ -2,7 +2,7 @@ import { fail } from '@sveltejs/kit';
 import { and, eq, desc } from 'drizzle-orm';
 import { db } from '$lib/server/db';
 import { yarns, fabrics, notions, tools } from '$lib/server/db/schema';
-import { saveUpload, saveDataUrl, deleteStored } from '$lib/server/storage';
+import { saveImageUpload, saveDataUrl, deleteStored, UnsupportedImageError } from '$lib/server/storage';
 import { embed, aiConfigured } from '$lib/server/ai/ollama';
 import type { Actions, PageServerLoad } from './$types';
 import type { toolType } from '$lib/server/db/schema';
@@ -27,18 +27,36 @@ export const load: PageServerLoad = async ({ locals }) => {
 	return { yarnList, fabricList, notionList, toolList };
 };
 
+// Photo d'un article de stock : soit un fichier choisi dans le formulaire,
+// soit une image récupérée côté serveur (import URL / code-barres) passée en
+// data URL. Renvoie `unsupported` plutôt que de lever, pour que chaque action
+// puisse répondre un fail() lisible au lieu d'une erreur 500 muette.
+async function photoFromForm(
+	uid: string,
+	form: FormData,
+	subdir: string
+): Promise<{ path: string | null } | { unsupported: true }> {
+	const photo = form.get('photo');
+	if (photo instanceof File && photo.size > 0) {
+		try {
+			return { path: (await saveImageUpload(uid, photo, subdir)).storedPath };
+		} catch (e) {
+			if (e instanceof UnsupportedImageError) return { unsupported: true };
+			throw e;
+		}
+	}
+	const photoDataUrl = str(form.get('photoDataUrl'));
+	if (photoDataUrl) return { path: (await saveDataUrl(uid, photoDataUrl, subdir))?.storedPath ?? null };
+	return { path: null };
+}
+
 export const actions: Actions = {
 	addYarn: async ({ locals, request }) => {
 		const uid = locals.user!.id;
 		const form = await request.formData();
-		let photoPath: string | null = null;
-		const photo = form.get('photo');
-		if (photo instanceof File && photo.size > 0) {
-			photoPath = (await saveUpload(uid, photo, 'yarns')).storedPath;
-		} else {
-			const photoDataUrl = str(form.get('photoDataUrl'));
-			if (photoDataUrl) photoPath = (await saveDataUrl(uid, photoDataUrl, 'yarns'))?.storedPath ?? null;
-		}
+		const saved = await photoFromForm(uid, form, 'yarns');
+		if ('unsupported' in saved) return fail(415, { error: 'photoFormat' });
+		const photoPath = saved.path;
 		const inserted = (
 			await db.insert(yarns).values({
 				ownerId: uid,
@@ -73,14 +91,9 @@ export const actions: Actions = {
 	addFabric: async ({ locals, request }) => {
 		const uid = locals.user!.id;
 		const form = await request.formData();
-		let photoPath: string | null = null;
-		const photo = form.get('photo');
-		if (photo instanceof File && photo.size > 0) {
-			photoPath = (await saveUpload(uid, photo, 'fabrics')).storedPath;
-		} else {
-			const photoDataUrl = str(form.get('photoDataUrl'));
-			if (photoDataUrl) photoPath = (await saveDataUrl(uid, photoDataUrl, 'fabrics'))?.storedPath ?? null;
-		}
+		const saved = await photoFromForm(uid, form, 'fabrics');
+		if ('unsupported' in saved) return fail(415, { error: 'photoFormat' });
+		const photoPath = saved.path;
 		await db.insert(fabrics).values({
 			ownerId: uid,
 			name: str(form.get('name')),
@@ -99,9 +112,10 @@ export const actions: Actions = {
 		const uid = locals.user!.id;
 		const form = await request.formData();
 		const name = str(form.get('name'));
-		if (!name) return fail(400, { error: 'Nom requis' });
-		const photoDataUrl = str(form.get('photoDataUrl'));
-		const photoPath = photoDataUrl ? (await saveDataUrl(uid, photoDataUrl, 'notions'))?.storedPath ?? null : null;
+		if (!name) return fail(400, { error: 'notionName' });
+		const saved = await photoFromForm(uid, form, 'notions');
+		if ('unsupported' in saved) return fail(415, { error: 'photoFormat' });
+		const photoPath = saved.path;
 		await db.insert(notions).values({
 			ownerId: uid,
 			name,
@@ -117,15 +131,10 @@ export const actions: Actions = {
 		const form = await request.formData();
 		const type = String(form.get('type') ?? '') as (typeof toolType.enumValues)[number];
 		const valid = ['aiguille_droite', 'aiguille_circulaire', 'aiguille_double_pointe', 'crochet', 'autre'];
-		if (!valid.includes(type)) return fail(400, { error: 'Type requis' });
-		let photoPath: string | null = null;
-		const photo = form.get('photo');
-		if (photo instanceof File && photo.size > 0) {
-			photoPath = (await saveUpload(uid, photo, 'tools')).storedPath;
-		} else {
-			const photoDataUrl = str(form.get('photoDataUrl'));
-			if (photoDataUrl) photoPath = (await saveDataUrl(uid, photoDataUrl, 'tools'))?.storedPath ?? null;
-		}
+		if (!valid.includes(type)) return fail(400, { error: 'toolType' });
+		const saved = await photoFromForm(uid, form, 'tools');
+		if ('unsupported' in saved) return fail(415, { error: 'photoFormat' });
+		const photoPath = saved.path;
 		await db.insert(tools).values({
 			ownerId: uid,
 			type,
@@ -142,7 +151,7 @@ export const actions: Actions = {
 		const form = await request.formData();
 		const kind = String(form.get('kind') ?? '');
 		const id = String(form.get('id') ?? '');
-		if (!id) return fail(400, { error: 'id manquant' });
+		if (!id) return fail(400, { error: 'missingId' });
 
 		if (kind === 'yarn') {
 			const row = (
