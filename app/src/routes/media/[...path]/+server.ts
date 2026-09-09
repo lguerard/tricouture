@@ -1,6 +1,7 @@
 import { error } from '@sveltejs/kit';
 import { createReadStream } from 'node:fs';
 import { stat } from 'node:fs/promises';
+import { Readable } from 'node:stream';
 import { extname } from 'node:path';
 import { and, eq } from 'drizzle-orm';
 import { db } from '$lib/server/db';
@@ -46,8 +47,14 @@ export const GET: RequestHandler = async ({ params, locals }) => {
 	}
 
 	const type = MIME[extname(rel).toLowerCase()] ?? 'application/octet-stream';
-	const stream = createReadStream(abs);
-	return new Response(stream as unknown as ReadableStream, {
+	// Readable.toWeb, et surtout PAS un cast du flux Node vers ReadableStream :
+	// undici finissait par appeler close() sur un contrôleur déjà fermé, ce qui
+	// lève ERR_INVALID_STATE dans une micro-tâche — donc hors de tout try/catch,
+	// donc process Node terminé. Reproduit à la 2e image servie : il suffisait
+	// d'ouvrir une page de stock, qui en charge plusieurs à la fois, pour couper
+	// l'application pour tout le monde.
+	const stream = Readable.toWeb(createReadStream(abs)) as ReadableStream;
+	return new Response(stream, {
 		headers: {
 			'content-type': type,
 			'content-length': String(size),

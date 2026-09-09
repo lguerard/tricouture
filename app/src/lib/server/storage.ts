@@ -39,6 +39,39 @@ const EXT_BY_MIME: Record<string, string> = {
 	'image/gif': '.gif'
 };
 
+// Levée quand la photo est dans un format que /media/[...path] ne sait pas
+// resservir : il ne connaît que les types ci-dessus et retombe sinon sur
+// application/octet-stream, ce qui donne une image cassée dans le navigateur.
+export class UnsupportedImageError extends Error {
+	constructor(readonly mimeType: string) {
+		super(`Unsupported image type: ${mimeType || 'unknown'}`);
+		this.name = 'UnsupportedImageError';
+	}
+}
+
+// Enregistre une photo de stock (pelote, tissu, mercerie, outil).
+//
+// Contrairement à saveUpload — qui sert aussi aux PDF de patrons et accepte
+// donc tout — on valide ici le type AVANT d'écrire, et on tire l'extension du
+// type MIME plutôt que du nom de fichier : un téléphone envoie volontiers
+// « IMG_1234.HEIC », que saveUpload aurait stocké tel quel pour ne plus
+// jamais pouvoir l'afficher, sur mobile comme sur fixe.
+export async function saveImageUpload(
+	ownerId: string,
+	file: File,
+	subdir = ''
+): Promise<{ storedPath: string; sizeBytes: number; mimeType: string }> {
+	const mimeType = (file.type || '').split(';')[0].trim().toLowerCase();
+	const ext = EXT_BY_MIME[mimeType];
+	if (!ext) throw new UnsupportedImageError(mimeType);
+	const buf = Buffer.from(await file.arrayBuffer());
+	const rel = join(ownerId, subdir, `${randomUUID()}${ext}`).split(sep).join('/');
+	const abs = absolutePath(rel);
+	await mkdir(join(abs, '..'), { recursive: true });
+	await writeFile(abs, buf);
+	return { storedPath: rel, sizeBytes: buf.length, mimeType };
+}
+
 // Saves a `data:<mime>;base64,<...>` string (e.g. a photo fetched server-side
 // from a shop URL / barcode lookup) the same way saveUpload stores a File.
 export async function saveDataUrl(
