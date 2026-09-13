@@ -162,6 +162,25 @@ export const patternFiles = pgTable(
 	})
 );
 
+// Pieces to make for a pattern (Back, Front, Left sleeve...), detected by AI
+// from the pattern's extracted text (or entered by hand) — belongs to the
+// PATTERN, not a project, since the same pattern can be made more than once.
+export const patternPieces = pgTable(
+	'pattern_pieces',
+	{
+		id: uuid('id').primaryKey().defaultRandom(),
+		patternId: uuid('pattern_id')
+			.notNull()
+			.references(() => patterns.id, { onDelete: 'cascade' }),
+		name: varchar('name', { length: 160 }).notNull(),
+		position: integer('position').notNull().default(0),
+		createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
+	},
+	(t) => ({
+		patternIdx: index('pattern_pieces_pattern_idx').on(t.patternId)
+	})
+);
+
 /* ------------------------------------------------------------------ */
 /* Stash                                                              */
 /* ------------------------------------------------------------------ */
@@ -325,6 +344,27 @@ export const projects = pgTable(
 	(t) => ({
 		ownerIdx: index('projects_owner_idx').on(t.ownerId),
 		statusIdx: index('projects_status_idx').on(t.status)
+	})
+);
+
+// Per-project completion of a pattern's pieces — each project making the same
+// pattern tracks its own progress independently.
+export const projectPieceProgress = pgTable(
+	'project_piece_progress',
+	{
+		id: uuid('id').primaryKey().defaultRandom(),
+		projectId: uuid('project_id')
+			.notNull()
+			.references(() => projects.id, { onDelete: 'cascade' }),
+		pieceId: uuid('piece_id')
+			.notNull()
+			.references(() => patternPieces.id, { onDelete: 'cascade' }),
+		completed: boolean('completed').notNull().default(false),
+		completedAt: timestamp('completed_at', { withTimezone: true })
+	},
+	(t) => ({
+		projectIdx: index('project_piece_progress_project_idx').on(t.projectId),
+		uniquePair: uniqueIndex('project_piece_progress_unique').on(t.projectId, t.pieceId)
 	})
 );
 

@@ -1,9 +1,11 @@
 import { error, fail, redirect } from '@sveltejs/kit';
-import { and, desc, eq, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, sql } from 'drizzle-orm';
 import { db } from '$lib/server/db';
 import {
 	projects,
 	patterns,
+	patternPieces,
+	projectPieceProgress,
 	paceLogs,
 	yarns,
 	fabrics,
@@ -69,6 +71,22 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 	const pattern = project.patternId
 		? (await db.select({ id: patterns.id, title: patterns.title }).from(patterns).where(eq(patterns.id, project.patternId)).limit(1))[0]
 		: null;
+
+	const pieces = project.patternId
+		? await db
+				.select({
+					id: patternPieces.id,
+					name: patternPieces.name,
+					completed: sql<boolean>`coalesce(${projectPieceProgress.completed}, false)`
+				})
+				.from(patternPieces)
+				.leftJoin(
+					projectPieceProgress,
+					and(eq(projectPieceProgress.pieceId, patternPieces.id), eq(projectPieceProgress.projectId, project.id))
+				)
+				.where(eq(patternPieces.patternId, project.patternId))
+				.orderBy(asc(patternPieces.position))
+		: [];
 
 	const pace = await db
 		.select()
@@ -145,6 +163,7 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 		sharedWith,
 		people,
 		pattern,
+		pieces,
 		pace,
 		rowsPerHour,
 		remaining,
@@ -359,6 +378,24 @@ export const actions: Actions = {
 		await dropSharesOf('project', p.id);
 		await db.delete(projects).where(eq(projects.id, p.id));
 		throw redirect(303, '/projects/board');
+	},
+
+	togglePiece: async ({ locals, params, request }) => {
+		const uid = locals.user!.id;
+		const p = await editable(uid, params.id);
+		if (!p) return fail(404, { error: 'Not found' });
+		const form = await request.formData();
+		const pieceId = String(form.get('pieceId') ?? '');
+		const completed = String(form.get('completed') ?? '') === 'true';
+		if (!pieceId) return fail(400, { error: 'pieceId required' });
+		await db
+			.insert(projectPieceProgress)
+			.values({ projectId: p.id, pieceId, completed, completedAt: completed ? new Date() : null })
+			.onConflictDoUpdate({
+				target: [projectPieceProgress.projectId, projectPieceProgress.pieceId],
+				set: { completed, completedAt: completed ? new Date() : null }
+			});
+		return { ok: true };
 	},
 
 	// --- Sharing (owner only) -------------------------------------------------

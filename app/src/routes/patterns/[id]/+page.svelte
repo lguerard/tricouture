@@ -1,10 +1,40 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import { invalidateAll } from '$app/navigation';
 	import { craftLabel, difficultyLabel } from '$lib/labels';
 	import { t } from '$lib/i18n';
 	let { data } = $props();
 	const locale = $derived(data.locale);
 	const p = $derived(data.pattern);
+
+	// Pièces (analyse IA)
+	let analyzing = $state(false);
+	let analyzeError = $state('');
+	async function analyzePieces() {
+		analyzing = true;
+		analyzeError = '';
+		try {
+			const res = await fetch('/api/ai/pattern-pieces', {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({ patternId: p.id })
+			});
+			const d = await res.json();
+			if (!res.ok) {
+				analyzeError =
+					d.error === 'no-text'
+						? t(locale, 'patterns.detail.piecesNoText')
+						: d.error === 'empty'
+							? t(locale, 'patterns.detail.piecesEmpty')
+							: (d.error ?? t(locale, 'patterns.detail.aiError'));
+			} else {
+				await invalidateAll();
+			}
+		} catch {
+			analyzeError = t(locale, 'patterns.detail.aiNetworkError');
+		}
+		analyzing = false;
+	}
 
 	// A pattern usually arrives as a PDF (uploaded above) or as a link — a
 	// Ravelry page, a designer's shop, a blog post. Both go through the same
@@ -137,6 +167,41 @@
 		</section>
 	</div>
 
+	<section class="card pieces">
+		<div class="pieces-head">
+			<h2>{t(locale, 'patterns.detail.piecesTitle')}</h2>
+			{#if data.isOwner}
+				<button type="button" onclick={analyzePieces} disabled={analyzing}>
+					{analyzing ? t(locale, 'patterns.detail.piecesAnalyzing') : t(locale, 'patterns.detail.piecesAnalyze')}
+				</button>
+			{/if}
+		</div>
+		{#if analyzeError}<p class="error">{analyzeError}</p>{/if}
+		{#if data.pieces.length === 0}
+			<p class="muted small">{t(locale, 'patterns.detail.piecesEmptyList')}</p>
+		{:else}
+			<ul class="piece-list">
+				{#each data.pieces as piece}
+					<li>
+						<span>{piece.name}</span>
+						{#if data.isOwner}
+							<form method="POST" action="?/removePiece" use:enhance>
+								<input type="hidden" name="pieceId" value={piece.id} />
+								<button type="submit" class="link-btn" title={t(locale, 'patterns.detail.piecesRemove')}>✕</button>
+							</form>
+						{/if}
+					</li>
+				{/each}
+			</ul>
+		{/if}
+		{#if data.isOwner}
+			<form method="POST" action="?/addPiece" use:enhance class="add-piece">
+				<input name="name" placeholder={t(locale, 'patterns.detail.piecesAddPlaceholder')} required />
+				<button type="submit">{t(locale, 'patterns.detail.piecesAdd')}</button>
+			</form>
+		{/if}
+	</section>
+
 	<section class="card copilot">
 		<h2>{t(locale, 'patterns.detail.copilotTitle')}</h2>
 		<div class="ask">
@@ -149,6 +214,49 @@
 </div>
 
 <style>
+	.pieces {
+		margin-top: 1.2rem;
+	}
+	.pieces-head {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		gap: 0.5rem;
+	}
+	.piece-list {
+		list-style: none;
+		margin: 0.8rem 0 0;
+		padding: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 0.3rem;
+	}
+	.piece-list li {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		padding: 0.4rem 0.6rem;
+		background: var(--accent-soft);
+		border-radius: var(--radius);
+	}
+	.link-btn {
+		background: none;
+		border: none;
+		cursor: pointer;
+		color: var(--muted);
+		padding: 0 0.3rem;
+	}
+	.link-btn:hover {
+		color: var(--text);
+	}
+	.add-piece {
+		display: flex;
+		gap: 0.5rem;
+		margin-top: 0.8rem;
+	}
+	.add-piece input {
+		flex: 1;
+	}
 	.copilot {
 		margin-top: 1.2rem;
 	}

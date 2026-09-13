@@ -34,6 +34,19 @@ export const GENERATE_SYSTEM = `Tu es créateur·rice de patrons de tricot/croch
 - finitions
 Utilise la terminologie française et les abréviations standard. Sois précis sur les calculs de mailles.`;
 
+export const PIECES_SYSTEM = `Tu es assistant·e de tricot/crochet/couture, expert·e en lecture de patrons.
+À partir du texte d'un patron, identifie la liste des PIÈCES distinctes à réaliser
+(ex. "Dos", "Devant", "Manche gauche", "Manche droite", "Col", "Poche"...).
+Réponds STRICTEMENT avec un objet JSON de la forme {"pieces": ["Pièce 1", "Pièce 2"]},
+sans aucun texte autour, sans balises markdown.
+Liste courte et concrète (généralement 2 à 15 pièces). Si le patron ne décrit qu'une
+seule pièce continue (ex. écharpe simple, bonnet), renvoie une seule entrée.
+${KNITTING_GLOSSARY}`;
+
+export function piecesPrompt(context: string): string {
+	return `PATRON:\n${context.slice(0, 12000)}\n\nListe les pièces à réaliser pour ce patron, au format JSON demandé.`;
+}
+
 export function copilotPrompt(context: string, question: string): string {
 	const ctx = context.slice(0, 12000);
 	return `CONTEXTE DU PATRON:\n${ctx}\n\nQUESTION: ${question}`;

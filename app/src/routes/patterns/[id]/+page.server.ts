@@ -1,7 +1,7 @@
 import { error, fail, redirect } from '@sveltejs/kit';
-import { and, eq, or } from 'drizzle-orm';
+import { and, asc, eq, or } from 'drizzle-orm';
 import { db } from '$lib/server/db';
-import { patterns, patternFiles, users } from '$lib/server/db/schema';
+import { patterns, patternFiles, patternPieces, users } from '$lib/server/db/schema';
 import { deleteStored } from '$lib/server/storage';
 import type { Actions, PageServerLoad } from './$types';
 
@@ -37,8 +37,14 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 		.from(patternFiles)
 		.where(eq(patternFiles.patternId, row.pattern.id));
 
+	const pieces = await db
+		.select()
+		.from(patternPieces)
+		.where(eq(patternPieces.patternId, row.pattern.id))
+		.orderBy(asc(patternPieces.position));
+
 	const isOwner = row.pattern.ownerId === uid;
-	return { pattern: row.pattern, files, isOwner, ownerName: row.ownerName };
+	return { pattern: row.pattern, files, pieces, isOwner, ownerName: row.ownerName };
 };
 
 export const actions: Actions = {
@@ -67,5 +73,25 @@ export const actions: Actions = {
 
 		await db.delete(patterns).where(eq(patterns.id, pattern.id));
 		throw redirect(303, '/patterns');
+	},
+
+	addPiece: async ({ locals, params, request }) => {
+		const uid = locals.user!.id;
+		const pattern = await ownedPattern(uid, params.id);
+		if (!pattern) return fail(403, { error: 'Owner only' });
+		const name = String((await request.formData()).get('name') ?? '').trim();
+		if (!name) return fail(400, { pieceError: 'Nom requis' });
+		const count = (await db.select().from(patternPieces).where(eq(patternPieces.patternId, pattern.id))).length;
+		await db.insert(patternPieces).values({ patternId: pattern.id, name, position: count });
+		return { ok: true };
+	},
+
+	removePiece: async ({ locals, params, request }) => {
+		const uid = locals.user!.id;
+		const pattern = await ownedPattern(uid, params.id);
+		if (!pattern) return fail(403, { error: 'Owner only' });
+		const pieceId = String((await request.formData()).get('pieceId') ?? '');
+		await db.delete(patternPieces).where(and(eq(patternPieces.id, pieceId), eq(patternPieces.patternId, pattern.id)));
+		return { ok: true };
 	}
 };
