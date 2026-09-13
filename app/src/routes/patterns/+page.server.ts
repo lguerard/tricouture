@@ -23,12 +23,18 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	}
 	if (q) {
 		// Full-text search (French dictionary) on title + extracted PDF text,
-		// with ILIKE fallback for partial matches.
+		// with an ILIKE fallback for partial title matches, plus a match against
+		// any tag (substring, case-insensitive) so typing a tag in the search box
+		// finds it too -- not just clicking it on a pattern.
 		conds.push(
 			sql`(
 				to_tsvector('french', coalesce(${patterns.title}, '') || ' ' || coalesce(${patterns.extractedText}, ''))
 					@@ plainto_tsquery('french', ${q})
 				or ${patterns.title} ilike ${'%' + q + '%'}
+				or exists (
+					select 1 from jsonb_array_elements_text(${patterns.tags}) as tag
+					where tag ilike ${'%' + q + '%'}
+				)
 			)`
 		);
 	}
