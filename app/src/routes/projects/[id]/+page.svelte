@@ -177,6 +177,38 @@
 			</form>
 		</section>
 
+		<!-- Pieces (from the linked pattern, per-project progress) -->
+		{#if data.pattern && data.pieces.length > 0}
+			<section class="card pieces">
+				<h2>{t(locale, 'projects.detail.piecesTitle')}</h2>
+				<ul class="piece-checklist">
+					{#each data.pieces as piece}
+						<li>
+							<form method="POST" action="?/togglePiece" use:enhance>
+								<input type="hidden" name="pieceId" value={piece.id} />
+								<input type="hidden" name="completed" value={(!piece.completed).toString()} />
+								<label>
+									<input
+										type="checkbox"
+										checked={piece.completed}
+										disabled={readOnly}
+										onchange={(e) => e.currentTarget.form?.requestSubmit()}
+									/>
+									<span class:done={piece.completed}>{piece.name}</span>
+								</label>
+							</form>
+						</li>
+					{/each}
+				</ul>
+				<span class="muted small">
+					{t(locale, 'projects.detail.piecesDone', {
+						done: data.pieces.filter((x) => x.completed).length,
+						total: data.pieces.length
+					})}
+				</span>
+			</section>
+		{/if}
+
 		<!-- Details / editing -->
 		<section class="card detail">
 			<h2>{t(locale, 'projects.detail.detailsTitle')}</h2>
@@ -396,6 +428,24 @@
 	}
 	.detail {
 		grid-column: 1 / -1;
+	}
+	.piece-checklist {
+		list-style: none;
+		margin: 0.6rem 0;
+		padding: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 0.3rem;
+	}
+	.piece-checklist label {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		cursor: pointer;
+	}
+	.piece-checklist .done {
+		text-decoration: line-through;
+		color: var(--muted);
 	}
 	.counter {
 		text-align: center;

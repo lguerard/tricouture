@@ -47,8 +47,12 @@ besoin :
 ### Patrons
 
 - Upload de fichiers **PDF et images**, visionneuse intégrée.
-- **Recherche plein-texte française** dans le contenu des PDF.
-- Métadonnées riches : discipline, type, difficulté, jauge, métrage, tags.
+- **Recherche plein-texte française** dans le contenu des PDF, et **par tag**
+  (tags cliquables, cumulables avec la recherche texte).
+- Métadonnées riches : discipline, type, difficulté, jauge, métrage, tags —
+  **modifiables à tout moment** après la création du patron.
+- **Pièces détectées par IA** à partir du contenu du patron (Dos, Devant,
+  Manche...), éditables à la main — servent de checklist par projet.
 - **Copilote IA** par patron (questions, recalculs de taille).
 - **Partage** entre comptes (voir [section dédiée](#multi-utilisateur-et-partage)).
 
@@ -65,6 +69,8 @@ besoin :
 - **Tableau Kanban** glisser-déposer (Idée → En cours → Bloqué → Terminé),
   accessible depuis le web comme depuis l'app Android (même interface).
 - **Compteur de rangs** (boutons + **commande vocale** mains-libres).
+- **Checklist des pièces** du patron (une coche par pièce, propre à chaque
+  projet — deux réalisations du même patron ont chacune leur avancement).
 - **Matières utilisées** : la laine et le tissu consommés se déclarent
   depuis la fiche projet et sont **déduits automatiquement du stock**
   (et recrédités si on annule), pour que l'inventaire reste fiable.
