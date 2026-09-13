@@ -1,4 +1,9 @@
-CREATE TYPE "public"."share_role" AS ENUM('view', 'edit');--> statement-breakpoint
+DO $$ BEGIN
+ CREATE TYPE "public"."share_role" AS ENUM('view', 'edit');
+EXCEPTION
+ WHEN duplicate_object THEN null;
+END $$;
+--> statement-breakpoint
 CREATE TABLE IF NOT EXISTS "password_reset_tokens" (
 	"id" text PRIMARY KEY NOT NULL,
 	"user_id" uuid NOT NULL,
