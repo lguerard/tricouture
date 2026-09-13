@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { craftLabel, CRAFTS, difficultyLabel } from '$lib/labels';
 	import { t } from '$lib/i18n';
+	import { goto } from '$app/navigation';
 	let { data } = $props();
 	const locale = $derived(data.locale);
 </script>
@@ -25,8 +26,16 @@
 			<option value="mine" selected={data.scope === 'mine'}>{t(locale, 'patterns.list.mine')}</option>
 			<option value="shared" selected={data.scope === 'shared'}>{t(locale, 'patterns.list.sharedWithMe')}</option>
 		</select>
+		<input type="hidden" name="tag" value={data.tagFilter} />
 		<button type="submit">{t(locale, 'patterns.list.search')}</button>
 	</form>
+
+	{#if data.tagFilter}
+		<p class="tag-filter">
+			{t(locale, 'patterns.list.filteredByTag', { tag: data.tagFilter })}
+			<a href={`/patterns?q=${encodeURIComponent(data.q)}&craft=${data.craftFilter}&scope=${data.scope}`}>{t(locale, 'patterns.list.clearTagFilter')}</a>
+		</p>
+	{/if}
 
 	{#if data.rows.length === 0}
 		<p class="muted">{t(locale, 'patterns.list.empty')} <a href="/patterns/new">{t(locale, 'patterns.list.addFirst')}</a>.</p>
@@ -56,7 +65,25 @@
 						<span class="muted small">{difficultyLabel(locale, p.difficulty) ?? ''}</span>
 					{/if}
 					<div>
-						{#each p.tags ?? [] as tag}<span class="tag">{tag}</span>{/each}
+						{#each p.tags ?? [] as tag}
+							<span
+								class="tag"
+								role="link"
+								tabindex="0"
+								onclick={(e) => {
+									e.preventDefault();
+									e.stopPropagation();
+									goto(`/patterns?tag=${encodeURIComponent(tag)}`);
+								}}
+								onkeydown={(e) => {
+									if (e.key === 'Enter' || e.key === ' ') {
+										e.preventDefault();
+										e.stopPropagation();
+										goto(`/patterns?tag=${encodeURIComponent(tag)}`);
+									}
+								}}
+							>{tag}</span>
+						{/each}
 					</div>
 				</a>
 			{/each}
@@ -115,5 +142,19 @@
 	.tag.fmt {
 		background: #eef3fb;
 		font-size: 0.72rem;
+	}
+	.tag[role='link'] {
+		cursor: pointer;
+	}
+	.tag[role='link']:hover {
+		text-decoration: underline;
+	}
+	.tag-filter {
+		margin: -0.8rem 0 1rem;
+		font-size: 0.85rem;
+		color: var(--muted);
+	}
+	.tag-filter a {
+		margin-left: 0.5rem;
 	}
 </style>

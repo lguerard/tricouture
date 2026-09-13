@@ -60,7 +60,7 @@
 			<h1>{p.title}</h1>
 			<div>
 				<span class="tag">{craftLabel(locale, p.craft)}</span>
-				{#each p.tags ?? [] as tag}<span class="tag">{tag}</span>{/each}
+				{#each p.tags ?? [] as tag}<a class="tag" href={`/patterns?tag=${encodeURIComponent(tag)}`}>{tag}</a>{/each}
 			</div>
 			{#if !data.isOwner}
 				<span class="shared">{t(locale, 'patterns.detail.sharedBy', { name: data.ownerName })}</span>
@@ -71,6 +71,7 @@
 				{t(locale, 'patterns.detail.startProject')}
 			</a>
 			{#if data.isOwner}
+				<a class="btn" href={`/patterns/${p.id}/edit`}>{t(locale, 'patterns.detail.edit')}</a>
 				<form method="POST" action="?/toggleShare" use:enhance>
 					<button type="submit" class:on={p.isShared}>
 						{p.isShared ? t(locale, 'patterns.detail.shareOn') : t(locale, 'patterns.detail.share')}

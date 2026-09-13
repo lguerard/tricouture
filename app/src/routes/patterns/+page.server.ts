@@ -8,6 +8,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	const q = (url.searchParams.get('q') ?? '').trim();
 	const craftFilter = url.searchParams.get('craft') ?? '';
 	const scope = url.searchParams.get('scope') ?? ''; // '', 'mine', 'shared'
+	const tagFilter = (url.searchParams.get('tag') ?? '').trim();
 
 	// Visible: own patterns + those shared by others.
 	const conds = [or(eq(patterns.ownerId, uid), eq(patterns.isShared, true))!];
@@ -15,6 +16,10 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	if (scope === 'shared') conds.push(and(eq(patterns.isShared, true), sql`${patterns.ownerId} <> ${uid}`)!);
 	if (craftFilter === 'couture' || craftFilter === 'tricot' || craftFilter === 'crochet') {
 		conds.push(eq(patterns.craft, craftFilter));
+	}
+	if (tagFilter) {
+		// jsonb containment: patterns.tags is a jsonb string[] column.
+		conds.push(sql`${patterns.tags} @> ${JSON.stringify([tagFilter])}::jsonb`);
 	}
 	if (q) {
 		// Full-text search (French dictionary) on title + extracted PDF text,
@@ -62,5 +67,5 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		hasLink: /^https?:\/\//i.test((source ?? '').trim())
 	}));
 
-	return { rows: mapped, q, craftFilter, scope };
+	return { rows: mapped, q, craftFilter, scope, tagFilter };
 };
