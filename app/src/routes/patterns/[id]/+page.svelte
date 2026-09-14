@@ -3,6 +3,7 @@
 	import { invalidateAll } from '$app/navigation';
 	import { craftLabel, difficultyLabel } from '$lib/labels';
 	import { t } from '$lib/i18n';
+	import { tagStyle } from '$lib/tagColor';
 	let { data } = $props();
 	const locale = $derived(data.locale);
 	const p = $derived(data.pattern);
@@ -90,7 +91,7 @@
 			<h1>{p.title}</h1>
 			<div>
 				<span class="tag">{craftLabel(locale, p.craft)}</span>
-				{#each p.tags ?? [] as tag}<a class="tag" href={`/patterns?tag=${encodeURIComponent(tag)}`}>{tag}</a>{/each}
+				{#each p.tags ?? [] as tag}<a class="tag" style={tagStyle(tag)} href={`/patterns?tag=${encodeURIComponent(tag)}`}>{tag}</a>{/each}
 			</div>
 			{#if !data.isOwner}
 				<span class="shared">{t(locale, 'patterns.detail.sharedBy', { name: data.ownerName })}</span>

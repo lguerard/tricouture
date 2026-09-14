@@ -2,6 +2,7 @@
 	import { craftLabel, CRAFTS, difficultyLabel } from '$lib/labels';
 	import { t } from '$lib/i18n';
 	import { goto } from '$app/navigation';
+	import { tagStyle } from '$lib/tagColor';
 	let { data } = $props();
 	const locale = $derived(data.locale);
 </script>
@@ -26,7 +27,12 @@
 			<option value="mine" selected={data.scope === 'mine'}>{t(locale, 'patterns.list.mine')}</option>
 			<option value="shared" selected={data.scope === 'shared'}>{t(locale, 'patterns.list.sharedWithMe')}</option>
 		</select>
-		<input type="hidden" name="tag" value={data.tagFilter} />
+		<select name="tag" onchange={(e) => e.currentTarget.form?.requestSubmit()}>
+			<option value="">{t(locale, 'patterns.list.allTags')}</option>
+			{#each data.allTags as tag}
+				<option value={tag} selected={data.tagFilter === tag}>{tag}</option>
+			{/each}
+		</select>
 		<button type="submit">{t(locale, 'patterns.list.search')}</button>
 	</form>
 
@@ -68,6 +74,7 @@
 						{#each p.tags ?? [] as tag}
 							<span
 								class="tag"
+								style={tagStyle(tag)}
 								role="link"
 								tabindex="0"
 								onclick={(e) => {
