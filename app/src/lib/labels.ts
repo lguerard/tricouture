@@ -1,4 +1,4 @@
-import type { ProjectStatus, Craft } from '$lib/server/db/schema';
+import type { ProjectStatus, Craft, PieceStatus } from '$lib/server/db/schema';
 import { t, type Locale } from '$lib/i18n';
 
 export const STATUS_ORDER: ProjectStatus[] = ['idee', 'monte', 'bloque', 'fini'];
@@ -9,6 +9,12 @@ export function statusLabel(locale: Locale, status: ProjectStatus): string {
 export const CRAFTS: Craft[] = ['couture', 'tricot', 'crochet'];
 export function craftLabel(locale: Locale, craft: Craft): string {
 	return t(locale, `craft.${craft}`);
+}
+
+// Couture piece progress: cutting/sewing stage.
+export const PIECE_STATUS_ORDER: PieceStatus[] = ['a_couper', 'coupe', 'cousu', 'fini'];
+export function pieceStatusLabel(locale: Locale, status: PieceStatus): string {
+	return t(locale, `pieceStatus.${status}`);
 }
 
 // Yarn weight categories (Craft Yarn Council standard) — codes are locale-invariant.

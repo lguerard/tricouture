@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import { onMount } from 'svelte';
-	import { statusLabel, STATUS_ORDER } from '$lib/labels';
+	import { statusLabel, STATUS_ORDER, pieceStatusLabel, PIECE_STATUS_ORDER } from '$lib/labels';
 	import { scheduleDeadlineReminder } from '$lib/capacitor';
 	import { t } from '$lib/i18n';
 	let { data } = $props();
@@ -183,20 +183,62 @@
 				<h2>{t(locale, 'projects.detail.piecesTitle')}</h2>
 				<ul class="piece-checklist">
 					{#each data.pieces as piece}
-						<li>
-							<form method="POST" action="?/togglePiece" use:enhance>
-								<input type="hidden" name="pieceId" value={piece.id} />
-								<input type="hidden" name="completed" value={(!piece.completed).toString()} />
-								<label>
+						<li class="piece-row">
+							{#if data.pattern.craft === 'couture'}
+								<span class:done={piece.status === 'fini'}>{piece.name}</span>
+								<form method="POST" action="?/setPieceStatus" use:enhance>
+									<input type="hidden" name="pieceId" value={piece.id} />
+									<select
+										name="status"
+										disabled={readOnly}
+										onchange={(e) => e.currentTarget.form?.requestSubmit()}
+									>
+										{#each PIECE_STATUS_ORDER as s}
+											<option value={s} selected={(piece.status ?? 'a_couper') === s}>{pieceStatusLabel(locale, s)}</option>
+										{/each}
+									</select>
+								</form>
+							{:else if piece.totalRows}
+								<span class:done={piece.completed}>{piece.name}</span>
+								<div class="piece-rows">
+									<form method="POST" action="?/setPieceRow" use:enhance>
+										<input type="hidden" name="pieceId" value={piece.id} />
+										<input type="hidden" name="delta" value="-1" />
+										<button type="submit" disabled={readOnly}>−</button>
+									</form>
+									<span class="muted small">{piece.currentRow} / {piece.totalRows}</span>
+									<form method="POST" action="?/setPieceRow" use:enhance>
+										<input type="hidden" name="pieceId" value={piece.id} />
+										<input type="hidden" name="delta" value="1" />
+										<button type="submit" disabled={readOnly}>+</button>
+									</form>
+								</div>
+							{:else}
+								<form method="POST" action="?/togglePiece" use:enhance>
+									<input type="hidden" name="pieceId" value={piece.id} />
+									<input type="hidden" name="completed" value={(!piece.completed).toString()} />
+									<label>
+										<input
+											type="checkbox"
+											checked={piece.completed}
+											disabled={readOnly}
+											onchange={(e) => e.currentTarget.form?.requestSubmit()}
+										/>
+										<span class:done={piece.completed}>{piece.name}</span>
+									</label>
+								</form>
+								<form method="POST" action="?/setPieceTotalRows" use:enhance class="piece-target">
+									<input type="hidden" name="pieceId" value={piece.id} />
 									<input
-										type="checkbox"
-										checked={piece.completed}
+										name="totalRows"
+										type="number"
+										min="1"
+										placeholder={t(locale, 'projects.detail.pieceRowsPlaceholder')}
 										disabled={readOnly}
 										onchange={(e) => e.currentTarget.form?.requestSubmit()}
 									/>
-									<span class:done={piece.completed}>{piece.name}</span>
-								</label>
-							</form>
+								</form>
+							{/if}
 						</li>
 					{/each}
 				</ul>
@@ -446,6 +488,28 @@
 	.piece-checklist .done {
 		text-decoration: line-through;
 		color: var(--muted);
+	}
+	.piece-row {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		flex-wrap: wrap;
+		gap: 0.4rem;
+	}
+	.piece-row select {
+		width: auto;
+	}
+	.piece-rows {
+		display: flex;
+		align-items: center;
+		gap: 0.4rem;
+	}
+	.piece-rows button {
+		padding: 0.1rem 0.6rem;
+		line-height: 1.4;
+	}
+	.piece-target input {
+		width: 4.5rem;
 	}
 	.counter {
 		text-align: center;

@@ -6,12 +6,14 @@ import {
 	patterns,
 	patternPieces,
 	projectPieceProgress,
+	pieceStatus as pieceStatusEnum,
 	paceLogs,
 	yarns,
 	fabrics,
 	projectYarns,
 	projectFabrics
 } from '$lib/server/db/schema';
+import type { PieceStatus } from '$lib/server/db/schema';
 import {
 	accessFor,
 	canEdit,
@@ -69,7 +71,13 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 	const { project, access } = found;
 
 	const pattern = project.patternId
-		? (await db.select({ id: patterns.id, title: patterns.title }).from(patterns).where(eq(patterns.id, project.patternId)).limit(1))[0]
+		? (
+				await db
+					.select({ id: patterns.id, title: patterns.title, craft: patterns.craft })
+					.from(patterns)
+					.where(eq(patterns.id, project.patternId))
+					.limit(1)
+			)[0]
 		: null;
 
 	const pieces = project.patternId
@@ -77,7 +85,10 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 				.select({
 					id: patternPieces.id,
 					name: patternPieces.name,
-					completed: sql<boolean>`coalesce(${projectPieceProgress.completed}, false)`
+					completed: sql<boolean>`coalesce(${projectPieceProgress.completed}, false)`,
+					status: projectPieceProgress.status,
+					currentRow: sql<number>`coalesce(${projectPieceProgress.currentRow}, 0)`,
+					totalRows: projectPieceProgress.totalRows
 				})
 				.from(patternPieces)
 				.leftJoin(
@@ -174,6 +185,37 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 		usedFabrics
 	};
 };
+
+// Merges a partial update into a piece's progress row and derives `completed`
+// from whichever craft-specific signal applies: a couture piece is done once
+// its stage reaches 'fini', a tricot/crochet piece with a row target is done
+// once it's reached -- otherwise `completed` is left to the plain checkbox
+// action (togglePiece) below, unaffected by this helper.
+async function upsertPieceProgress(
+	projectId: string,
+	pieceId: string,
+	patch: { status?: PieceStatus | null; currentRow?: number; totalRows?: number | null }
+) {
+	const existing = (
+		await db
+			.select()
+			.from(projectPieceProgress)
+			.where(and(eq(projectPieceProgress.projectId, projectId), eq(projectPieceProgress.pieceId, pieceId)))
+			.limit(1)
+	)[0];
+	const status = patch.status !== undefined ? patch.status : (existing?.status ?? null);
+	const currentRow = patch.currentRow !== undefined ? patch.currentRow : (existing?.currentRow ?? 0);
+	const totalRows = patch.totalRows !== undefined ? patch.totalRows : (existing?.totalRows ?? null);
+	const completed = status ? status === 'fini' : totalRows != null && totalRows > 0 && currentRow >= totalRows;
+	const completedAt = completed ? new Date() : null;
+	await db
+		.insert(projectPieceProgress)
+		.values({ projectId, pieceId, status, currentRow, totalRows, completed, completedAt })
+		.onConflictDoUpdate({
+			target: [projectPieceProgress.projectId, projectPieceProgress.pieceId],
+			set: { status, currentRow, totalRows, completed, completedAt }
+		});
+}
 
 export const actions: Actions = {
 	row: async ({ locals, params, request }) => {
@@ -395,6 +437,57 @@ export const actions: Actions = {
 				target: [projectPieceProgress.projectId, projectPieceProgress.pieceId],
 				set: { completed, completedAt: completed ? new Date() : null }
 			});
+		return { ok: true };
+	},
+
+	// Couture: move a piece to its next cut/sew stage.
+	setPieceStatus: async ({ locals, params, request }) => {
+		const uid = locals.user!.id;
+		const p = await editable(uid, params.id);
+		if (!p) return fail(404, { error: 'Not found' });
+		const form = await request.formData();
+		const pieceId = String(form.get('pieceId') ?? '');
+		const status = String(form.get('status') ?? '');
+		if (!pieceId || !pieceStatusEnum.enumValues.includes(status as PieceStatus)) {
+			return fail(400, { error: 'Invalid' });
+		}
+		await upsertPieceProgress(p.id, pieceId, { status: status as PieceStatus });
+		return { ok: true };
+	},
+
+	// Tricot/crochet: +1/-1 on a piece's own row counter.
+	setPieceRow: async ({ locals, params, request }) => {
+		const uid = locals.user!.id;
+		const p = await editable(uid, params.id);
+		if (!p) return fail(404, { error: 'Not found' });
+		const form = await request.formData();
+		const pieceId = String(form.get('pieceId') ?? '');
+		const delta = parseInt(String(form.get('delta') ?? '0'), 10) || 0;
+		if (!pieceId) return fail(400, { error: 'pieceId required' });
+		const existing = (
+			await db
+				.select()
+				.from(projectPieceProgress)
+				.where(and(eq(projectPieceProgress.projectId, p.id), eq(projectPieceProgress.pieceId, pieceId)))
+				.limit(1)
+		)[0];
+		const currentRow = Math.max(0, (existing?.currentRow ?? 0) + delta);
+		await upsertPieceProgress(p.id, pieceId, { currentRow });
+		return { ok: true };
+	},
+
+	// Tricot/crochet: set (or clear) a piece's row target, switching it into
+	// row-counter mode -- a piece with no target keeps the plain checkbox.
+	setPieceTotalRows: async ({ locals, params, request }) => {
+		const uid = locals.user!.id;
+		const p = await editable(uid, params.id);
+		if (!p) return fail(404, { error: 'Not found' });
+		const form = await request.formData();
+		const pieceId = String(form.get('pieceId') ?? '');
+		if (!pieceId) return fail(400, { error: 'pieceId required' });
+		const raw = String(form.get('totalRows') ?? '').trim();
+		const totalRows = raw ? Math.max(0, parseInt(raw, 10) || 0) || null : null;
+		await upsertPieceProgress(p.id, pieceId, { totalRows });
 		return { ok: true };
 	},
 
