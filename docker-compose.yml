@@ -16,6 +16,11 @@ services:
       VISION_URL: ${VISION_URL:-}
       WHISPER_URL: ${WHISPER_URL:-}
       SD_URL: ${SD_URL:-}
+      # Monthly model-watch cron job (scripts/model-watch/) — empty disables
+      # the /api/cron/model-watch endpoint entirely (503).
+      MODEL_WATCH_TOKEN: ${MODEL_WATCH_TOKEN:-}
+      MODEL_WATCH_MAX_CANDIDATES: ${MODEL_WATCH_MAX_CANDIDATES:-3}
+      MODEL_WATCH_MIN_IMPROVEMENT: ${MODEL_WATCH_MIN_IMPROVEMENT:-5.0}
       # adapter-node plafonne les corps de requête à 512 Ko par défaut : un seul
       # PDF de patron un peu lourd suffit à déclencher un 413, et un import en
       # lot le dépasse à coup sûr. 100 Mo par défaut, ajustable dans le .env.

@@ -9,3 +9,6 @@ app/.env
 /models/
 *.log
 .DS_Store
+
+# Surveillance mensuelle des modèles : rapports locaux
+scripts/model-watch/reports/

@@ -8,7 +8,11 @@ const PUBLIC_PREFIXES = [
 	'/register',
 	'/forgot-password',
 	'/reset-password',
-	'/api/locale'
+	'/api/locale',
+	// Machine-to-machine: the monthly model-watch cron job has no session
+	// cookie to send. Not actually open — the route itself requires a
+	// MODEL_WATCH_TOKEN bearer token, checked in its own handler.
+	'/api/cron/model-watch'
 ];
 
 // Public routes that make no sense once signed in, so signed-in visitors are
