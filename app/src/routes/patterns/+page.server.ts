@@ -39,6 +39,17 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		);
 	}
 
+	// Distinct tags across everything visible to the user, for the filter dropdown --
+	// independent of the current search/craft/scope/tag filters so the list of
+	// choices doesn't shrink as filters are applied.
+	const tagRows = await db
+		.select({ tags: patterns.tags })
+		.from(patterns)
+		.where(or(eq(patterns.ownerId, uid), eq(patterns.isShared, true))!);
+	const allTags = Array.from(new Set(tagRows.flatMap((r) => r.tags ?? []))).sort((a, b) =>
+		a.localeCompare(b)
+	);
+
 	const rows = await db
 		.select({
 			id: patterns.id,
@@ -73,5 +84,5 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		hasLink: /^https?:\/\//i.test((source ?? '').trim())
 	}));
 
-	return { rows: mapped, q, craftFilter, scope, tagFilter };
+	return { rows: mapped, q, craftFilter, scope, tagFilter, allTags };
 };
