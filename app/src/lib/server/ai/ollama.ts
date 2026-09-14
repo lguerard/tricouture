@@ -9,20 +9,27 @@ export function aiConfigured(): boolean {
 	return OLLAMA_URL().length > 0;
 }
 
+// The chat model actually in use — read here rather than duplicated so the
+// model-watch evaluation always compares against the real current setting.
+export function currentChatModel(): string {
+	return CHAT_MODEL();
+}
+
 export class AiUnavailable extends Error {
 	constructor(msg = 'AI service unavailable (OLLAMA_URL not configured or offline).') {
 		super(msg);
 	}
 }
 
-async function call(path: string, body: unknown): Promise<unknown> {
+async function call(path: string, body: unknown, timeoutMs?: number): Promise<unknown> {
 	if (!aiConfigured()) throw new AiUnavailable();
 	let res: Response;
 	try {
 		res = await fetch(`${OLLAMA_URL()}${path}`, {
 			method: 'POST',
 			headers: { 'content-type': 'application/json' },
-			body: JSON.stringify(body)
+			body: JSON.stringify(body),
+			signal: timeoutMs ? AbortSignal.timeout(timeoutMs) : undefined
 		});
 	} catch {
 		throw new AiUnavailable();
@@ -31,10 +38,12 @@ async function call(path: string, body: unknown): Promise<unknown> {
 	return res.json();
 }
 
-// Text generation (non-streaming for simplicity).
-export async function generate(prompt: string, system?: string): Promise<string> {
+// Text generation (non-streaming for simplicity). `model` defaults to the
+// configured chat model; the model-watch evaluation passes a candidate's tag
+// instead, so it runs the exact same call production uses.
+export async function generate(prompt: string, system?: string, model?: string): Promise<string> {
 	const data = (await call('/api/generate', {
-		model: CHAT_MODEL(),
+		model: model || CHAT_MODEL(),
 		prompt,
 		system,
 		stream: false
@@ -50,4 +59,28 @@ export async function embed(text: string): Promise<number[]> {
 	})) as { embedding?: number[] };
 	if (!data.embedding) throw new Error('Empty embedding');
 	return data.embedding;
+}
+
+// Downloads a model into Ollama's local store if not already present
+// (no-op otherwise). Pulls can take minutes for a multi-GB model, hence the
+// generous timeout — used only by the monthly model-watch evaluation, never
+// on a user-facing request path.
+export async function pullModel(model: string): Promise<void> {
+	await call('/api/pull', { name: model, stream: false }, 60 * 60 * 1000);
+}
+
+// Removes a model from Ollama's local store. Best-effort: failures are not
+// fatal (the caller just ends up keeping a model on disk it meant to drop).
+export async function deleteModel(model: string): Promise<void> {
+	if (!aiConfigured()) return;
+	try {
+		await fetch(`${OLLAMA_URL()}/api/delete`, {
+			method: 'DELETE',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({ model }),
+			signal: AbortSignal.timeout(30_000)
+		});
+	} catch {
+		/* non-fatal — see comment above */
+	}
 }

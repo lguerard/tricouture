@@ -37,14 +37,27 @@ Utilise la terminologie française et les abréviations standard. Sois précis s
 export const PIECES_SYSTEM = `Tu es assistant·e de tricot/crochet/couture, expert·e en lecture de patrons.
 À partir du texte d'un patron, identifie la liste des PIÈCES distinctes à réaliser
 (ex. "Dos", "Devant", "Manche gauche", "Manche droite", "Col", "Poche"...).
-Réponds STRICTEMENT avec un objet JSON de la forme {"pieces": ["Pièce 1", "Pièce 2"]},
+Pour chaque pièce, ajoute en plus, UNIQUEMENT si le texte le précise explicitement :
+- "rows" : le nombre total de rangs (ou tours) à tricoter/crocheter pour cette pièce
+  (tricot/crochet seulement -- n'ajoute jamais ce champ pour de la couture)
+- "quantity" : le nombre d'exemplaires à couper/réaliser, seulement si > 1
+  (ex. "Manche x2" -> 2 ; couture surtout -- n'ajoute jamais ce champ pour du tricot/crochet)
+N'invente et ne devine JAMAIS un nombre : omets le champ plutôt que d'approximer.
+Réponds STRICTEMENT avec un objet JSON de la forme
+{"pieces": [{"name": "Dos", "rows": 84}, {"name": "Manche", "rows": 52, "quantity": 2}]},
 sans aucun texte autour, sans balises markdown.
 Liste courte et concrète (généralement 2 à 15 pièces). Si le patron ne décrit qu'une
 seule pièce continue (ex. écharpe simple, bonnet), renvoie une seule entrée.
 ${KNITTING_GLOSSARY}`;
 
-export function piecesPrompt(context: string): string {
-	return `PATRON:\n${context.slice(0, 12000)}\n\nListe les pièces à réaliser pour ce patron, au format JSON demandé.`;
+export function piecesPrompt(context: string, craft?: string): string {
+	const hint =
+		craft === 'couture'
+			? ' Patron de couture : cherche le nombre de pièces à couper ("quantity"), pas de rangs.'
+			: craft === 'tricot' || craft === 'crochet'
+				? ' Patron de tricot/crochet : cherche le nombre de rangs total par pièce ("rows").'
+				: '';
+	return `PATRON:\n${context.slice(0, 12000)}\n\nListe les pièces à réaliser pour ce patron, avec leurs rangs/quantités si précisés, au format JSON demandé.${hint}`;
 }
 
 export function copilotPrompt(context: string, question: string): string {

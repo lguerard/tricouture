@@ -213,6 +213,14 @@ Cela ajoute :
 > Si `OLLAMA_URL` est vide dans `.env`, les boutons d'IA affichent un message clair au lieu
 > de planter : le socle reste pleinement utilisable.
 
+### 6.4 Surveillance mensuelle des modèles (optionnel)
+
+Un job cron optionnel vérifie une fois par mois si un nouveau modèle Ollama
+ferait mieux que `OLLAMA_CHAT_MODEL` tout en tenant dans la VRAM du GPU, et
+bascule dessus automatiquement si oui. Voir
+[`scripts/model-watch/README.md`](../scripts/model-watch/README.md) pour
+l'installation.
+
 ---
 
 ## 7. Exposer sur Internet en toute sécurité
