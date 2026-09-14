@@ -88,7 +88,11 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 					completed: sql<boolean>`coalesce(${projectPieceProgress.completed}, false)`,
 					status: projectPieceProgress.status,
 					currentRow: sql<number>`coalesce(${projectPieceProgress.currentRow}, 0)`,
-					totalRows: projectPieceProgress.totalRows
+					// This project's own target if it has one, else the pattern's
+					// AI-suggested row count for the piece -- so a piece the AI could
+					// read a row count for starts in counter mode with no setup.
+					totalRows: sql<number | null>`coalesce(${projectPieceProgress.totalRows}, ${patternPieces.defaultTotalRows})`,
+					quantity: patternPieces.quantity
 				})
 				.from(patternPieces)
 				.leftJoin(
@@ -472,7 +476,18 @@ export const actions: Actions = {
 				.limit(1)
 		)[0];
 		const currentRow = Math.max(0, (existing?.currentRow ?? 0) + delta);
-		await upsertPieceProgress(p.id, pieceId, { currentRow });
+		// First time this piece is touched on this project: adopt the pattern's
+		// AI-suggested row count as the starting target, editable from here on.
+		const totalRows = existing
+			? undefined
+			: ((
+					await db
+						.select({ defaultTotalRows: patternPieces.defaultTotalRows })
+						.from(patternPieces)
+						.where(eq(patternPieces.id, pieceId))
+						.limit(1)
+				)[0]?.defaultTotalRows ?? null);
+		await upsertPieceProgress(p.id, pieceId, { currentRow, ...(totalRows !== undefined ? { totalRows } : {}) });
 		return { ok: true };
 	},
 

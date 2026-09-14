@@ -57,6 +57,13 @@
       "when": 1789373581934,
       "tag": "0007_safe_ma_gnuci",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1789374249803,
+      "tag": "0008_lean_galactus",
+      "breakpoints": true
     }
   ]
 }

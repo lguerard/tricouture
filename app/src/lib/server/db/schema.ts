@@ -174,6 +174,11 @@ export const patternPieces = pgTable(
 			.references(() => patterns.id, { onDelete: 'cascade' }),
 		name: varchar('name', { length: 160 }).notNull(),
 		position: integer('position').notNull().default(0),
+		// AI-suggested (or hand-entered) defaults, read from the pattern text --
+		// editable here and used to pre-fill a project's own per-piece progress
+		// (project_piece_progress.total_rows) the first time it is touched.
+		defaultTotalRows: integer('default_total_rows'), // tricot/crochet: rows for this piece
+		quantity: integer('quantity'), // couture: how many to cut (e.g. 2 sleeves)
 		createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
 	},
 	(t) => ({

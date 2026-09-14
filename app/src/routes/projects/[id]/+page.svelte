@@ -185,7 +185,9 @@
 					{#each data.pieces as piece}
 						<li class="piece-row">
 							{#if data.pattern.craft === 'couture'}
-								<span class:done={piece.status === 'fini'}>{piece.name}</span>
+								<span class:done={piece.status === 'fini'}>
+									{piece.name}{#if piece.quantity}<span class="muted small"> ×{piece.quantity}</span>{/if}
+								</span>
 								<form method="POST" action="?/setPieceStatus" use:enhance>
 									<input type="hidden" name="pieceId" value={piece.id} />
 									<select

@@ -93,5 +93,32 @@ export const actions: Actions = {
 		const pieceId = String((await request.formData()).get('pieceId') ?? '');
 		await db.delete(patternPieces).where(and(eq(patternPieces.id, pieceId), eq(patternPieces.patternId, pattern.id)));
 		return { ok: true };
+	},
+
+	// Correct (or fill in) the AI-suggested row count / cut quantity for a
+	// piece. Only the field actually submitted is touched, so the couture
+	// form (quantity) never clobbers a tricot/crochet row count and vice versa.
+	updatePieceDefaults: async ({ locals, params, request }) => {
+		const uid = locals.user!.id;
+		const pattern = await ownedPattern(uid, params.id);
+		if (!pattern) return fail(403, { error: 'Owner only' });
+		const form = await request.formData();
+		const pieceId = String(form.get('pieceId') ?? '');
+		if (!pieceId) return fail(400, { error: 'pieceId required' });
+		const patch: { defaultTotalRows?: number | null; quantity?: number | null } = {};
+		if (form.has('defaultTotalRows')) {
+			const raw = String(form.get('defaultTotalRows') ?? '').trim();
+			patch.defaultTotalRows = raw ? Math.max(0, parseInt(raw, 10) || 0) || null : null;
+		}
+		if (form.has('quantity')) {
+			const raw = String(form.get('quantity') ?? '').trim();
+			patch.quantity = raw ? Math.max(0, parseInt(raw, 10) || 0) || null : null;
+		}
+		if (Object.keys(patch).length === 0) return fail(400, { error: 'Nothing to update' });
+		await db
+			.update(patternPieces)
+			.set(patch)
+			.where(and(eq(patternPieces.id, pieceId), eq(patternPieces.patternId, pattern.id)));
+		return { ok: true };
 	}
 };

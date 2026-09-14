@@ -185,6 +185,35 @@
 				{#each data.pieces as piece}
 					<li>
 						<span>{piece.name}</span>
+						{#if data.isOwner && (p.craft === 'tricot' || p.craft === 'crochet')}
+							<form method="POST" action="?/updatePieceDefaults" use:enhance class="piece-default">
+								<input type="hidden" name="pieceId" value={piece.id} />
+								<input
+									name="defaultTotalRows"
+									type="number"
+									min="1"
+									placeholder={t(locale, 'patterns.detail.piecesRowsPlaceholder')}
+									value={piece.defaultTotalRows ?? ''}
+									onchange={(e) => e.currentTarget.form?.requestSubmit()}
+								/>
+							</form>
+						{:else if data.isOwner && p.craft === 'couture'}
+							<form method="POST" action="?/updatePieceDefaults" use:enhance class="piece-default">
+								<input type="hidden" name="pieceId" value={piece.id} />
+								<input
+									name="quantity"
+									type="number"
+									min="1"
+									placeholder={t(locale, 'patterns.detail.piecesQuantityPlaceholder')}
+									value={piece.quantity ?? ''}
+									onchange={(e) => e.currentTarget.form?.requestSubmit()}
+								/>
+							</form>
+						{:else if piece.defaultTotalRows}
+							<span class="muted small">{t(locale, 'patterns.detail.piecesRowsBadge', { n: piece.defaultTotalRows })}</span>
+						{:else if piece.quantity}
+							<span class="muted small">{t(locale, 'patterns.detail.piecesQuantityBadge', { n: piece.quantity })}</span>
+						{/if}
 						{#if data.isOwner}
 							<form method="POST" action="?/removePiece" use:enhance>
 								<input type="hidden" name="pieceId" value={piece.id} />
@@ -239,6 +268,9 @@
 		padding: 0.4rem 0.6rem;
 		background: var(--accent-soft);
 		border-radius: var(--radius);
+	}
+	.piece-default input {
+		width: 4.5rem;
 	}
 	.link-btn {
 		background: none;
