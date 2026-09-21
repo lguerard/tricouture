@@ -4,6 +4,7 @@ import { db } from '$lib/server/db';
 import { patterns } from '$lib/server/db/schema';
 import { AiUnavailable } from '$lib/server/ai/ollama';
 import { suggestPatternInfo, mergePatternInfo, normalizeInfoLanguage } from '$lib/server/ai/patternInfo';
+import { getPatternVocabulary } from '$lib/server/patternVocabulary';
 import type { RequestHandler } from './$types';
 
 export const POST: RequestHandler = async ({ request, locals }) => {
@@ -37,7 +38,8 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 	let suggested;
 	try {
 		const context = [pat.title, pat.notes, pat.extractedText].filter(Boolean).join('\n\n');
-		suggested = await suggestPatternInfo(context, language);
+		const vocabulary = await getPatternVocabulary(locals.user!.id);
+		suggested = await suggestPatternInfo(context, language, vocabulary);
 	} catch (e) {
 		if (e instanceof AiUnavailable) return json({ error: e.message }, { status: 503 });
 		return json({ error: 'Analysis failed' }, { status: 500 });

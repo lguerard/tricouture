@@ -1,5 +1,7 @@
 // Domain glossary and prompts for the knitting/sewing/crochet assistant.
 
+import type { PatternVocabulary } from '$lib/server/patternVocabulary';
+
 export const KNITTING_GLOSSARY = `
 Glossaire de référence (anglais → français) à respecter strictement :
 - k = maille endroit (m. end.) ; p = maille envers (m. env.)
@@ -98,13 +100,29 @@ devine JAMAIS une valeur : omets le champ plutôt que d'approximer.
 Rédige "tags", "garmentType" et "sizes" en ${langName}, quelle que soit la langue
 du texte source du patron ("designer" reste tel quel, un nom propre ; "language"
 reste le code de la langue source, voir ci-dessus).
+Si un bloc "VOCABULAIRE DÉJÀ UTILISÉ" est fourni avec le patron, il liste les
+tags / types d'objet / créateur·rice·s déjà utilisés par cette personne pour ses
+autres patrons : réutilise une valeur existante de cette liste quand elle
+convient, plutôt que d'en inventer une nouvelle qui dit la même chose autrement
+(ex. si "hiver" y figure déjà, ne propose pas "d'hiver" ou "chaud" comme tag à
+part). Ce vocabulaire sert seulement à rester cohérent avec ce qui existe déjà --
+n'utilise jamais une valeur de cette liste si elle ne correspond pas vraiment à
+CE patron.
 Réponds STRICTEMENT avec un objet JSON contenant uniquement les champs déterminés
 avec certitude, sans aucun texte autour, sans balises markdown. Exemple :
 {"tags": ["homme", "hiver"], "garmentType": "pull", "difficulty": 3, "gaugeStitches": 20, "gaugeRows": 28}`;
 }
 
-export function patternInfoPrompt(context: string): string {
-	return `PATRON:\n${context.slice(0, 12000)}\n\nExtrais les informations pour ce patron, au format JSON demandé.`;
+function vocabularyBlock(vocabulary?: PatternVocabulary): string {
+	const lines: string[] = [];
+	if (vocabulary?.tags.length) lines.push(`Tags déjà utilisés : ${vocabulary.tags.join(', ')}`);
+	if (vocabulary?.garmentTypes.length) lines.push(`Types d'objet déjà utilisés : ${vocabulary.garmentTypes.join(', ')}`);
+	if (vocabulary?.designers.length) lines.push(`Créateur·rice·s déjà enregistré·e·s : ${vocabulary.designers.join(', ')}`);
+	return lines.length ? `\n\nVOCABULAIRE DÉJÀ UTILISÉ :\n${lines.join('\n')}` : '';
+}
+
+export function patternInfoPrompt(context: string, vocabulary?: PatternVocabulary): string {
+	return `PATRON:\n${context.slice(0, 12000)}${vocabularyBlock(vocabulary)}\n\nExtrais les informations pour ce patron, au format JSON demandé.`;
 }
 
 export function copilotPrompt(context: string, question: string): string {

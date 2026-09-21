@@ -1,5 +1,6 @@
 import { generate } from './ollama';
 import { patternInfoSystem, patternInfoPrompt } from './prompts';
+import type { PatternVocabulary } from '$lib/server/patternVocabulary';
 
 const MAX_TAGS = 6;
 const MAX_TAG_LENGTH = 40;
@@ -110,9 +111,10 @@ function parsePatternInfo(raw: string): SuggestedPatternInfo {
 // reports the failure to the person who clicked it.
 export async function suggestPatternInfo(
 	context: string,
-	language: InfoLanguage = DEFAULT_INFO_LANGUAGE
+	language: InfoLanguage = DEFAULT_INFO_LANGUAGE,
+	vocabulary?: PatternVocabulary
 ): Promise<SuggestedPatternInfo> {
-	return parsePatternInfo(await generate(patternInfoPrompt(context), patternInfoSystem(language)));
+	return parsePatternInfo(await generate(patternInfoPrompt(context, vocabulary), patternInfoSystem(language)));
 }
 
 // Merges newly suggested tags into an existing list without duplicates

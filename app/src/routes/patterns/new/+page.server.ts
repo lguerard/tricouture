@@ -6,6 +6,7 @@ import { saveUpload } from '$lib/server/storage';
 import { extractPdfText } from '$lib/server/pdf';
 import { embed, aiConfigured } from '$lib/server/ai/ollama';
 import { suggestPatternInfo, mergePatternInfo, normalizeInfoLanguage } from '$lib/server/ai/patternInfo';
+import { getPatternVocabulary } from '$lib/server/patternVocabulary';
 import { t } from '$lib/i18n';
 import type { Actions } from './$types';
 import type { Craft } from '$lib/server/db/schema';
@@ -93,7 +94,12 @@ export const actions: Actions = {
 		// never overridden. Best-effort, same policy as the embedding step below.
 		if (aiConfigured()) {
 			try {
-				const suggested = await suggestPatternInfo([title, extractedText].filter(Boolean).join('\n\n'), aiLanguage);
+				const vocabulary = await getPatternVocabulary(uid);
+				const suggested = await suggestPatternInfo(
+					[title, extractedText].filter(Boolean).join('\n\n'),
+					aiLanguage,
+					vocabulary
+				);
 				const merged = mergePatternInfo(
 					{ tags, garmentType, designer, language, difficulty, sizes, gaugeStitches, gaugeRows, yardageRequired },
 					suggested
