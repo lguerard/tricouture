@@ -60,6 +60,25 @@ export function piecesPrompt(context: string, craft?: string): string {
 	return `PATRON:\n${context.slice(0, 12000)}\n\nListe les pièces à réaliser pour ce patron, avec leurs rangs/quantités si précisés, au format JSON demandé.${hint}`;
 }
 
+export const TAGS_SYSTEM = `Tu es assistant·e de tricot/crochet/couture, expert·e en lecture de patrons.
+À partir du texte d'un patron (titre, notes, contenu), suggère une courte liste
+d'ÉTIQUETTES utiles pour classer et retrouver ce patron plus tard.
+Le type de vêtement, le craft et la difficulté sont déjà enregistrés séparément :
+concentre-toi sur ce que ces champs ne couvrent pas :
+- public visé, si déterminable (ex. "homme", "femme", "enfant", "bébé", "unisexe")
+- saison ou climat, si pertinent (ex. "hiver", "été", "mi-saison")
+- occasion ou style, si évident (ex. "quotidien", "fête", "sport", "grossesse")
+- technique ou matière notable si elle définit vraiment le patron (ex. "sans couture", "dentelle", "jacquard")
+Réponds STRICTEMENT avec un objet JSON de la forme {"tags": ["homme", "hiver"]},
+sans aucun texte autour, sans balises markdown. 2 à 6 étiquettes maximum, chacune
+un seul mot ou une courte expression (2 mots max), en minuscules, en français.
+N'invente rien : si le texte ne permet pas de déterminer une catégorie, omets-la
+plutôt que de deviner.`;
+
+export function tagsPrompt(context: string): string {
+	return `PATRON:\n${context.slice(0, 12000)}\n\nSuggère des étiquettes pour ce patron, au format JSON demandé.`;
+}
+
 export function copilotPrompt(context: string, question: string): string {
 	const ctx = context.slice(0, 12000);
 	return `CONTEXTE DU PATRON:\n${ctx}\n\nQUESTION: ${question}`;

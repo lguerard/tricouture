@@ -5,6 +5,7 @@ import { patterns, patternFiles } from '$lib/server/db/schema';
 import { saveUpload } from '$lib/server/storage';
 import { extractPdfText } from '$lib/server/pdf';
 import { embed, aiConfigured } from '$lib/server/ai/ollama';
+import { suggestTags, mergeTags } from '$lib/server/ai/tags';
 import { t } from '$lib/i18n';
 import type { Actions } from './$types';
 import type { Craft } from '$lib/server/db/schema';
@@ -29,7 +30,7 @@ export const actions: Actions = {
 			return fail(400, { error: t(event.locals.locale, 'patterns.new.error.missingFields') });
 		}
 
-		const tags = String(form.get('tags') ?? '')
+		let tags = String(form.get('tags') ?? '')
 			.split(',')
 			.map((t) => t.trim())
 			.filter(Boolean);
@@ -78,6 +79,21 @@ export const actions: Actions = {
 
 		const updates: Record<string, unknown> = {};
 		if (extractedText) updates.extractedText = extractedText;
+
+		// Auto-tag only when the form's tags field was left empty -- an
+		// explicit choice is never overridden. Best-effort, same policy as
+		// the embedding step below.
+		if (tags.length === 0 && aiConfigured()) {
+			try {
+				const suggested = await suggestTags([title, extractedText].filter(Boolean).join('\n\n'));
+				if (suggested.length) {
+					tags = mergeTags(tags, suggested);
+					updates.tags = tags;
+				}
+			} catch {
+				/* Ollama absent — the pattern is created without tags */
+			}
+		}
 
 		if (aiConfigured()) {
 			try {

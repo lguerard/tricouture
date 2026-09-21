@@ -8,6 +8,30 @@
 	const locale = $derived(data.locale);
 	const p = $derived(data.pattern);
 
+	// Étiquettes suggérées (analyse IA)
+	let tagging = $state(false);
+	let tagError = $state('');
+	async function suggestTags() {
+		tagging = true;
+		tagError = '';
+		try {
+			const res = await fetch('/api/ai/pattern-tags', {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({ patternId: p.id })
+			});
+			const d = await res.json();
+			if (!res.ok) {
+				tagError = d.error === 'empty' ? t(locale, 'patterns.detail.tagsEmpty') : (d.error ?? t(locale, 'patterns.detail.aiError'));
+			} else {
+				await invalidateAll();
+			}
+		} catch {
+			tagError = t(locale, 'patterns.detail.aiNetworkError');
+		}
+		tagging = false;
+	}
+
 	// Pièces (analyse IA)
 	let analyzing = $state(false);
 	let analyzeError = $state('');
@@ -92,7 +116,13 @@
 			<div>
 				<span class="tag">{craftLabel(locale, p.craft)}</span>
 				{#each p.tags ?? [] as tag}<a class="tag" style={tagStyle(tag)} href={`/patterns?tag=${encodeURIComponent(tag)}`}>{tag}</a>{/each}
+				{#if data.isOwner}
+					<button type="button" class="tag-suggest" onclick={suggestTags} disabled={tagging}>
+						{tagging ? t(locale, 'patterns.detail.tagsSuggesting') : t(locale, 'patterns.detail.tagsSuggest')}
+					</button>
+				{/if}
 			</div>
+			{#if tagError}<p class="error small">{tagError}</p>{/if}
 			{#if !data.isOwner}
 				<span class="shared">{t(locale, 'patterns.detail.sharedBy', { name: data.ownerName })}</span>
 			{/if}
@@ -244,6 +274,14 @@
 </div>
 
 <style>
+	.small {
+		font-size: 0.82rem;
+	}
+	.tag-suggest {
+		font-size: 0.78rem;
+		padding: 0.15rem 0.6rem;
+		vertical-align: middle;
+	}
 	.pieces {
 		margin-top: 1.2rem;
 	}

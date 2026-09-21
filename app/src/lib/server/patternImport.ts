@@ -4,6 +4,7 @@ import { patterns, patternFiles } from '$lib/server/db/schema';
 import { saveUpload } from '$lib/server/storage';
 import { extractPdfText } from '$lib/server/pdf';
 import { embed, aiConfigured } from '$lib/server/ai/ollama';
+import { suggestTags, mergeTags } from '$lib/server/ai/tags';
 import type { Craft } from '$lib/server/db/schema';
 
 // "Pull_Aiguilles-No12_v2.pdf" -> "Pull Aiguilles No12 v2". Separators become
@@ -37,7 +38,8 @@ export async function importOnePattern(opts: {
 	tags: string[];
 	file: File;
 }): Promise<ImportOneResult> {
-	const { uid, craft, tags, file } = opts;
+	const { uid, craft, file } = opts;
+	let tags = opts.tags;
 
 	// Anything that is not a PDF is reported rather than silently dropped: a
 	// batch where a few files vanished without a word is worse than none.
@@ -64,6 +66,21 @@ export async function importOnePattern(opts: {
 		sizeBytes: saved.sizeBytes,
 		isPrimary: true
 	});
+
+	// Auto-tag only when nothing was specified for the batch -- an explicit
+	// choice (even one shared across the whole batch) is never overridden.
+	// Best-effort, same policy as the embedding step below.
+	if (tags.length === 0 && aiConfigured()) {
+		try {
+			const suggested = await suggestTags([title, extractedText].filter(Boolean).join('\n\n'));
+			if (suggested.length) {
+				tags = mergeTags(tags, suggested);
+				await db.update(patterns).set({ tags }).where(eq(patterns.id, inserted.id));
+			}
+		} catch {
+			/* Ollama absent or busy — the pattern is imported without tags */
+		}
+	}
 
 	// Semantic search is a bonus: an embedding failing must not abort the import.
 	if (aiConfigured()) {
