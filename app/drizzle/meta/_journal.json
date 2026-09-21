@@ -71,6 +71,13 @@
       "when": 1789976325862,
       "tag": "0009_cheerful_wilson_fisk",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1789977220619,
+      "tag": "0010_lethal_thunderbolt",
+      "breakpoints": true
     }
   ]
 }

@@ -54,6 +54,11 @@ export const dict: Record<Locale, Table> = {
 		'account.passwordChanged': 'Mot de passe modifié.',
 		'account.logoutNote':
 			'Tes autres appareils seront déconnectés ; ce navigateur reste connecté.',
+		'account.aiAutoFill.title': "Remplissage automatique par l'IA",
+		'account.aiAutoFill.hint':
+			"Quand tu ajoutes un patron (à la main ou en lot), l'IA propose automatiquement titre, tags et autres infos à partir du PDF. Le bouton « Compléter avec l'IA » sur la fiche d'un patron reste disponible même désactivé.",
+		'account.aiAutoFill.on': 'Activé',
+		'account.aiAutoFill.off': 'Désactivé',
 
 		// Mot de passe oublié
 		'forgot.title': 'Mot de passe oublié',
@@ -631,6 +636,11 @@ export const dict: Record<Locale, Table> = {
 		'account.confirmPassword': 'Confirm the new password',
 		'account.passwordChanged': 'Password changed.',
 		'account.logoutNote': 'Your other devices will be signed out; this browser stays signed in.',
+		'account.aiAutoFill.title': 'AI auto-fill',
+		'account.aiAutoFill.hint':
+			'When you add a pattern (manually or in a batch import), AI automatically suggests title, tags, and other info from the PDF. The "Complete with AI" button on a pattern\'s own page stays available either way.',
+		'account.aiAutoFill.on': 'On',
+		'account.aiAutoFill.off': 'Off',
 
 		// Forgot password
 		'forgot.title': 'Forgot password',

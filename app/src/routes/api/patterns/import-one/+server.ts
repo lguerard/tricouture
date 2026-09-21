@@ -30,6 +30,13 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		.filter(Boolean);
 	const aiLanguage = normalizeInfoLanguage(form.get('aiLanguage'));
 
-	const result = await importOnePattern({ uid, craft, tags, file, aiLanguage });
+	const result = await importOnePattern({
+		uid,
+		craft,
+		tags,
+		file,
+		aiLanguage,
+		aiAutoFillEnabled: locals.user!.aiAutoFillEnabled
+	});
 	return json(result);
 };

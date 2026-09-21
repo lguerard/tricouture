@@ -92,7 +92,9 @@ export const actions: Actions = {
 
 		// Auto-fill only fields the form left empty -- an explicit choice is
 		// never overridden. Best-effort, same policy as the embedding step below.
-		if (aiConfigured()) {
+		// Gated on the user's own aiAutoFillEnabled setting (account page), on
+		// top of aiConfigured() (whether Ollama is reachable at all).
+		if (aiConfigured() && event.locals.user!.aiAutoFillEnabled) {
 			try {
 				const vocabulary = await getPatternVocabulary(uid);
 				const suggested = await suggestPatternInfo(

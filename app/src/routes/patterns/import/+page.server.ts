@@ -43,10 +43,11 @@ export const actions: Actions = {
 			return fail(400, { error: t(locale, 'patterns.import.error.tooMany', { max: MAX_FILES }) });
 		}
 
+		const aiAutoFillEnabled = event.locals.user!.aiAutoFillEnabled;
 		const skipped: string[] = [];
 		const created: { id: string; title: string }[] = [];
 		for (const file of all) {
-			const result = await importOnePattern({ uid, craft, tags, file, aiLanguage });
+			const result = await importOnePattern({ uid, craft, tags, file, aiLanguage, aiAutoFillEnabled });
 			if (result.ok) created.push({ id: result.id, title: result.title });
 			else skipped.push(result.name);
 		}

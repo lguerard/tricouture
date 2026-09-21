@@ -39,8 +39,9 @@ export async function importOnePattern(opts: {
 	tags: string[];
 	file: File;
 	aiLanguage?: InfoLanguage;
+	aiAutoFillEnabled?: boolean;
 }): Promise<ImportOneResult> {
-	const { uid, craft, file, aiLanguage = DEFAULT_INFO_LANGUAGE } = opts;
+	const { uid, craft, file, aiLanguage = DEFAULT_INFO_LANGUAGE, aiAutoFillEnabled = true } = opts;
 	let tags = opts.tags;
 
 	// Anything that is not a PDF is reported rather than silently dropped: a
@@ -79,7 +80,11 @@ export async function importOnePattern(opts: {
 	// empty": at import it's always the filename guess, never a deliberate
 	// choice (there's no per-file title field in a batch), so a title the AI
 	// can actually read off the document is preferred outright.
-	if (aiConfigured()) {
+	//
+	// Gated on the owner's own aiAutoFillEnabled setting (account page) --
+	// separate from aiConfigured(), which just says Ollama is reachable at
+	// all. A user can have AI available but not want it touching new patterns.
+	if (aiConfigured() && aiAutoFillEnabled) {
 		try {
 			const vocabulary = await getPatternVocabulary(uid);
 			const suggested = await suggestPatternInfo(

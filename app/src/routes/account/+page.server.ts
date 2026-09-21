@@ -42,5 +42,20 @@ export const actions: Actions = {
 		// Keeps this browser signed in, signs every other device out.
 		await setPassword(uid, next, event.locals.sessionId);
 		return { success: t(locale, 'account.passwordChanged') };
+	},
+
+	// Whether adding a pattern (manually or via batch import) applies AI
+	// suggestions automatically -- see the column's own comment in schema.ts.
+	// Doesn't touch the explicit "Compléter avec l'IA" button on a pattern's
+	// own page; that stays available either way.
+	toggleAiAutoFill: async (event) => {
+		const uid = event.locals.user!.id;
+		const enabled = !event.locals.user!.aiAutoFillEnabled;
+		await db.update(users).set({ aiAutoFillEnabled: enabled }).where(eq(users.id, uid));
+		// Mutated directly so the load() that runs right after this action (in
+		// the same request) reflects the new value instead of the one read at
+		// the start of the request, before this update.
+		event.locals.user!.aiAutoFillEnabled = enabled;
+		return { ok: true };
 	}
 };

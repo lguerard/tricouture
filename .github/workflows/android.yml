@@ -40,8 +40,19 @@ jobs:
           distribution: temurin
           java-version: 17
 
+      # No `packages:` used to mean "install this action's own default list",
+      # which starts with the legacy `tools` package -- Google has since
+      # dropped it from the SDK repository manifest entirely (superseded by
+      # cmdline-tools years ago), so that install now fails outright and
+      # aborts this step before platform-tools/build-tools are ever reached.
+      # Requesting only platform-tools here sidesteps it; the Gradle build
+      # below auto-downloads whatever platform/build-tools version Capacitor's
+      # generated project actually needs once licenses are accepted (which
+      # this action still does unconditionally, regardless of `packages:`).
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools'
 
       - name: Install Capacitor deps
         working-directory: mobile
