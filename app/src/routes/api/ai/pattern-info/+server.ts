@@ -36,9 +36,10 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 	if (!pat) return json({ error: 'Pattern not found' }, { status: 404 });
 
 	let suggested;
+	let vocabulary;
 	try {
 		const context = [pat.title, pat.notes, pat.extractedText].filter(Boolean).join('\n\n');
-		const vocabulary = await getPatternVocabulary(locals.user!.id);
+		vocabulary = await getPatternVocabulary(locals.user!.id);
 		suggested = await suggestPatternInfo(context, language, vocabulary);
 	} catch (e) {
 		if (e instanceof AiUnavailable) return json({ error: e.message }, { status: 503 });
@@ -57,7 +58,8 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			gaugeRows: pat.gaugeRows,
 			yardageRequired: pat.yardageRequired
 		},
-		suggested
+		suggested,
+		vocabulary
 	);
 	if (Object.keys(updates).length === 0) return json({ error: 'empty' }, { status: 422 });
 

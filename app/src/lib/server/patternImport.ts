@@ -48,7 +48,7 @@ export async function importOnePattern(opts: {
 	const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
 	if (!isPdf) return { ok: false, skipped: true, name: file.name };
 
-	const title = titleFromFilename(file.name);
+	let title = titleFromFilename(file.name);
 	const buf = Buffer.from(await file.arrayBuffer());
 	const extractedText = await extractPdfText(buf);
 
@@ -75,7 +75,10 @@ export async function importOnePattern(opts: {
 	// form beyond craft/tags, so that's just tags here) -- an explicit choice,
 	// even one shared across the whole batch, is never overridden. Best-effort,
 	// same policy as the embedding step below: a slow/unavailable Ollama must
-	// not abort the import.
+	// not abort the import. The title is the one exception to "only fill if
+	// empty": at import it's always the filename guess, never a deliberate
+	// choice (there's no per-file title field in a batch), so a title the AI
+	// can actually read off the document is preferred outright.
 	if (aiConfigured()) {
 		try {
 			const vocabulary = await getPatternVocabulary(uid);
@@ -84,6 +87,10 @@ export async function importOnePattern(opts: {
 				aiLanguage,
 				vocabulary
 			);
+			if (suggested.title) {
+				title = suggested.title;
+				updates.title = title;
+			}
 			const merged = mergePatternInfo(
 				{
 					tags,
@@ -96,7 +103,8 @@ export async function importOnePattern(opts: {
 					gaugeRows: null,
 					yardageRequired: null
 				},
-				suggested
+				suggested,
+				vocabulary
 			);
 			tags = merged.tags;
 			Object.assign(updates, merged.updates);

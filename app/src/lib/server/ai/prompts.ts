@@ -75,9 +75,12 @@ export function patternInfoSystem(language: string): string {
 À partir du texte d'un patron (titre, notes, contenu), extrais les informations
 suivantes, UNIQUEMENT quand le texte les précise explicitement. N'invente et ne
 devine JAMAIS une valeur : omets le champ plutôt que d'approximer.
-- "tags" : 2 à 6 étiquettes courtes (minuscules) pour classer le patron -- PAS le
-  type de vêtement ni la difficulté (déjà couverts ci-dessous), plutôt le public
-  visé ("homme", "femme", "enfant", "bébé", "unisexe"), la saison ("hiver", "été",
+- "title" : le titre/nom réel du patron tel qu'il apparaît dans le document (page
+  de couverture, gros titre...) -- UNIQUEMENT s'il est clairement identifiable
+  comme LE titre du patron, jamais une phrase de description ou un résumé
+- "tags" : 2 à 6 étiquettes courtes pour classer le patron -- PAS le type de
+  vêtement ni la difficulté (déjà couverts ci-dessous), plutôt le public visé
+  ("homme", "femme", "enfant", "bébé", "unisexe"), la saison ("hiver", "été",
   "mi-saison"), l'occasion/style ("quotidien", "fête", "sport", "grossesse"), une
   technique ou matière notable ("sans couture", "dentelle", "jacquard")
 - "garmentType" : le type d'objet réalisé, un ou deux mots (ex. "pull", "chaussettes",
@@ -97,20 +100,26 @@ devine JAMAIS une valeur : omets le champ plutôt que d'approximer.
   seulement, nombre)
 - "yardageRequired" : le métrage de laine nécessaire, en mètres, arrondi à l'entier
   (tricot/crochet seulement -- convertis les yards en mètres si besoin : 1 yard ≈ 0.91 m)
-Rédige "tags", "garmentType" et "sizes" en ${langName}, quelle que soit la langue
-du texte source du patron ("designer" reste tel quel, un nom propre ; "language"
-reste le code de la langue source, voir ci-dessus).
+Rédige "title", "tags", "garmentType" et "sizes" en ${langName}, quelle que soit
+la langue du texte source du patron ("designer" reste tel quel, un nom propre ;
+"language" reste le code de la langue source, voir ci-dessus).
+Casse : utilise la casse la plus naturelle pour chaque champ texte (majuscule en
+début de nom propre ou de type d'objet, tags en minuscules sauf s'il s'agit
+eux-mêmes d'un nom propre) -- SAUF si un bloc "VOCABULAIRE DÉJÀ UTILISÉ" est
+fourni : dans ce cas, si une valeur de ce vocabulaire correspond, reprends-la
+À L'IDENTIQUE, lettre pour lettre et casse comprise, plutôt que de la
+réécrire différemment.
 Si un bloc "VOCABULAIRE DÉJÀ UTILISÉ" est fourni avec le patron, il liste les
 tags / types d'objet / créateur·rice·s déjà utilisés par cette personne pour ses
 autres patrons : réutilise une valeur existante de cette liste quand elle
 convient, plutôt que d'en inventer une nouvelle qui dit la même chose autrement
-(ex. si "hiver" y figure déjà, ne propose pas "d'hiver" ou "chaud" comme tag à
-part). Ce vocabulaire sert seulement à rester cohérent avec ce qui existe déjà --
-n'utilise jamais une valeur de cette liste si elle ne correspond pas vraiment à
-CE patron.
+(ex. si "Hiver" y figure déjà, ne propose pas "hiver" avec une autre casse, ni
+"d'hiver" ou "chaud" comme tag à part). Ce vocabulaire sert seulement à rester
+cohérent avec ce qui existe déjà -- n'utilise jamais une valeur de cette liste
+si elle ne correspond pas vraiment à CE patron.
 Réponds STRICTEMENT avec un objet JSON contenant uniquement les champs déterminés
 avec certitude, sans aucun texte autour, sans balises markdown. Exemple :
-{"tags": ["homme", "hiver"], "garmentType": "pull", "difficulty": 3, "gaugeStitches": 20, "gaugeRows": 28}`;
+{"title": "Pull Islandais", "tags": ["Homme", "Hiver"], "garmentType": "Pull", "difficulty": 3, "gaugeStitches": 20, "gaugeRows": 28}`;
 }
 
 function vocabularyBlock(vocabulary?: PatternVocabulary): string {
