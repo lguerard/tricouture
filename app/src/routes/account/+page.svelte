@@ -14,6 +14,18 @@
 		<div><span class="muted">{t(locale, 'auth.email')}</span><strong>{data.account.email}</strong></div>
 	</div>
 
+	<form class="card ai-toggle" method="POST" action="?/toggleAiAutoFill" use:enhance>
+		<div class="ai-toggle-row">
+			<div>
+				<h2>{t(locale, 'account.aiAutoFill.title')}</h2>
+				<p class="muted small">{t(locale, 'account.aiAutoFill.hint')}</p>
+			</div>
+			<button type="submit" class:on={data.account.aiAutoFillEnabled}>
+				{data.account.aiAutoFillEnabled ? t(locale, 'account.aiAutoFill.on') : t(locale, 'account.aiAutoFill.off')}
+			</button>
+		</div>
+	</form>
+
 	<form class="card" method="POST" action="?/changePassword" use:enhance>
 		<h2>{t(locale, 'account.changePassword')}</h2>
 		<div class="field">
@@ -47,4 +59,19 @@
 	.identity { display: flex; flex-direction: column; gap: 0.5rem; }
 	.identity div { display: flex; justify-content: space-between; gap: 1rem; }
 	.small { font-size: 0.8rem; }
+	.ai-toggle-row {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		gap: 1rem;
+	}
+	.ai-toggle-row h2 { margin: 0 0 0.2rem; font-size: 1rem; }
+	.ai-toggle-row button {
+		flex: none;
+	}
+	.ai-toggle-row button.on {
+		background: var(--accent);
+		color: #fff;
+		border-color: var(--accent);
+	}
 </style>

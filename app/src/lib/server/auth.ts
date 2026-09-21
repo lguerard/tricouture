@@ -17,6 +17,7 @@ export interface SessionUser {
 	email: string;
 	displayName: string;
 	isAdmin: boolean;
+	aiAutoFillEnabled: boolean;
 }
 
 /* ---------------------- passwords ---------------------- */
@@ -65,7 +66,8 @@ export async function validateSession(token: string): Promise<SessionUser | null
 			id: users.id,
 			email: users.email,
 			displayName: users.displayName,
-			isAdmin: users.isAdmin
+			isAdmin: users.isAdmin,
+			aiAutoFillEnabled: users.aiAutoFillEnabled
 		})
 		.from(sessions)
 		.innerJoin(users, eq(sessions.userId, users.id))
@@ -82,7 +84,8 @@ export async function validateSession(token: string): Promise<SessionUser | null
 		id: row.id,
 		email: row.email,
 		displayName: row.displayName,
-		isAdmin: row.isAdmin
+		isAdmin: row.isAdmin,
+		aiAutoFillEnabled: row.aiAutoFillEnabled
 	};
 }
 

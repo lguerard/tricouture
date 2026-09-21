@@ -39,6 +39,13 @@ export const users = pgTable('users', {
 	displayName: varchar('display_name', { length: 120 }).notNull(),
 	passwordHash: text('password_hash').notNull(),
 	isAdmin: boolean('is_admin').notNull().default(false),
+	// Whether AI (Ollama) suggestions are applied automatically when this user
+	// adds a pattern (manual add and batch import both check this) -- default
+	// true so existing behavior doesn't change for anyone until they opt out.
+	// The explicit "Compléter avec l'IA" button on a pattern's own page is
+	// unaffected: that is a one-off action the user asked for, not
+	// autocompletion "when adding" a pattern.
+	aiAutoFillEnabled: boolean('ai_auto_fill_enabled').notNull().default(true),
 	createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
 });
 
