@@ -143,6 +143,15 @@
 			<span class="muted small">{t(locale, 'patterns.new.filesHint')}</span>
 		</div>
 
+		<div class="field">
+			<label for="aiLanguage">{t(locale, 'patterns.new.aiLanguageLabel')}</label>
+			<select id="aiLanguage" name="aiLanguage">
+				<option value="fr" selected>Français</option>
+				<option value="en">English</option>
+			</select>
+			<span class="muted small">{t(locale, 'patterns.new.aiLanguageHint')}</span>
+		</div>
+
 		{#if form?.error}<p class="error">{form.error}</p>{/if}
 
 		<button class="btn-primary" type="submit" disabled={submitting}>

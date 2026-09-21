@@ -4,6 +4,8 @@ import { patterns, patternFiles } from '$lib/server/db/schema';
 import { saveUpload } from '$lib/server/storage';
 import { extractPdfText } from '$lib/server/pdf';
 import { embed, aiConfigured } from '$lib/server/ai/ollama';
+import { suggestPatternInfo, mergePatternInfo, DEFAULT_INFO_LANGUAGE, type InfoLanguage } from '$lib/server/ai/patternInfo';
+import { getPatternVocabulary } from '$lib/server/patternVocabulary';
 import type { Craft } from '$lib/server/db/schema';
 
 // "Pull_Aiguilles-No12_v2.pdf" -> "Pull Aiguilles No12 v2". Separators become
@@ -36,8 +38,10 @@ export async function importOnePattern(opts: {
 	craft: Craft;
 	tags: string[];
 	file: File;
+	aiLanguage?: InfoLanguage;
 }): Promise<ImportOneResult> {
-	const { uid, craft, tags, file } = opts;
+	const { uid, craft, file, aiLanguage = DEFAULT_INFO_LANGUAGE } = opts;
+	let tags = opts.tags;
 
 	// Anything that is not a PDF is reported rather than silently dropped: a
 	// batch where a few files vanished without a word is worse than none.
@@ -65,15 +69,54 @@ export async function importOnePattern(opts: {
 		isPrimary: true
 	});
 
+	const updates: Record<string, unknown> = {};
+
+	// Auto-fill only fields nothing was specified for (a batch has no per-file
+	// form beyond craft/tags, so that's just tags here) -- an explicit choice,
+	// even one shared across the whole batch, is never overridden. Best-effort,
+	// same policy as the embedding step below: a slow/unavailable Ollama must
+	// not abort the import.
+	if (aiConfigured()) {
+		try {
+			const vocabulary = await getPatternVocabulary(uid);
+			const suggested = await suggestPatternInfo(
+				[title, extractedText].filter(Boolean).join('\n\n'),
+				aiLanguage,
+				vocabulary
+			);
+			const merged = mergePatternInfo(
+				{
+					tags,
+					garmentType: null,
+					designer: null,
+					language: null,
+					difficulty: null,
+					sizes: null,
+					gaugeStitches: null,
+					gaugeRows: null,
+					yardageRequired: null
+				},
+				suggested
+			);
+			tags = merged.tags;
+			Object.assign(updates, merged.updates);
+		} catch {
+			/* Ollama absent or busy — the pattern is imported as-is */
+		}
+	}
+
 	// Semantic search is a bonus: an embedding failing must not abort the import.
 	if (aiConfigured()) {
 		try {
 			const parts = [title, craft, tags.join(' '), extractedText?.slice(0, 800)].filter(Boolean).join(' ');
-			const embedding = await embed(parts);
-			await db.update(patterns).set({ embedding }).where(eq(patterns.id, inserted.id));
+			updates.embedding = await embed(parts);
 		} catch {
 			/* Ollama absent or busy — the pattern is imported either way */
 		}
+	}
+
+	if (Object.keys(updates).length) {
+		await db.update(patterns).set(updates).where(eq(patterns.id, inserted.id));
 	}
 
 	return { ok: true, id: inserted.id, title };

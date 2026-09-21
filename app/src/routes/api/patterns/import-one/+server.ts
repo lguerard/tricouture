@@ -1,5 +1,6 @@
 import { json } from '@sveltejs/kit';
 import { importOnePattern } from '$lib/server/patternImport';
+import { normalizeInfoLanguage } from '$lib/server/ai/patternInfo';
 import type { RequestHandler } from './$types';
 import type { Craft } from '$lib/server/db/schema';
 
@@ -27,7 +28,8 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		.split(',')
 		.map((s) => s.trim())
 		.filter(Boolean);
+	const aiLanguage = normalizeInfoLanguage(form.get('aiLanguage'));
 
-	const result = await importOnePattern({ uid, craft, tags, file });
+	const result = await importOnePattern({ uid, craft, tags, file, aiLanguage });
 	return json(result);
 };

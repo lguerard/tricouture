@@ -8,6 +8,33 @@
 	const locale = $derived(data.locale);
 	const p = $derived(data.pattern);
 
+	// Champs suggérés (analyse IA) : tags, type d'objet, créateur·rice, langue,
+	// difficulté, tailles, jauge, métrage -- tout ce qui est encore vide.
+	let completing = $state(false);
+	let completeError = $state('');
+	let aiLanguage = $state('fr');
+	async function completeWithAi() {
+		completing = true;
+		completeError = '';
+		try {
+			const res = await fetch('/api/ai/pattern-info', {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({ patternId: p.id, language: aiLanguage })
+			});
+			const d = await res.json();
+			if (!res.ok) {
+				completeError =
+					d.error === 'empty' ? t(locale, 'patterns.detail.completeEmpty') : (d.error ?? t(locale, 'patterns.detail.aiError'));
+			} else {
+				await invalidateAll();
+			}
+		} catch {
+			completeError = t(locale, 'patterns.detail.aiNetworkError');
+		}
+		completing = false;
+	}
+
 	// Pièces (analyse IA)
 	let analyzing = $state(false);
 	let analyzeError = $state('');
@@ -92,7 +119,17 @@
 			<div>
 				<span class="tag">{craftLabel(locale, p.craft)}</span>
 				{#each p.tags ?? [] as tag}<a class="tag" style={tagStyle(tag)} href={`/patterns?tag=${encodeURIComponent(tag)}`}>{tag}</a>{/each}
+				{#if data.isOwner}
+					<button type="button" class="tag-suggest" onclick={completeWithAi} disabled={completing}>
+						{completing ? t(locale, 'patterns.detail.completing') : t(locale, 'patterns.detail.complete')}
+					</button>
+					<select class="ai-language" bind:value={aiLanguage} disabled={completing} title={t(locale, 'patterns.detail.completeLanguage')}>
+						<option value="fr">Français</option>
+						<option value="en">English</option>
+					</select>
+				{/if}
 			</div>
+			{#if completeError}<p class="error small">{completeError}</p>{/if}
 			{#if !data.isOwner}
 				<span class="shared">{t(locale, 'patterns.detail.sharedBy', { name: data.ownerName })}</span>
 			{/if}
@@ -244,6 +281,21 @@
 </div>
 
 <style>
+	.small {
+		font-size: 0.82rem;
+	}
+	.tag-suggest {
+		font-size: 0.78rem;
+		padding: 0.15rem 0.6rem;
+		vertical-align: middle;
+	}
+	.ai-language {
+		width: auto;
+		display: inline-block;
+		font-size: 0.78rem;
+		padding: 0.15rem 0.4rem;
+		vertical-align: middle;
+	}
 	.pieces {
 		margin-top: 1.2rem;
 	}
