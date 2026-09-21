@@ -18,10 +18,16 @@
 		return [...seen.values()];
 	});
 
-	// Which tag's picker is currently open (one at a time), and the color
-	// input's live value while it's open.
+	// Which tag's picker is currently open (one at a time). `customColor` is
+	// the submitted value, always a valid #rrggbb -- it drives the swatch
+	// (<input type="color"> rejects anything else outright). `hexText` is a
+	// separate, freely-typed buffer for the text field: it only promotes to
+	// customColor once it parses as a full hex, so a half-typed value never
+	// gets forced into the swatch (or blocked by native pattern validation on
+	// submit -- there's no `pattern` here for that reason).
 	let openTag = $state<string | null>(null);
 	let customColor = $state('#c6a6d6');
+	let hexText = $state('#c6a6d6');
 	let customForm: HTMLFormElement | undefined = $state();
 
 	function openPicker(tag: string) {
@@ -30,7 +36,15 @@
 			return;
 		}
 		customColor = data.colors.get(tag)?.bg ?? '#c6a6d6';
+		hexText = customColor;
 		openTag = tag;
+	}
+
+	function onHexInput(e: Event) {
+		const raw = (e.currentTarget as HTMLInputElement).value.trim();
+		hexText = raw;
+		const normalized = raw.startsWith('#') ? raw : `#${raw}`;
+		if (/^#[0-9a-fA-F]{6}$/.test(normalized)) customColor = normalized.toLowerCase();
 	}
 
 	const afterSubmit = () => {
@@ -100,16 +114,12 @@
 									type="color"
 									name="bg"
 									bind:value={customColor}
-									onchange={() => customForm?.requestSubmit()}
+									onchange={() => {
+										hexText = customColor;
+										customForm?.requestSubmit();
+									}}
 								/>
-								<input
-									class="hex"
-									type="text"
-									bind:value={customColor}
-									pattern="#[0-9a-fA-F]{6}"
-									maxlength="7"
-									placeholder="#c6a6d6"
-								/>
+								<input class="hex" type="text" value={hexText} maxlength="7" placeholder="#c6a6d6" oninput={onHexInput} />
 								<button class="btn small" type="submit">{t(locale, 'patterns.tags.apply')}</button>
 							</form>
 						</div>
