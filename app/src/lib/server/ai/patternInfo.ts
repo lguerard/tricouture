@@ -21,6 +21,7 @@ export function normalizeInfoLanguage(v: unknown): InfoLanguage {
 }
 
 export type SuggestedPatternInfo = {
+	title?: string;
 	tags: string[];
 	garmentType?: string;
 	designer?: string;
@@ -49,14 +50,17 @@ export type PatternInfoBaseline = {
 
 function cleanTags(values: unknown): string[] {
 	if (!Array.isArray(values)) return [];
+	// Casing is kept as the model wrote it (not forced to lowercase): a
+	// vocabulary match gets re-cased to the existing value in mergeTags below,
+	// and a genuinely new tag keeps whatever natural casing the model chose
+	// rather than everything collapsing to lowercase regardless of context.
 	const seen = new Set<string>();
 	const out: string[] = [];
 	for (const v of values) {
-		const tag = String(v ?? '')
-			.trim()
-			.toLowerCase();
-		if (tag && tag.length <= MAX_TAG_LENGTH && !seen.has(tag)) {
-			seen.add(tag);
+		const tag = String(v ?? '').trim();
+		const key = tag.toLowerCase();
+		if (tag && tag.length <= MAX_TAG_LENGTH && !seen.has(key)) {
+			seen.add(key);
 			out.push(tag);
 		}
 	}
@@ -87,6 +91,7 @@ function parsePatternInfo(raw: string): SuggestedPatternInfo {
 		const data = JSON.parse(text);
 		if (data && typeof data === 'object' && !Array.isArray(data)) {
 			return {
+				title: cleanText(data.title, 255),
 				tags: cleanTags(data.tags),
 				garmentType: cleanText(data.garmentType, 120),
 				designer: cleanText(data.designer, 160),
@@ -117,16 +122,29 @@ export async function suggestPatternInfo(
 	return parsePatternInfo(await generate(patternInfoPrompt(context, vocabulary), patternInfoSystem(language)));
 }
 
+// If `value` case-insensitively matches something already in `pool` (the
+// library-wide vocabulary), returns that pool entry's exact spelling/casing
+// instead of the model's own -- so reusing an existing tag/garment type never
+// creates a case-variant near-duplicate ("Hiver" vs "hiver") even when the
+// model doesn't follow the casing instruction perfectly. `value` is returned
+// unchanged when nothing in the pool matches.
+function canonicalize(value: string, pool: string[]): string {
+	const key = value.trim().toLowerCase();
+	return pool.find((p) => p.trim().toLowerCase() === key) ?? value;
+}
+
 // Merges newly suggested tags into an existing list without duplicates
-// (case-insensitive), keeping the casing and order of what was already there.
-export function mergeTags(existing: string[], suggested: string[]): string[] {
+// (case-insensitive), keeping the casing and order of what was already
+// there. A suggested tag matching the library-wide vocabulary is re-cased to
+// match it (see canonicalize above); one with no match keeps its own casing.
+export function mergeTags(existing: string[], suggested: string[], vocabulary: string[] = []): string[] {
 	const seen = new Set(existing.map((t) => t.trim().toLowerCase()));
 	const merged = [...existing];
 	for (const tag of suggested) {
 		const key = tag.trim().toLowerCase();
 		if (key && !seen.has(key)) {
 			seen.add(key);
-			merged.push(tag);
+			merged.push(canonicalize(tag, vocabulary));
 		}
 	}
 	return merged;
@@ -135,16 +153,23 @@ export function mergeTags(existing: string[], suggested: string[]): string[] {
 // Combines a suggestion with a pattern's current values: tags are merged
 // (additive), every other field is filled only if currently empty. Returns
 // the resulting tags array plus a DB update payload containing only the
-// fields that actually changed.
+// fields that actually changed. `vocabulary`, when given, re-cases
+// tags/garmentType/designer to match an existing library-wide value instead
+// of introducing a same-meaning, differently-cased near-duplicate.
 export function mergePatternInfo(
 	existing: PatternInfoBaseline,
-	suggested: SuggestedPatternInfo
+	suggested: SuggestedPatternInfo,
+	vocabulary?: PatternVocabulary
 ): { tags: string[]; updates: Record<string, unknown> } {
-	const tags = mergeTags(existing.tags, suggested.tags);
+	const tags = mergeTags(existing.tags, suggested.tags, vocabulary?.tags ?? []);
 	const updates: Record<string, unknown> = {};
 	if (tags.length !== existing.tags.length) updates.tags = tags;
-	if (!existing.garmentType && suggested.garmentType) updates.garmentType = suggested.garmentType;
-	if (!existing.designer && suggested.designer) updates.designer = suggested.designer;
+	if (!existing.garmentType && suggested.garmentType) {
+		updates.garmentType = canonicalize(suggested.garmentType, vocabulary?.garmentTypes ?? []);
+	}
+	if (!existing.designer && suggested.designer) {
+		updates.designer = canonicalize(suggested.designer, vocabulary?.designers ?? []);
+	}
 	if (!existing.language && suggested.language) updates.language = suggested.language;
 	if (existing.difficulty == null && suggested.difficulty != null) updates.difficulty = suggested.difficulty;
 	if (!existing.sizes && suggested.sizes) updates.sizes = suggested.sizes;

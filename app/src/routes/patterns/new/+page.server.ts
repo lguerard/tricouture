@@ -102,7 +102,8 @@ export const actions: Actions = {
 				);
 				const merged = mergePatternInfo(
 					{ tags, garmentType, designer, language, difficulty, sizes, gaugeStitches, gaugeRows, yardageRequired },
-					suggested
+					suggested,
+					vocabulary
 				);
 				tags = merged.tags;
 				Object.assign(updates, merged.updates);
