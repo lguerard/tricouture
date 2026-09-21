@@ -7,10 +7,20 @@
 // apart (e.g. "enfant"/"homme" landed 12° apart), and at the pale, low-
 // saturation lightness a tag pill uses, anything closer than ~30° reads as
 // the same color. 12 steps guarantees a real, visible difference between any
-// two tags that don't land in the exact same bucket; past 12 distinct tags,
-// buckets repeat -- an acceptable tradeoff since tags stay distinguishable
-// by their label either way.
+// two tags that land in different hue buckets.
+//
+// On top of that, a second, independent slice of the same hash picks one of
+// 3 lightness/saturation variants -- 36 combinations total instead of 12, so
+// two tags that happen to share a hue bucket (increasingly likely as a
+// pattern library's tag vocabulary grows) still usually render as visibly
+// different shades rather than identical pills. Only 1-in-36 pairs now match
+// exactly, down from 1-in-12.
 const HUE_STEPS = 12;
+const VARIANTS = [
+	{ s: 65, bgL: 92, fgL: 32 }, // pastel
+	{ s: 55, bgL: 84, fgL: 26 }, // deeper
+	{ s: 45, bgL: 96, fgL: 40 } // softer
+];
 
 // FNV-1a: unlike a plain polynomial hash (`hash*31 + c`), this doesn't lose
 // distribution once reduced mod a small number -- 31 mod 12 has order 2
@@ -26,10 +36,14 @@ function fnv1a(str: string): number {
 }
 
 export function tagColor(tag: string): { bg: string; fg: string } {
-	const hue = (fnv1a(tag) % HUE_STEPS) * (360 / HUE_STEPS);
+	const h = fnv1a(tag);
+	const hue = (h % HUE_STEPS) * (360 / HUE_STEPS);
+	// Mixed-radix split of the same hash: h = HUE_STEPS * floor(h/HUE_STEPS) + (h%HUE_STEPS),
+	// so the variant comes from bits the hue bucket didn't use.
+	const variant = VARIANTS[Math.floor(h / HUE_STEPS) % VARIANTS.length];
 	return {
-		bg: `hsl(${hue} 65% 92%)`,
-		fg: `hsl(${hue} 55% 32%)`
+		bg: `hsl(${hue} ${variant.s}% ${variant.bgL}%)`,
+		fg: `hsl(${hue} ${variant.s}% ${variant.fgL}%)`
 	};
 }
 
