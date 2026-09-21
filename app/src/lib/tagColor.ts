@@ -62,7 +62,12 @@ const PALETTE: { bg: string; fg: string }[] = [
 	{ bg: '#d3c6e7', fg: '#4a257e' } // perse
 ];
 
-type TagColor = { bg: string; fg: string };
+export type TagColor = { bg: string; fg: string };
+
+// The palette, exposed for the manual color picker (see
+// /patterns/tags) -- the only swatches offered there, so a manual choice
+// still sits in the site's own palette rather than an arbitrary hex.
+export const PALETTE_SWATCHES: readonly TagColor[] = PALETTE;
 
 // The real assignment: given every distinct tag currently in use (a page
 // fetches this once, server-side -- see $lib/server/patternTags.ts), each
@@ -71,10 +76,28 @@ type TagColor = { bg: string; fg: string };
 // distinct tags than PALETTE.length (36) -- at that point they repeat, the
 // one tradeoff any finite palette has, but that's 36 distinct concepts in a
 // personal pattern library, not 8.
-export function assignTagColors(tags: Iterable<string>): Map<string, TagColor> {
+//
+// `overrides` (a tag -> color the user picked manually, see
+// $lib/server/tagColorOverrides.ts) takes priority; the remaining tags still
+// get distinct index-based colors from each other, counting only themselves
+// -- an override "spending" a palette slot doesn't shrink the guarantee for
+// everyone else.
+export function assignTagColors(
+	tags: Iterable<string>,
+	overrides?: Map<string, TagColor>
+): Map<string, TagColor> {
 	const unique = [...new Set(tags)].sort((a, b) => a.localeCompare(b));
 	const map = new Map<string, TagColor>();
-	unique.forEach((tag, i) => map.set(tag, PALETTE[i % PALETTE.length]));
+	let i = 0;
+	for (const tag of unique) {
+		const override = overrides?.get(tag);
+		if (override) {
+			map.set(tag, override);
+		} else {
+			map.set(tag, PALETTE[i % PALETTE.length]);
+			i++;
+		}
+	}
 	return map;
 }
 

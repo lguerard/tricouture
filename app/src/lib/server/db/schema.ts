@@ -143,6 +143,29 @@ export const patterns = pgTable(
 	})
 );
 
+// A user's manual color choice for a tag, overriding the automatic
+// index-based assignment in $lib/tagColor.ts for that one tag. Keyed by
+// (userId, tag) rather than by pattern: tags are freeform strings with no
+// tags table of their own, and the same tag can appear on many patterns
+// (including ones owned by someone else and shared with this user) -- the
+// color is a per-viewer preference, not a property of the tag itself.
+export const tagColorOverrides = pgTable(
+	'tag_color_overrides',
+	{
+		id: uuid('id').primaryKey().defaultRandom(),
+		userId: uuid('user_id')
+			.notNull()
+			.references(() => users.id, { onDelete: 'cascade' }),
+		tag: varchar('tag', { length: 160 }).notNull(),
+		bg: varchar('bg', { length: 7 }).notNull(),
+		fg: varchar('fg', { length: 7 }).notNull(),
+		createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
+	},
+	(t) => ({
+		userTagIdx: uniqueIndex('tag_color_overrides_user_tag_idx').on(t.userId, t.tag)
+	})
+);
+
 export const patternFiles = pgTable(
 	'pattern_files',
 	{

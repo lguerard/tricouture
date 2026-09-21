@@ -2,6 +2,7 @@ import { and, or, eq, desc, sql } from 'drizzle-orm';
 import { db } from '$lib/server/db';
 import { patterns, patternFiles, users } from '$lib/server/db/schema';
 import { getAllVisibleTags } from '$lib/server/patternTags';
+import { getTagColorOverrides } from '$lib/server/tagColorOverrides';
 import { assignTagColors } from '$lib/tagColor';
 import type { PageServerLoad } from './$types';
 
@@ -47,7 +48,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	// collision-free tag colors (assignTagColors): every tag pill on this page
 	// comes from one of these patterns, so this set always covers them.
 	const allTags = await getAllVisibleTags(uid);
-	const tagColors = assignTagColors(allTags);
+	const tagColors = assignTagColors(allTags, await getTagColorOverrides(uid));
 
 	const rows = await db
 		.select({
