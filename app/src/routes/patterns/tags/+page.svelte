@@ -6,8 +6,39 @@
 	let { data, form } = $props();
 	const locale = $derived(data.locale);
 
-	// Which tag's swatch grid is currently open (one at a time).
+	// One-click quick picks: every color currently in use across the user's
+	// tags (auto-assigned or manually picked) plus the site's own palette,
+	// deduped by hex -- reusing a color already in the library, or one of the
+	// app's defaults, shouldn't mean re-typing its hex by hand. The picker
+	// below is never limited to this list, though -- see the color input.
+	const quickSwatches = $derived.by(() => {
+		const seen = new Map<string, { bg: string; fg: string }>();
+		for (const c of data.colors.values()) seen.set(c.bg, c);
+		for (const c of data.palette) if (!seen.has(c.bg)) seen.set(c.bg, c);
+		return [...seen.values()];
+	});
+
+	// Which tag's picker is currently open (one at a time), and the color
+	// input's live value while it's open.
 	let openTag = $state<string | null>(null);
+	let customColor = $state('#c6a6d6');
+	let customForm: HTMLFormElement | undefined = $state();
+
+	function openPicker(tag: string) {
+		if (openTag === tag) {
+			openTag = null;
+			return;
+		}
+		customColor = data.colors.get(tag)?.bg ?? '#c6a6d6';
+		openTag = tag;
+	}
+
+	const afterSubmit = () => {
+		return async ({ update }: { update: () => Promise<void> }) => {
+			await update();
+			openTag = null;
+		};
+	};
 </script>
 
 <div class="container narrow">
@@ -32,36 +63,55 @@
 								<button class="btn small" type="submit">{t(locale, 'patterns.tags.reset')}</button>
 							</form>
 						{/if}
-						<button class="btn small" type="button" onclick={() => (openTag = openTag === tag ? null : tag)}>
+						<button class="btn small" type="button" onclick={() => openPicker(tag)}>
 							{t(locale, 'patterns.tags.changeColor')}
 						</button>
 					</div>
 
 					{#if openTag === tag}
-						<div class="swatches">
-							{#each data.palette as color}
-								<form
-									method="POST"
-									action="?/setColor"
-									use:enhance={() => {
-										return async ({ update }) => {
-											await update();
-											openTag = null;
-										};
-									}}
-								>
-									<input type="hidden" name="tag" value={tag} />
-									<input type="hidden" name="bg" value={color.bg} />
-									<input type="hidden" name="fg" value={color.fg} />
-									<button
-										class="swatch"
-										type="submit"
-										style={`background:${color.bg};color:${color.fg}`}
-										aria-label={color.bg}
-										title={color.bg}
-									>A</button>
-								</form>
-							{/each}
+						<div class="picker">
+							<div class="swatches">
+								{#each quickSwatches as color}
+									<form method="POST" action="?/setColor" use:enhance={afterSubmit}>
+										<input type="hidden" name="tag" value={tag} />
+										<input type="hidden" name="bg" value={color.bg} />
+										<button
+											class="swatch"
+											type="submit"
+											style={`background:${color.bg};color:${color.fg}`}
+											aria-label={color.bg}
+											title={color.bg}
+										>A</button>
+									</form>
+								{/each}
+							</div>
+
+							<form
+								class="custom"
+								method="POST"
+								action="?/setColor"
+								bind:this={customForm}
+								use:enhance={afterSubmit}
+							>
+								<input type="hidden" name="tag" value={tag} />
+								<label class="visually-hidden" for={`picker-${tag}`}>{t(locale, 'patterns.tags.customColor')}</label>
+								<input
+									id={`picker-${tag}`}
+									type="color"
+									name="bg"
+									bind:value={customColor}
+									onchange={() => customForm?.requestSubmit()}
+								/>
+								<input
+									class="hex"
+									type="text"
+									bind:value={customColor}
+									pattern="#[0-9a-fA-F]{6}"
+									maxlength="7"
+									placeholder="#c6a6d6"
+								/>
+								<button class="btn small" type="submit">{t(locale, 'patterns.tags.apply')}</button>
+							</form>
 						</div>
 					{/if}
 				</li>
@@ -101,13 +151,18 @@
 		padding: 0.3rem 0.6rem;
 		font-size: 0.82rem;
 	}
-	.swatches {
+	.picker {
 		flex-basis: 100%;
+		display: flex;
+		flex-direction: column;
+		gap: 0.6rem;
+		padding-top: 0.6rem;
+		border-top: 1px solid var(--border);
+	}
+	.swatches {
 		display: flex;
 		flex-wrap: wrap;
 		gap: 0.35rem;
-		padding-top: 0.5rem;
-		border-top: 1px solid var(--border);
 	}
 	.swatch {
 		width: 1.6rem;
@@ -119,5 +174,28 @@
 	}
 	.swatch:hover {
 		border-color: var(--accent);
+	}
+	.custom {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+	}
+	.custom input[type='color'] {
+		width: 2.4rem;
+		height: 2.2rem;
+		padding: 0.15rem;
+		flex: none;
+	}
+	.custom .hex {
+		width: 8rem;
+		flex: none;
+	}
+	.visually-hidden {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		overflow: hidden;
+		clip: rect(0 0 0 0);
+		white-space: nowrap;
 	}
 </style>

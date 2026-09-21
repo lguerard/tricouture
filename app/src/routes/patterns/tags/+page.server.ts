@@ -1,7 +1,9 @@
 import { fail } from '@sveltejs/kit';
 import { getAllVisibleTags } from '$lib/server/patternTags';
 import { clearTagColorOverride, getTagColorOverrides, setTagColorOverride } from '$lib/server/tagColorOverrides';
-import { assignTagColors, PALETTE_SWATCHES } from '$lib/tagColor';
+import { assignTagColors, PALETTE_SWATCHES, readableFg } from '$lib/tagColor';
+
+const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
 import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ locals }) => {
@@ -18,18 +20,18 @@ export const load: PageServerLoad = async ({ locals }) => {
 };
 
 export const actions: Actions = {
-	// Pick a swatch (only the site's own palette is offered, so a manual
-	// choice still fits the rest of the app -- not a free-form color picker).
+	// Any hex color -- the palette swatches are offered client-side only as
+	// quick picks, never enforced here. The matching text color isn't taken
+	// from the client: it's computed from the chosen background so it stays
+	// readable regardless of what was submitted.
 	setColor: async ({ locals, request }) => {
 		const uid = locals.user!.id;
 		const form = await request.formData();
 		const tag = String(form.get('tag') ?? '').trim();
-		const bg = String(form.get('bg') ?? '');
-		const fg = String(form.get('fg') ?? '');
+		const bg = String(form.get('bg') ?? '').trim().toLowerCase();
 		if (!tag) return fail(400, { error: 'tag required' });
-		const isPaletteEntry = PALETTE_SWATCHES.some((s) => s.bg === bg && s.fg === fg);
-		if (!isPaletteEntry) return fail(400, { error: 'invalid color' });
-		await setTagColorOverride(uid, tag, { bg, fg });
+		if (!HEX_COLOR.test(bg)) return fail(400, { error: 'invalid color' });
+		await setTagColorOverride(uid, tag, { bg, fg: readableFg(bg) });
 		return { ok: true };
 	},
 

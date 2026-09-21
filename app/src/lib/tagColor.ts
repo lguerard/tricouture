@@ -64,10 +64,31 @@ const PALETTE: { bg: string; fg: string }[] = [
 
 export type TagColor = { bg: string; fg: string };
 
-// The palette, exposed for the manual color picker (see
-// /patterns/tags) -- the only swatches offered there, so a manual choice
-// still sits in the site's own palette rather than an arbitrary hex.
+// The palette used for automatic assignment (assignTagColors below) and
+// offered as quick suggestions in the manual picker -- a manual choice is
+// not limited to it, though (see readableFg): the picker at /patterns/tags
+// accepts any color, this is just what auto-assignment sticks to so it
+// keeps matching the rest of the app's aesthetic.
 export const PALETTE_SWATCHES: readonly TagColor[] = PALETTE;
+
+// WCAG relative luminance, used below to pick a readable text color for a
+// background the user chose freely (unlike PALETTE's entries, an arbitrary
+// bg has no hand-picked fg to go with it).
+function relativeLuminance(hex: string): number {
+	const n = parseInt(hex.slice(1), 16);
+	const [r, g, b] = [(n >> 16) & 0xff, (n >> 8) & 0xff, n & 0xff].map((c) => c / 255);
+	const lin = (c: number) => (c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4));
+	return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+}
+
+// Black or white text, whichever contrasts more against `bg` (the standard
+// WCAG contrast-ratio comparison) -- so any background the user picks stays
+// legible without asking them to also pick a matching text color.
+export function readableFg(bg: string): string {
+	const l = relativeLuminance(bg);
+	const contrast = (other: number) => (Math.max(l, other) + 0.05) / (Math.min(l, other) + 0.05);
+	return contrast(1) > contrast(0) ? '#ffffff' : '#111111';
+}
 
 // The real assignment: given every distinct tag currently in use (a page
 // fetches this once, server-side -- see $lib/server/patternTags.ts), each
