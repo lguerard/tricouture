@@ -5,7 +5,7 @@ import { patterns, patternFiles } from '$lib/server/db/schema';
 import { saveUpload } from '$lib/server/storage';
 import { extractPdfText } from '$lib/server/pdf';
 import { embed, aiConfigured } from '$lib/server/ai/ollama';
-import { suggestPatternInfo, mergePatternInfo } from '$lib/server/ai/patternInfo';
+import { suggestPatternInfo, mergePatternInfo, normalizeInfoLanguage } from '$lib/server/ai/patternInfo';
 import { t } from '$lib/i18n';
 import type { Actions } from './$types';
 import type { Craft } from '$lib/server/db/schema';
@@ -42,6 +42,7 @@ export const actions: Actions = {
 		const gaugeStitches = intOrNull(form.get('gaugeStitches'));
 		const gaugeRows = intOrNull(form.get('gaugeRows'));
 		const yardageRequired = intOrNull(form.get('yardageRequired'));
+		const aiLanguage = normalizeInfoLanguage(form.get('aiLanguage'));
 
 		const inserted = (
 			await db
@@ -92,7 +93,7 @@ export const actions: Actions = {
 		// never overridden. Best-effort, same policy as the embedding step below.
 		if (aiConfigured()) {
 			try {
-				const suggested = await suggestPatternInfo([title, extractedText].filter(Boolean).join('\n\n'));
+				const suggested = await suggestPatternInfo([title, extractedText].filter(Boolean).join('\n\n'), aiLanguage);
 				const merged = mergePatternInfo(
 					{ tags, garmentType, designer, language, difficulty, sizes, gaugeStitches, gaugeRows, yardageRequired },
 					suggested

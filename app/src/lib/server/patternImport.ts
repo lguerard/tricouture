@@ -4,7 +4,7 @@ import { patterns, patternFiles } from '$lib/server/db/schema';
 import { saveUpload } from '$lib/server/storage';
 import { extractPdfText } from '$lib/server/pdf';
 import { embed, aiConfigured } from '$lib/server/ai/ollama';
-import { suggestPatternInfo, mergePatternInfo } from '$lib/server/ai/patternInfo';
+import { suggestPatternInfo, mergePatternInfo, DEFAULT_INFO_LANGUAGE, type InfoLanguage } from '$lib/server/ai/patternInfo';
 import type { Craft } from '$lib/server/db/schema';
 
 // "Pull_Aiguilles-No12_v2.pdf" -> "Pull Aiguilles No12 v2". Separators become
@@ -37,8 +37,9 @@ export async function importOnePattern(opts: {
 	craft: Craft;
 	tags: string[];
 	file: File;
+	aiLanguage?: InfoLanguage;
 }): Promise<ImportOneResult> {
-	const { uid, craft, file } = opts;
+	const { uid, craft, file, aiLanguage = DEFAULT_INFO_LANGUAGE } = opts;
 	let tags = opts.tags;
 
 	// Anything that is not a PDF is reported rather than silently dropped: a
@@ -76,7 +77,7 @@ export async function importOnePattern(opts: {
 	// not abort the import.
 	if (aiConfigured()) {
 		try {
-			const suggested = await suggestPatternInfo([title, extractedText].filter(Boolean).join('\n\n'));
+			const suggested = await suggestPatternInfo([title, extractedText].filter(Boolean).join('\n\n'), aiLanguage);
 			const merged = mergePatternInfo(
 				{
 					tags,

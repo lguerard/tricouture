@@ -3,13 +3,14 @@ import { and, eq } from 'drizzle-orm';
 import { db } from '$lib/server/db';
 import { patterns } from '$lib/server/db/schema';
 import { AiUnavailable } from '$lib/server/ai/ollama';
-import { suggestPatternInfo, mergePatternInfo } from '$lib/server/ai/patternInfo';
+import { suggestPatternInfo, mergePatternInfo, normalizeInfoLanguage } from '$lib/server/ai/patternInfo';
 import type { RequestHandler } from './$types';
 
 export const POST: RequestHandler = async ({ request, locals }) => {
 	const body = await request.json().catch(() => ({}));
 	const patternId = String(body?.patternId ?? '');
 	if (!patternId) return json({ error: 'patternId required' }, { status: 400 });
+	const language = normalizeInfoLanguage(body?.language);
 
 	const pat = (
 		await db
@@ -36,7 +37,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 	let suggested;
 	try {
 		const context = [pat.title, pat.notes, pat.extractedText].filter(Boolean).join('\n\n');
-		suggested = await suggestPatternInfo(context);
+		suggested = await suggestPatternInfo(context, language);
 	} catch (e) {
 		if (e instanceof AiUnavailable) return json({ error: e.message }, { status: 503 });
 		return json({ error: 'Analysis failed' }, { status: 500 });

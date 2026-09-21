@@ -24,6 +24,7 @@
 		const fd = new FormData(formEl);
 		const craft = String(fd.get('craft') ?? '');
 		const tags = String(fd.get('tags') ?? '');
+		const aiLanguage = String(fd.get('aiLanguage') ?? 'fr');
 		const files = (fd.getAll('files') as File[]).filter((f) => f instanceof File && f.size > 0);
 
 		clientError = '';
@@ -50,6 +51,7 @@
 				oneFd.set('file', file);
 				oneFd.set('craft', craft);
 				oneFd.set('tags', tags);
+				oneFd.set('aiLanguage', aiLanguage);
 				const res = await fetch('/api/patterns/import-one', { method: 'POST', body: oneFd });
 				const data = await res.json();
 				if (res.ok && data.ok) created.push({ id: data.id, title: data.title });
@@ -125,6 +127,15 @@
 		<div class="field">
 			<label for="tags">{t(locale, 'patterns.import.tagsLabel')}</label>
 			<input id="tags" name="tags" placeholder={t(locale, 'patterns.import.tagsPlaceholder')} />
+		</div>
+
+		<div class="field">
+			<label for="aiLanguage">{t(locale, 'patterns.import.aiLanguageLabel')}</label>
+			<select id="aiLanguage" name="aiLanguage">
+				<option value="fr" selected>Français</option>
+				<option value="en">English</option>
+			</select>
+			<span class="muted small">{t(locale, 'patterns.import.aiLanguageHint')}</span>
 		</div>
 
 		<button type="submit" class="btn btn-primary" disabled={importing}>

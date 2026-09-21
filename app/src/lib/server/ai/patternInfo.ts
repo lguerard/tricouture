@@ -1,9 +1,23 @@
 import { generate } from './ollama';
-import { PATTERN_INFO_SYSTEM, patternInfoPrompt } from './prompts';
+import { patternInfoSystem, patternInfoPrompt } from './prompts';
 
 const MAX_TAGS = 6;
 const MAX_TAG_LENGTH = 40;
 const MAX_TEXT_FIELD_LENGTH = 160;
+
+// Locale codes the app's own UI supports (see $lib/i18n) -- also what the
+// "language of the info" picker offers, so an unrecognized/missing value
+// falls back to the app's default rather than being passed to the model
+// verbatim.
+export const SUPPORTED_INFO_LANGUAGES = ['fr', 'en'] as const;
+export type InfoLanguage = (typeof SUPPORTED_INFO_LANGUAGES)[number];
+export const DEFAULT_INFO_LANGUAGE: InfoLanguage = 'fr';
+
+export function normalizeInfoLanguage(v: unknown): InfoLanguage {
+	return (SUPPORTED_INFO_LANGUAGES as readonly string[]).includes(String(v))
+		? (v as InfoLanguage)
+		: DEFAULT_INFO_LANGUAGE;
+}
 
 export type SuggestedPatternInfo = {
 	tags: string[];
@@ -94,8 +108,11 @@ function parsePatternInfo(raw: string): SuggestedPatternInfo {
 // this best-effort (auto-fill on creation, same policy as the embedding
 // step) wrap the call themselves; the manual "suggest" endpoint instead
 // reports the failure to the person who clicked it.
-export async function suggestPatternInfo(context: string): Promise<SuggestedPatternInfo> {
-	return parsePatternInfo(await generate(patternInfoPrompt(context), PATTERN_INFO_SYSTEM));
+export async function suggestPatternInfo(
+	context: string,
+	language: InfoLanguage = DEFAULT_INFO_LANGUAGE
+): Promise<SuggestedPatternInfo> {
+	return parsePatternInfo(await generate(patternInfoPrompt(context), patternInfoSystem(language)));
 }
 
 // Merges newly suggested tags into an existing list without duplicates

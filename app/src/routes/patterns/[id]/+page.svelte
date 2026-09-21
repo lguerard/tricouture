@@ -12,6 +12,7 @@
 	// difficulté, tailles, jauge, métrage -- tout ce qui est encore vide.
 	let completing = $state(false);
 	let completeError = $state('');
+	let aiLanguage = $state('fr');
 	async function completeWithAi() {
 		completing = true;
 		completeError = '';
@@ -19,7 +20,7 @@
 			const res = await fetch('/api/ai/pattern-info', {
 				method: 'POST',
 				headers: { 'content-type': 'application/json' },
-				body: JSON.stringify({ patternId: p.id })
+				body: JSON.stringify({ patternId: p.id, language: aiLanguage })
 			});
 			const d = await res.json();
 			if (!res.ok) {
@@ -122,6 +123,10 @@
 					<button type="button" class="tag-suggest" onclick={completeWithAi} disabled={completing}>
 						{completing ? t(locale, 'patterns.detail.completing') : t(locale, 'patterns.detail.complete')}
 					</button>
+					<select class="ai-language" bind:value={aiLanguage} disabled={completing} title={t(locale, 'patterns.detail.completeLanguage')}>
+						<option value="fr">Français</option>
+						<option value="en">English</option>
+					</select>
 				{/if}
 			</div>
 			{#if completeError}<p class="error small">{completeError}</p>{/if}
@@ -282,6 +287,13 @@
 	.tag-suggest {
 		font-size: 0.78rem;
 		padding: 0.15rem 0.6rem;
+		vertical-align: middle;
+	}
+	.ai-language {
+		width: auto;
+		display: inline-block;
+		font-size: 0.78rem;
+		padding: 0.15rem 0.4rem;
 		vertical-align: middle;
 	}
 	.pieces {

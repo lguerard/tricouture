@@ -1,6 +1,7 @@
 import { fail } from '@sveltejs/kit';
 import { t } from '$lib/i18n';
 import { importOnePattern } from '$lib/server/patternImport';
+import { normalizeInfoLanguage } from '$lib/server/ai/patternInfo';
 import type { Actions } from './$types';
 import type { Craft } from '$lib/server/db/schema';
 
@@ -34,6 +35,7 @@ export const actions: Actions = {
 			.split(',')
 			.map((s) => s.trim())
 			.filter(Boolean);
+		const aiLanguage = normalizeInfoLanguage(form.get('aiLanguage'));
 
 		const all = form.getAll('files').filter((f): f is File => f instanceof File && f.size > 0);
 		if (all.length === 0) return fail(400, { error: t(locale, 'patterns.import.error.noFiles') });
@@ -44,7 +46,7 @@ export const actions: Actions = {
 		const skipped: string[] = [];
 		const created: { id: string; title: string }[] = [];
 		for (const file of all) {
-			const result = await importOnePattern({ uid, craft, tags, file });
+			const result = await importOnePattern({ uid, craft, tags, file, aiLanguage });
 			if (result.ok) created.push({ id: result.id, title: result.title });
 			else skipped.push(result.name);
 		}
