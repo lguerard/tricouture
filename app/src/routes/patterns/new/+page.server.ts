@@ -5,7 +5,7 @@ import { patterns, patternFiles } from '$lib/server/db/schema';
 import { saveUpload } from '$lib/server/storage';
 import { extractPdfText } from '$lib/server/pdf';
 import { embed, aiConfigured } from '$lib/server/ai/ollama';
-import { suggestTags, mergeTags } from '$lib/server/ai/tags';
+import { suggestPatternInfo, mergePatternInfo } from '$lib/server/ai/patternInfo';
 import { t } from '$lib/i18n';
 import type { Actions } from './$types';
 import type { Craft } from '$lib/server/db/schema';
@@ -34,6 +34,14 @@ export const actions: Actions = {
 			.split(',')
 			.map((t) => t.trim())
 			.filter(Boolean);
+		const garmentType = String(form.get('garmentType') ?? '').trim() || null;
+		const designer = String(form.get('designer') ?? '').trim() || null;
+		const language = String(form.get('language') ?? '').trim() || null;
+		const difficulty = intOrNull(form.get('difficulty'));
+		const sizes = String(form.get('sizes') ?? '').trim() || null;
+		const gaugeStitches = intOrNull(form.get('gaugeStitches'));
+		const gaugeRows = intOrNull(form.get('gaugeRows'));
+		const yardageRequired = intOrNull(form.get('yardageRequired'));
 
 		const inserted = (
 			await db
@@ -42,15 +50,15 @@ export const actions: Actions = {
 					ownerId: uid,
 					title,
 					craft,
-					garmentType: String(form.get('garmentType') ?? '').trim() || null,
-					designer: String(form.get('designer') ?? '').trim() || null,
+					garmentType,
+					designer,
 					source: String(form.get('source') ?? '').trim() || null,
-					language: String(form.get('language') ?? '').trim() || null,
-					difficulty: intOrNull(form.get('difficulty')),
-					sizes: String(form.get('sizes') ?? '').trim() || null,
-					gaugeStitches: intOrNull(form.get('gaugeStitches')),
-					gaugeRows: intOrNull(form.get('gaugeRows')),
-					yardageRequired: intOrNull(form.get('yardageRequired')),
+					language,
+					difficulty,
+					sizes,
+					gaugeStitches,
+					gaugeRows,
+					yardageRequired,
 					notes: String(form.get('notes') ?? '').trim() || null,
 					tags
 				})
@@ -80,18 +88,19 @@ export const actions: Actions = {
 		const updates: Record<string, unknown> = {};
 		if (extractedText) updates.extractedText = extractedText;
 
-		// Auto-tag only when the form's tags field was left empty -- an
-		// explicit choice is never overridden. Best-effort, same policy as
-		// the embedding step below.
-		if (tags.length === 0 && aiConfigured()) {
+		// Auto-fill only fields the form left empty -- an explicit choice is
+		// never overridden. Best-effort, same policy as the embedding step below.
+		if (aiConfigured()) {
 			try {
-				const suggested = await suggestTags([title, extractedText].filter(Boolean).join('\n\n'));
-				if (suggested.length) {
-					tags = mergeTags(tags, suggested);
-					updates.tags = tags;
-				}
+				const suggested = await suggestPatternInfo([title, extractedText].filter(Boolean).join('\n\n'));
+				const merged = mergePatternInfo(
+					{ tags, garmentType, designer, language, difficulty, sizes, gaugeStitches, gaugeRows, yardageRequired },
+					suggested
+				);
+				tags = merged.tags;
+				Object.assign(updates, merged.updates);
 			} catch {
-				/* Ollama absent — the pattern is created without tags */
+				/* Ollama absent — the pattern is created as typed */
 			}
 		}
 

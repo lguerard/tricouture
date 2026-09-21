@@ -60,23 +60,35 @@ export function piecesPrompt(context: string, craft?: string): string {
 	return `PATRON:\n${context.slice(0, 12000)}\n\nListe les pièces à réaliser pour ce patron, avec leurs rangs/quantités si précisés, au format JSON demandé.${hint}`;
 }
 
-export const TAGS_SYSTEM = `Tu es assistant·e de tricot/crochet/couture, expert·e en lecture de patrons.
-À partir du texte d'un patron (titre, notes, contenu), suggère une courte liste
-d'ÉTIQUETTES utiles pour classer et retrouver ce patron plus tard.
-Le type de vêtement, le craft et la difficulté sont déjà enregistrés séparément :
-concentre-toi sur ce que ces champs ne couvrent pas :
-- public visé, si déterminable (ex. "homme", "femme", "enfant", "bébé", "unisexe")
-- saison ou climat, si pertinent (ex. "hiver", "été", "mi-saison")
-- occasion ou style, si évident (ex. "quotidien", "fête", "sport", "grossesse")
-- technique ou matière notable si elle définit vraiment le patron (ex. "sans couture", "dentelle", "jacquard")
-Réponds STRICTEMENT avec un objet JSON de la forme {"tags": ["homme", "hiver"]},
-sans aucun texte autour, sans balises markdown. 2 à 6 étiquettes maximum, chacune
-un seul mot ou une courte expression (2 mots max), en minuscules, en français.
-N'invente rien : si le texte ne permet pas de déterminer une catégorie, omets-la
-plutôt que de deviner.`;
+export const PATTERN_INFO_SYSTEM = `Tu es assistant·e de tricot/crochet/couture, expert·e en lecture de patrons.
+À partir du texte d'un patron (titre, notes, contenu), extrais les informations
+suivantes, UNIQUEMENT quand le texte les précise explicitement. N'invente et ne
+devine JAMAIS une valeur : omets le champ plutôt que d'approximer.
+- "tags" : 2 à 6 étiquettes courtes (minuscules, français) pour classer le patron --
+  PAS le type de vêtement ni la difficulté (déjà couverts ci-dessous), plutôt le
+  public visé ("homme", "femme", "enfant", "bébé", "unisexe"), la saison ("hiver",
+  "été", "mi-saison"), l'occasion/style ("quotidien", "fête", "sport", "grossesse"),
+  une technique ou matière notable ("sans couture", "dentelle", "jacquard")
+- "garmentType" : le type d'objet réalisé, un ou deux mots (ex. "pull", "chaussettes",
+  "jupe", "bonnet")
+- "designer" : le nom du·de la créateur·rice ou de la marque du patron, si indiqué
+- "language" : la langue du patron, en code court ("fr", "en", "de"...)
+- "difficulty" : un entier de 1 (très facile) à 5 (expert), UNIQUEMENT si le patron
+  indique explicitement un niveau (débutant/confirmé/expert ou équivalent)
+- "sizes" : les tailles disponibles telles qu'écrites dans le patron (ex. "36-44"
+  ou "S/M/L")
+- "gaugeStitches" : le nombre de mailles pour 10 cm à l'échantillon (tricot/crochet
+  seulement, nombre)
+- "gaugeRows" : le nombre de rangs pour 10 cm à l'échantillon (tricot/crochet
+  seulement, nombre)
+- "yardageRequired" : le métrage de laine nécessaire, en mètres, arrondi à l'entier
+  (tricot/crochet seulement -- convertis les yards en mètres si besoin : 1 yard ≈ 0.91 m)
+Réponds STRICTEMENT avec un objet JSON contenant uniquement les champs déterminés
+avec certitude, sans aucun texte autour, sans balises markdown. Exemple :
+{"tags": ["homme", "hiver"], "garmentType": "pull", "difficulty": 3, "gaugeStitches": 20, "gaugeRows": 28}`;
 
-export function tagsPrompt(context: string): string {
-	return `PATRON:\n${context.slice(0, 12000)}\n\nSuggère des étiquettes pour ce patron, au format JSON demandé.`;
+export function patternInfoPrompt(context: string): string {
+	return `PATRON:\n${context.slice(0, 12000)}\n\nExtrais les informations pour ce patron, au format JSON demandé.`;
 }
 
 export function copilotPrompt(context: string, question: string): string {

@@ -4,7 +4,7 @@ import { patterns, patternFiles } from '$lib/server/db/schema';
 import { saveUpload } from '$lib/server/storage';
 import { extractPdfText } from '$lib/server/pdf';
 import { embed, aiConfigured } from '$lib/server/ai/ollama';
-import { suggestTags, mergeTags } from '$lib/server/ai/tags';
+import { suggestPatternInfo, mergePatternInfo } from '$lib/server/ai/patternInfo';
 import type { Craft } from '$lib/server/db/schema';
 
 // "Pull_Aiguilles-No12_v2.pdf" -> "Pull Aiguilles No12 v2". Separators become
@@ -67,18 +67,34 @@ export async function importOnePattern(opts: {
 		isPrimary: true
 	});
 
-	// Auto-tag only when nothing was specified for the batch -- an explicit
-	// choice (even one shared across the whole batch) is never overridden.
-	// Best-effort, same policy as the embedding step below.
-	if (tags.length === 0 && aiConfigured()) {
+	const updates: Record<string, unknown> = {};
+
+	// Auto-fill only fields nothing was specified for (a batch has no per-file
+	// form beyond craft/tags, so that's just tags here) -- an explicit choice,
+	// even one shared across the whole batch, is never overridden. Best-effort,
+	// same policy as the embedding step below: a slow/unavailable Ollama must
+	// not abort the import.
+	if (aiConfigured()) {
 		try {
-			const suggested = await suggestTags([title, extractedText].filter(Boolean).join('\n\n'));
-			if (suggested.length) {
-				tags = mergeTags(tags, suggested);
-				await db.update(patterns).set({ tags }).where(eq(patterns.id, inserted.id));
-			}
+			const suggested = await suggestPatternInfo([title, extractedText].filter(Boolean).join('\n\n'));
+			const merged = mergePatternInfo(
+				{
+					tags,
+					garmentType: null,
+					designer: null,
+					language: null,
+					difficulty: null,
+					sizes: null,
+					gaugeStitches: null,
+					gaugeRows: null,
+					yardageRequired: null
+				},
+				suggested
+			);
+			tags = merged.tags;
+			Object.assign(updates, merged.updates);
 		} catch {
-			/* Ollama absent or busy — the pattern is imported without tags */
+			/* Ollama absent or busy — the pattern is imported as-is */
 		}
 	}
 
@@ -86,11 +102,14 @@ export async function importOnePattern(opts: {
 	if (aiConfigured()) {
 		try {
 			const parts = [title, craft, tags.join(' '), extractedText?.slice(0, 800)].filter(Boolean).join(' ');
-			const embedding = await embed(parts);
-			await db.update(patterns).set({ embedding }).where(eq(patterns.id, inserted.id));
+			updates.embedding = await embed(parts);
 		} catch {
 			/* Ollama absent or busy — the pattern is imported either way */
 		}
+	}
+
+	if (Object.keys(updates).length) {
+		await db.update(patterns).set(updates).where(eq(patterns.id, inserted.id));
 	}
 
 	return { ok: true, id: inserted.id, title };
