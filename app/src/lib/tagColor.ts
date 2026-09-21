@@ -1,6 +1,18 @@
-// Tags are freeform strings (no tags table to store a color on), so we derive
-// a color deterministically from the tag's text: same tag name -> same color
-// everywhere, every time, with no data to maintain.
+// Tags are freeform strings (no tags table to store a color on), so colors
+// are assigned rather than stored: given the full set of tags currently in
+// use (assignTagColors, called server-side from the tag list every page
+// that shows tag pills already has to fetch), each DISTINCT tag gets the
+// palette entry at its own position in a stable alphabetical order --
+// deterministic and collision-free as long as there are no more than
+// PALETTE.length distinct tags in use, not just "probably fine".
+//
+// A hash of each tag's own text in isolation (the previous approach) can't
+// give that guarantee at any practical palette size: by the birthday
+// paradox, independently-hashed tags collide far sooner than the palette
+// size suggests -- 8 tags already collide ~57% of the time even across 36
+// buckets, 95% of the time across 12. Position-based assignment sidesteps
+// the paradox entirely: it isn't leaving 36 dice rolls to chance, it's
+// dealing 36 distinct cards.
 //
 // Colors are hand-picked hex pairs rather than a computed hsl() formula, so
 // they actually sit in the site's own palette instead of cycling through
@@ -50,10 +62,74 @@ const PALETTE: { bg: string; fg: string }[] = [
 	{ bg: '#d3c6e7', fg: '#4a257e' } // perse
 ];
 
-// FNV-1a: unlike a plain polynomial hash (`hash*31 + c`), this doesn't lose
-// distribution once reduced mod a small number -- 31 mod 18 has order 6
-// (31^6 ≡ 1 mod 18), so `(hash*31+c) % 18` collapses most inputs into a
-// handful of buckets regardless of how well the hash itself is mixed.
+export type TagColor = { bg: string; fg: string };
+
+// The palette used for automatic assignment (assignTagColors below) and
+// offered as quick suggestions in the manual picker -- a manual choice is
+// not limited to it, though (see readableFg): the picker at /patterns/tags
+// accepts any color, this is just what auto-assignment sticks to so it
+// keeps matching the rest of the app's aesthetic.
+export const PALETTE_SWATCHES: readonly TagColor[] = PALETTE;
+
+// WCAG relative luminance, used below to pick a readable text color for a
+// background the user chose freely (unlike PALETTE's entries, an arbitrary
+// bg has no hand-picked fg to go with it).
+function relativeLuminance(hex: string): number {
+	const n = parseInt(hex.slice(1), 16);
+	const [r, g, b] = [(n >> 16) & 0xff, (n >> 8) & 0xff, n & 0xff].map((c) => c / 255);
+	const lin = (c: number) => (c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4));
+	return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+}
+
+// Black or white text, whichever contrasts more against `bg` (the standard
+// WCAG contrast-ratio comparison) -- so any background the user picks stays
+// legible without asking them to also pick a matching text color.
+export function readableFg(bg: string): string {
+	const l = relativeLuminance(bg);
+	const contrast = (other: number) => (Math.max(l, other) + 0.05) / (Math.min(l, other) + 0.05);
+	return contrast(1) > contrast(0) ? '#ffffff' : '#111111';
+}
+
+// The real assignment: given every distinct tag currently in use (a page
+// fetches this once, server-side -- see $lib/server/patternTags.ts), each
+// gets the palette entry at its own index in a stable alphabetical order.
+// Two different tags never land on the same entry unless there are more
+// distinct tags than PALETTE.length (36) -- at that point they repeat, the
+// one tradeoff any finite palette has, but that's 36 distinct concepts in a
+// personal pattern library, not 8.
+//
+// `overrides` (a tag -> color the user picked manually, see
+// $lib/server/tagColorOverrides.ts) takes priority; the remaining tags still
+// get distinct index-based colors from each other, counting only themselves
+// -- an override "spending" a palette slot doesn't shrink the guarantee for
+// everyone else.
+export function assignTagColors(
+	tags: Iterable<string>,
+	overrides?: Map<string, TagColor>
+): Map<string, TagColor> {
+	const unique = [...new Set(tags)].sort((a, b) => a.localeCompare(b));
+	const map = new Map<string, TagColor>();
+	let i = 0;
+	for (const tag of unique) {
+		const override = overrides?.get(tag);
+		if (override) {
+			map.set(tag, override);
+		} else {
+			map.set(tag, PALETTE[i % PALETTE.length]);
+			i++;
+		}
+	}
+	return map;
+}
+
+// FNV-1a, used only as the fallback below for a tag that isn't in a
+// precomputed assignTagColors() map (there shouldn't be one in normal use --
+// every page that renders tag pills fetches the full set first -- but a
+// missing entry should still get *a* color rather than none). Unlike a plain
+// polynomial hash (`hash*31 + c`), this doesn't lose distribution once
+// reduced mod a small number -- 31 mod 18 has order 6 (31^6 ≡ 1 mod 18), so
+// `(hash*31+c) % 18` collapses most inputs into a handful of buckets
+// regardless of how well the hash itself is mixed.
 function fnv1a(str: string): number {
 	let hash = 0x811c9dc5;
 	for (let i = 0; i < str.length; i++) {
@@ -63,11 +139,7 @@ function fnv1a(str: string): number {
 	return hash >>> 0;
 }
 
-export function tagColor(tag: string): { bg: string; fg: string } {
-	return PALETTE[fnv1a(tag) % PALETTE.length];
-}
-
-export function tagStyle(tag: string): string {
-	const { bg, fg } = tagColor(tag);
+export function tagStyle(tag: string, colors?: Map<string, TagColor>): string {
+	const { bg, fg } = colors?.get(tag) ?? PALETTE[fnv1a(tag) % PALETTE.length];
 	return `--tag-bg:${bg};--tag-fg:${fg}`;
 }

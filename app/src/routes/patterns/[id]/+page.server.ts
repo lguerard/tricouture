@@ -3,6 +3,9 @@ import { and, asc, eq, or } from 'drizzle-orm';
 import { db } from '$lib/server/db';
 import { patterns, patternFiles, patternPieces, users } from '$lib/server/db/schema';
 import { deleteStored } from '$lib/server/storage';
+import { getAllVisibleTags } from '$lib/server/patternTags';
+import { getTagColorOverrides } from '$lib/server/tagColorOverrides';
+import { assignTagColors } from '$lib/tagColor';
 import type { Actions, PageServerLoad } from './$types';
 
 // Pattern accessible if the user owns it OR it is shared.
@@ -43,8 +46,13 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 		.where(eq(patternPieces.patternId, row.pattern.id))
 		.orderBy(asc(patternPieces.position));
 
+	// Same set every tag pill on the patterns list is colored from (see
+	// $lib/tagColor.ts), so a tag reads as the same color wherever it appears.
+	const allTags = await getAllVisibleTags(uid);
+	const tagColors = assignTagColors(allTags, await getTagColorOverrides(uid));
+
 	const isOwner = row.pattern.ownerId === uid;
-	return { pattern: row.pattern, files, pieces, isOwner, ownerName: row.ownerName };
+	return { pattern: row.pattern, files, pieces, isOwner, ownerName: row.ownerName, tagColors };
 };
 
 export const actions: Actions = {
