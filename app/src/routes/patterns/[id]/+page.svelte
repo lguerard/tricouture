@@ -118,7 +118,7 @@
 			<h1>{p.title}</h1>
 			<div>
 				<span class="tag">{craftLabel(locale, p.craft)}</span>
-				{#each p.tags ?? [] as tag}<a class="tag" style={tagStyle(tag)} href={`/patterns?tag=${encodeURIComponent(tag)}`}>{tag}</a>{/each}
+				{#each p.tags ?? [] as tag}<a class="tag" style={tagStyle(tag, data.tagColors)} href={`/patterns?tag=${encodeURIComponent(tag)}`}>{tag}</a>{/each}
 				{#if data.isOwner}
 					<button type="button" class="tag-suggest" onclick={completeWithAi} disabled={completing}>
 						{completing ? t(locale, 'patterns.detail.completing') : t(locale, 'patterns.detail.complete')}

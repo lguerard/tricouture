@@ -1,6 +1,8 @@
 import { and, or, eq, desc, sql } from 'drizzle-orm';
 import { db } from '$lib/server/db';
 import { patterns, patternFiles, users } from '$lib/server/db/schema';
+import { getAllVisibleTags } from '$lib/server/patternTags';
+import { assignTagColors } from '$lib/tagColor';
 import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ locals, url }) => {
@@ -41,14 +43,11 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 
 	// Distinct tags across everything visible to the user, for the filter dropdown --
 	// independent of the current search/craft/scope/tag filters so the list of
-	// choices doesn't shrink as filters are applied.
-	const tagRows = await db
-		.select({ tags: patterns.tags })
-		.from(patterns)
-		.where(or(eq(patterns.ownerId, uid), eq(patterns.isShared, true))!);
-	const allTags = Array.from(new Set(tagRows.flatMap((r) => r.tags ?? []))).sort((a, b) =>
-		a.localeCompare(b)
-	);
+	// choices doesn't shrink as filters are applied. Also the basis for
+	// collision-free tag colors (assignTagColors): every tag pill on this page
+	// comes from one of these patterns, so this set always covers them.
+	const allTags = await getAllVisibleTags(uid);
+	const tagColors = assignTagColors(allTags);
 
 	const rows = await db
 		.select({
@@ -84,5 +83,5 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		hasLink: /^https?:\/\//i.test((source ?? '').trim())
 	}));
 
-	return { rows: mapped, q, craftFilter, scope, tagFilter, allTags };
+	return { rows: mapped, q, craftFilter, scope, tagFilter, allTags, tagColors };
 };

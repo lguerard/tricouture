@@ -74,7 +74,7 @@
 						{#each p.tags ?? [] as tag}
 							<span
 								class="tag"
-								style={tagStyle(tag)}
+								style={tagStyle(tag, data.tagColors)}
 								role="link"
 								tabindex="0"
 								onclick={(e) => {
