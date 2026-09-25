@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import { withFeedback } from '$lib/feedback';
 	import { t } from '$lib/i18n';
 	import { tagStyle } from '$lib/tagColor';
 
@@ -72,7 +73,7 @@
 					<span class="tag" style={tagStyle(tag, data.colors)}>{tag}</span>
 					<div class="actions">
 						{#if data.overriddenTags.includes(tag)}
-							<form method="POST" action="?/resetColor" use:enhance>
+							<form method="POST" action="?/resetColor" use:enhance={withFeedback()}>
 								<input type="hidden" name="tag" value={tag} />
 								<button class="btn small" type="submit">{t(locale, 'patterns.tags.reset')}</button>
 							</form>
@@ -86,7 +87,7 @@
 						<div class="picker">
 							<div class="swatches">
 								{#each quickSwatches as color}
-									<form method="POST" action="?/setColor" use:enhance={afterSubmit}>
+									<form method="POST" action="?/setColor" use:enhance={withFeedback({ success: 'toast.saved', inner: afterSubmit })}>
 										<input type="hidden" name="tag" value={tag} />
 										<input type="hidden" name="bg" value={color.bg} />
 										<button
@@ -105,7 +106,7 @@
 								method="POST"
 								action="?/setColor"
 								bind:this={customForm}
-								use:enhance={afterSubmit}
+								use:enhance={withFeedback({ success: 'toast.saved', inner: afterSubmit })}
 							>
 								<input type="hidden" name="tag" value={tag} />
 								<label class="visually-hidden" for={`picker-${tag}`}>{t(locale, 'patterns.tags.customColor')}</label>

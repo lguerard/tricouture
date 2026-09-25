@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import { withFeedback } from '$lib/feedback';
 	import { onMount } from 'svelte';
 	import { statusLabel, STATUS_ORDER, pieceStatusLabel, PIECE_STATUS_ORDER } from '$lib/labels';
 	import { scheduleDeadlineReminder } from '$lib/capacitor';
@@ -116,11 +117,11 @@
 			<div class="count-display">{p.currentRow}{p.totalRows ? ` / ${p.totalRows}` : ''}</div>
 			<div class="bar"><div class="fill" style={`width:${p.progressPct}%`}></div></div>
 			<div class="count-btns">
-				<form method="POST" action="?/row" use:enhance>
+				<form method="POST" action="?/row" use:enhance={withFeedback()}>
 					<input type="hidden" name="delta" value="-1" />
 					<button type="submit" class="big">−</button>
 				</form>
-				<form method="POST" action="?/row" use:enhance bind:this={incForm}>
+				<form method="POST" action="?/row" use:enhance={withFeedback()} bind:this={incForm}>
 					<input type="hidden" name="delta" value="1" />
 					<button type="submit" class="big btn-primary">{t(locale, 'projects.detail.addRow')}</button>
 				</form>
@@ -156,7 +157,7 @@
 			<form
 				method="POST"
 				action="?/logPace"
-				use:enhance={() => async ({ update }) => update({ reset: true })}
+				use:enhance={withFeedback({ success: 'toast.saved', inner: () => async ({ update }) => update({ reset: true }) })}
 				class="pace"
 			>
 				<input
@@ -188,7 +189,7 @@
 								<span class:done={piece.status === 'fini'}>
 									{piece.name}{#if piece.quantity}<span class="muted small"> ×{piece.quantity}</span>{/if}
 								</span>
-								<form method="POST" action="?/setPieceStatus" use:enhance>
+								<form method="POST" action="?/setPieceStatus" use:enhance={withFeedback()}>
 									<input type="hidden" name="pieceId" value={piece.id} />
 									<select
 										name="status"
@@ -203,20 +204,20 @@
 							{:else if piece.totalRows}
 								<span class:done={piece.completed}>{piece.name}</span>
 								<div class="piece-rows">
-									<form method="POST" action="?/setPieceRow" use:enhance>
+									<form method="POST" action="?/setPieceRow" use:enhance={withFeedback()}>
 										<input type="hidden" name="pieceId" value={piece.id} />
 										<input type="hidden" name="delta" value="-1" />
 										<button type="submit" disabled={readOnly}>−</button>
 									</form>
 									<span class="muted small">{piece.currentRow} / {piece.totalRows}</span>
-									<form method="POST" action="?/setPieceRow" use:enhance>
+									<form method="POST" action="?/setPieceRow" use:enhance={withFeedback()}>
 										<input type="hidden" name="pieceId" value={piece.id} />
 										<input type="hidden" name="delta" value="1" />
 										<button type="submit" disabled={readOnly}>+</button>
 									</form>
 								</div>
 							{:else}
-								<form method="POST" action="?/togglePiece" use:enhance>
+								<form method="POST" action="?/togglePiece" use:enhance={withFeedback()}>
 									<input type="hidden" name="pieceId" value={piece.id} />
 									<input type="hidden" name="completed" value={(!piece.completed).toString()} />
 									<label>
@@ -229,7 +230,7 @@
 										<span class:done={piece.completed}>{piece.name}</span>
 									</label>
 								</form>
-								<form method="POST" action="?/setPieceTotalRows" use:enhance class="piece-target">
+								<form method="POST" action="?/setPieceTotalRows" use:enhance={withFeedback()} class="piece-target">
 									<input type="hidden" name="pieceId" value={piece.id} />
 									<input
 										name="totalRows"
@@ -256,7 +257,7 @@
 		<!-- Details / editing -->
 		<section class="card detail">
 			<h2>{t(locale, 'projects.detail.detailsTitle')}</h2>
-			<form method="POST" action="?/update" use:enhance>
+			<form method="POST" action="?/update" use:enhance={withFeedback({ success: 'toast.saved' })}>
 				<div class="two">
 					<div class="field">
 						<label for="status">{t(locale, 'projects.detail.column')}</label>
@@ -328,7 +329,7 @@
 										{[u.brand, u.name, u.colorway].filter(Boolean).join(' ') || t(locale, 'projects.detail.deletedYarn')}
 										— {t(locale, 'projects.detail.skeinsAmount', { n: u.skeinsUsed })}
 									</span>
-									<form method="POST" action="?/undoYarnUse" use:enhance>
+									<form method="POST" action="?/undoYarnUse" use:enhance={withFeedback()}>
 										<input type="hidden" name="id" value={u.id} />
 										<button type="submit" class="undo" title={t(locale, 'projects.detail.undoUse')}>↩</button>
 									</form>
@@ -341,7 +342,7 @@
 							{t(locale, 'projects.detail.noYarnsInStash')} <a href="/stash">{t(locale, 'projects.detail.goToStash')}</a>
 						</p>
 					{:else}
-						<form method="POST" action="?/useYarn" use:enhance={() => async ({ update }) => update({ reset: true })} class="use-form">
+						<form method="POST" action="?/useYarn" use:enhance={withFeedback({ success: 'toast.saved', inner: () => async ({ update }) => update({ reset: true }) })} class="use-form">
 							<select name="yarnId" required>
 								<option value="">{t(locale, 'projects.detail.selectYarn')}</option>
 								{#each data.yarnStash as y}
@@ -368,7 +369,7 @@
 										{[u.name, u.fabricType].filter(Boolean).join(' ') || t(locale, 'projects.detail.deletedFabric')}
 										— {t(locale, 'projects.detail.lengthAmount', { n: u.lengthUsedCm })}
 									</span>
-									<form method="POST" action="?/undoFabricUse" use:enhance>
+									<form method="POST" action="?/undoFabricUse" use:enhance={withFeedback()}>
 										<input type="hidden" name="id" value={u.id} />
 										<button type="submit" class="undo" title={t(locale, 'projects.detail.undoUse')}>↩</button>
 									</form>
@@ -381,7 +382,7 @@
 							{t(locale, 'projects.detail.noFabricsInStash')} <a href="/stash">{t(locale, 'projects.detail.goToStash')}</a>
 						</p>
 					{:else}
-						<form method="POST" action="?/useFabric" use:enhance={() => async ({ update }) => update({ reset: true })} class="use-form">
+						<form method="POST" action="?/useFabric" use:enhance={withFeedback({ success: 'toast.saved', inner: () => async ({ update }) => update({ reset: true }) })} class="use-form">
 							<select name="fabricId" required>
 								<option value="">{t(locale, 'projects.detail.selectFabric')}</option>
 								{#each data.fabricStash as f}
@@ -417,7 +418,7 @@
 									? t(locale, 'projects.share.roleEdit')
 									: t(locale, 'projects.share.roleView')}
 							</span>
-							<form method="POST" action="?/unshare" use:enhance>
+							<form method="POST" action="?/unshare" use:enhance={withFeedback()}>
 								<input type="hidden" name="userId" value={s.userId} />
 								<button type="submit">{t(locale, 'projects.share.revoke')}</button>
 							</form>
@@ -432,7 +433,7 @@
 				<form
 					method="POST"
 					action="?/share"
-					use:enhance={() => async ({ update }) => update({ reset: true })}
+					use:enhance={withFeedback({ inner: () => async ({ update }) => update({ reset: true }) })}
 					class="share-form"
 				>
 					<label>

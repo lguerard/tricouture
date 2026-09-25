@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import { withFeedback } from '$lib/feedback';
 	import { craftLabel, CRAFTS, difficultyLabel } from '$lib/labels';
 	import { t } from '$lib/i18n';
 	let { data, form } = $props();
@@ -16,13 +17,13 @@
 	<form
 		method="POST"
 		enctype="multipart/form-data"
-		use:enhance={() => {
+		use:enhance={withFeedback({ success: 'toast.saved', inner: () => {
 			submitting = true;
 			return async ({ update }) => {
 				await update();
 				submitting = false;
 			};
-		}}
+		} })}
 	>
 		<div class="field">
 			<label for="title">{t(locale, 'patterns.new.titleLabel')}</label>

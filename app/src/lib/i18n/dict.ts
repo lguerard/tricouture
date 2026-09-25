@@ -28,6 +28,10 @@ export const dict: Record<Locale, Table> = {
 		'nav.account': 'Mon compte',
 		'nav.users': 'Utilisateurs',
 		'nav.logout': 'Déconnexion',
+		'toast.error': 'Une erreur est survenue, réessaie.',
+		'toast.saved': 'Enregistré ✓',
+		'toast.deleted': 'Supprimé.',
+		'toast.undo': 'Annuler',
 		'common.language': 'Langue',
 
 		// Auth
@@ -623,6 +627,10 @@ export const dict: Record<Locale, Table> = {
 		'nav.account': 'My account',
 		'nav.users': 'Users',
 		'nav.logout': 'Log out',
+		'toast.error': 'Something went wrong, please try again.',
+		'toast.saved': 'Saved ✓',
+		'toast.deleted': 'Deleted.',
+		'toast.undo': 'Undo',
 		'common.language': 'Language',
 
 		// Auth

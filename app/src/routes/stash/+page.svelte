@@ -1,5 +1,7 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import { withFeedback } from '$lib/feedback';
+	import { undoableDelete } from '$lib/undo';
 	import { YARN_WEIGHTS, MOTIF_VALUES, motifLabel, COLOR_NAMES, toolTypeOptions, toolTypeLabel } from '$lib/labels';
 	import { isCapacitor, scanBarcode } from '$lib/capacitor';
 	import { t } from '$lib/i18n';
@@ -356,7 +358,7 @@
 				</div>
 			{/if}
 			{#if tab === 'yarn'}
-				<form method="POST" action="?/addYarn" enctype="multipart/form-data" use:enhance={refresh}>
+				<form method="POST" action="?/addYarn" enctype="multipart/form-data" use:enhance={withFeedback({ success: 'toast.saved', inner: refresh })}>
 					<div class="row3">
 						<div class="field"><label for="b">{t(locale, 'stash.yarn.brand')}</label><input id="b" name="brand" /></div>
 						<div class="field"><label for="n">{t(locale, 'stash.yarn.name')}</label><input id="n" name="name" /></div>
@@ -409,7 +411,7 @@
 					<button class="btn-primary" type="submit">{t(locale, 'stash.yarn.submit')}</button>
 				</form>
 			{:else if tab === 'fabric'}
-				<form method="POST" action="?/addFabric" enctype="multipart/form-data" use:enhance={refresh}>
+				<form method="POST" action="?/addFabric" enctype="multipart/form-data" use:enhance={withFeedback({ success: 'toast.saved', inner: refresh })}>
 					<div class="row3">
 						<div class="field"><label for="fn">{t(locale, 'stash.fabric.name')}</label><input id="fn" name="name" /></div>
 						<div class="field"><label for="ft">{t(locale, 'stash.fabric.type')}</label><input id="ft" name="fabricType" placeholder={t(locale, 'stash.fabric.typePlaceholder')} /></div>
@@ -450,7 +452,7 @@
 					<button class="btn-primary" type="submit">{t(locale, 'stash.fabric.submit')}</button>
 				</form>
 			{:else if tab === 'notion'}
-				<form method="POST" action="?/addNotion" enctype="multipart/form-data" use:enhance={refresh}>
+				<form method="POST" action="?/addNotion" enctype="multipart/form-data" use:enhance={withFeedback({ success: 'toast.saved', inner: refresh })}>
 					<div class="row3">
 						<div class="field"><label for="nn">{t(locale, 'stash.notion.name')}</label><input id="nn" name="name" required /></div>
 						<div class="field"><label for="nc">{t(locale, 'stash.notion.category')}</label><input id="nc" name="category" placeholder={t(locale, 'stash.notion.categoryPlaceholder')} /></div>
@@ -473,7 +475,7 @@
 					<button class="btn-primary" type="submit">{t(locale, 'stash.notion.submit')}</button>
 				</form>
 			{:else}
-				<form method="POST" action="?/addTool" enctype="multipart/form-data" use:enhance={refresh}>
+				<form method="POST" action="?/addTool" enctype="multipart/form-data" use:enhance={withFeedback({ success: 'toast.saved', inner: refresh })}>
 					<div class="row3">
 						<div class="field">
 							<label for="tt">{t(locale, 'stash.tool.type')}</label>
@@ -503,7 +505,7 @@
 		{#if filteredYarns.length === 0}<p class="muted">{t(locale, 'stash.noResults')}</p>{/if}
 		<div class="grid">
 			{#each filteredYarns as y}
-				<div class="card stash-item">
+				<div class="card stash-item" data-undo-item>
 					{#if previewYarnId === y.id && previewSrc}
 						<img src={previewSrc} alt={t(locale, 'stash.yarn.previewAlt')} class="preview-img" />
 					{:else if y.photoPath}
@@ -512,7 +514,7 @@
 						<div class="swatch" style={`background:${y.colorHex ?? '#eee'}`}></div>
 					{/if}
 					{#if y.photoPath}
-						<form method="POST" action="?/removePhoto" use:enhance={refresh} class="photo-rm">
+						<form method="POST" action="?/removePhoto" use:enhance={withFeedback({ inner: refresh })} class="photo-rm">
 							<input type="hidden" name="kind" value="yarn" /><input type="hidden" name="id" value={y.id} />
 							<button class="btn-ghost small" type="submit">{t(locale, 'stash.removePhoto')}</button>
 						</form>
@@ -533,7 +535,7 @@
 						>
 							{previewBusy && previewYarnId === y.id ? `⏳ ${t(locale, 'stash.yarn.generating')}` : `🎨 ${t(locale, 'stash.yarn.previewBtn')}`}
 						</button>
-						<form method="POST" action="?/delete" use:enhance={refresh}>
+						<form method="POST" action="?/delete" use:enhance={undoableDelete()}>
 							<input type="hidden" name="kind" value="yarn" /><input type="hidden" name="id" value={y.id} />
 							<button class="del" type="submit">{t(locale, 'stash.delete')}</button>
 						</form>
@@ -545,14 +547,14 @@
 		{#if filteredFabrics.length === 0}<p class="muted">{t(locale, 'stash.noResults')}</p>{/if}
 		<div class="grid">
 			{#each filteredFabrics as f}
-				<div class="card stash-item">
+				<div class="card stash-item" data-undo-item>
 					{#if f.photoPath}
 						<img src={`/media/${f.photoPath}`} alt={f.name ?? t(locale, 'stash.fabric.fallbackName')} />
 					{:else}
 						<div class="swatch" style={`background:${f.colorHex ?? '#eee'}`}></div>
 					{/if}
 					{#if f.photoPath}
-						<form method="POST" action="?/removePhoto" use:enhance={refresh} class="photo-rm">
+						<form method="POST" action="?/removePhoto" use:enhance={withFeedback({ inner: refresh })} class="photo-rm">
 							<input type="hidden" name="kind" value="fabric" /><input type="hidden" name="id" value={f.id} />
 							<button class="btn-ghost small" type="submit">{t(locale, 'stash.removePhoto')}</button>
 						</form>
@@ -560,7 +562,7 @@
 					<strong>{f.name ?? f.fabricType ?? t(locale, 'stash.fabric.fallbackName')}</strong>
 					<span class="muted small">{[f.composition, f.motif && motifLabel(locale, f.motif)].filter(Boolean).join(' · ')}</span>
 					<span class="small">{[f.lengthCm && `${f.lengthCm} cm`, f.widthCm && `${t(locale, 'stash.fabric.widthPrefix')} ${f.widthCm}`].filter(Boolean).join(' · ')}</span>
-					<form method="POST" action="?/delete" use:enhance={refresh}>
+					<form method="POST" action="?/delete" use:enhance={undoableDelete()}>
 						<input type="hidden" name="kind" value="fabric" /><input type="hidden" name="id" value={f.id} />
 						<button class="del" type="submit">{t(locale, 'stash.delete')}</button>
 					</form>
@@ -571,12 +573,12 @@
 		{#if filteredNotions.length === 0}<p class="muted">{t(locale, 'stash.noResults')}</p>{/if}
 		<div class="grid">
 			{#each filteredNotions as n}
-				<div class="card stash-item">
+				<div class="card stash-item" data-undo-item>
 					{#if n.photoPath}
 						<img src={`/media/${n.photoPath}`} alt={n.name} />
 					{/if}
 					{#if n.photoPath}
-						<form method="POST" action="?/removePhoto" use:enhance={refresh} class="photo-rm">
+						<form method="POST" action="?/removePhoto" use:enhance={withFeedback({ inner: refresh })} class="photo-rm">
 							<input type="hidden" name="kind" value="notion" /><input type="hidden" name="id" value={n.id} />
 							<button class="btn-ghost small" type="submit">{t(locale, 'stash.removePhoto')}</button>
 						</form>
@@ -584,7 +586,7 @@
 					<strong>{n.name}</strong>
 					<span class="muted small">{n.category ?? ''}</span>
 					<span class="small">{t(locale, 'stash.qtyPrefix')} {n.quantity}</span>
-					<form method="POST" action="?/delete" use:enhance={refresh}>
+					<form method="POST" action="?/delete" use:enhance={undoableDelete()}>
 						<input type="hidden" name="kind" value="notion" /><input type="hidden" name="id" value={n.id} />
 						<button class="del" type="submit">{t(locale, 'stash.delete')}</button>
 					</form>
@@ -595,12 +597,12 @@
 		{#if filteredTools.length === 0}<p class="muted">{t(locale, 'stash.noResults')}</p>{/if}
 		<div class="grid">
 			{#each filteredTools as tl}
-				<div class="card stash-item">
+				<div class="card stash-item" data-undo-item>
 					{#if tl.photoPath}
 						<img src={`/media/${tl.photoPath}`} alt={toolTypeLabel(locale, tl.type)} />
 					{/if}
 					{#if tl.photoPath}
-						<form method="POST" action="?/removePhoto" use:enhance={refresh} class="photo-rm">
+						<form method="POST" action="?/removePhoto" use:enhance={withFeedback({ inner: refresh })} class="photo-rm">
 							<input type="hidden" name="kind" value="tool" /><input type="hidden" name="id" value={tl.id} />
 							<button class="btn-ghost small" type="submit">{t(locale, 'stash.removePhoto')}</button>
 						</form>
@@ -608,7 +610,7 @@
 					<strong>{toolTypeLabel(locale, tl.type)}</strong>
 					<span class="small">{[tl.sizeMm && `${tl.sizeMm} mm`, tl.lengthCm && `${tl.lengthCm} cm`].filter(Boolean).join(' · ')}</span>
 					<span class="muted small">{t(locale, 'stash.qtyPrefix')} {tl.quantity}{tl.inUseProjectId ? ` · ${t(locale, 'stash.inUse')}` : ''}</span>
-					<form method="POST" action="?/delete" use:enhance={refresh}>
+					<form method="POST" action="?/delete" use:enhance={undoableDelete()}>
 						<input type="hidden" name="kind" value="tool" /><input type="hidden" name="id" value={tl.id} />
 						<button class="del" type="submit">{t(locale, 'stash.delete')}</button>
 					</form>

@@ -1,5 +1,7 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import { withFeedback } from '$lib/feedback';
+	import { undoableDelete } from '$lib/undo';
 	import { t } from '$lib/i18n';
 	let { data } = $props();
 	let adding = $state(false);
@@ -21,7 +23,7 @@
 	</header>
 
 	{#if adding}
-		<form class="card add" method="POST" action="?/add" use:enhance={() => async ({ update }) => { await update({ reset: true }); adding = false; }}>
+		<form class="card add" method="POST" action="?/add" use:enhance={withFeedback({ success: 'toast.saved', inner: () => async ({ update }) => { await update({ reset: true }); adding = false; } })}>
 			<div class="row">
 				<div class="field"><label for="t">{t(locale, 'goals.labelTitle')}</label><input id="t" name="title" required /></div>
 				<div class="field">
@@ -43,7 +45,7 @@
 	{:else}
 		<div class="grid">
 			{#each data.list as g}
-				<div class="card goal">
+				<div class="card goal" data-undo-item>
 					<div class="ghead">
 						<strong>{g.title}</strong>
 						<span class="tag">{KINDS[g.kind] ?? g.kind}</span>
@@ -51,9 +53,9 @@
 					<div class="bar"><div class="fill" style={`width:${pct(g.currentValue, g.targetValue)}%`}></div></div>
 					<span class="muted small">{g.currentValue} / {g.targetValue}</span>
 					<div class="actions">
-						<form method="POST" action="?/step" use:enhance><input type="hidden" name="id" value={g.id} /><input type="hidden" name="delta" value="1" /><button type="submit">+1</button></form>
-						<form method="POST" action="?/step" use:enhance><input type="hidden" name="id" value={g.id} /><input type="hidden" name="delta" value="-1" /><button type="submit">−1</button></form>
-						<form method="POST" action="?/delete" use:enhance><input type="hidden" name="id" value={g.id} /><button class="del" type="submit">🗑</button></form>
+						<form method="POST" action="?/step" use:enhance={withFeedback()}><input type="hidden" name="id" value={g.id} /><input type="hidden" name="delta" value="1" /><button type="submit">+1</button></form>
+						<form method="POST" action="?/step" use:enhance={withFeedback()}><input type="hidden" name="id" value={g.id} /><input type="hidden" name="delta" value="-1" /><button type="submit">−1</button></form>
+						<form method="POST" action="?/delete" use:enhance={undoableDelete()}><input type="hidden" name="id" value={g.id} /><button class="del" type="submit">🗑</button></form>
 					</div>
 				</div>
 			{/each}

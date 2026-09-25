@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import { withFeedback } from '$lib/feedback';
 	import { t } from '$lib/i18n';
 	let { data, form } = $props();
 	const locale = $derived(data.locale);
@@ -14,7 +15,7 @@
 		<div><span class="muted">{t(locale, 'auth.email')}</span><strong>{data.account.email}</strong></div>
 	</div>
 
-	<form class="card ai-toggle" method="POST" action="?/toggleAiAutoFill" use:enhance>
+	<form class="card ai-toggle" method="POST" action="?/toggleAiAutoFill" use:enhance={withFeedback()}>
 		<div class="ai-toggle-row">
 			<div>
 				<h2>{t(locale, 'account.aiAutoFill.title')}</h2>
@@ -26,7 +27,7 @@
 		</div>
 	</form>
 
-	<form class="card" method="POST" action="?/changePassword" use:enhance>
+	<form class="card" method="POST" action="?/changePassword" use:enhance={withFeedback()}>
 		<h2>{t(locale, 'account.changePassword')}</h2>
 		<div class="field">
 			<label for="current">{t(locale, 'account.currentPassword')}</label>

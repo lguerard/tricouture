@@ -1,5 +1,7 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import { withFeedback } from '$lib/feedback';
+	import { undoableDelete } from '$lib/undo';
 	import { t } from '$lib/i18n';
 	let { data } = $props();
 	let adding = $state(false);
@@ -14,7 +16,7 @@
 	<p class="muted">{t(locale, 'bins.subtitle')}</p>
 
 	{#if adding}
-		<form class="card add" method="POST" action="?/add" use:enhance={() => async ({ update }) => { await update({ reset: true }); adding = false; }}>
+		<form class="card add" method="POST" action="?/add" use:enhance={withFeedback({ success: 'toast.saved', inner: () => async ({ update }) => { await update({ reset: true }); adding = false; } })}>
 			<div class="row">
 				<div class="field"><label for="l">{t(locale, 'bins.labelName')}</label><input id="l" name="label" required placeholder={t(locale, 'bins.placeholderName')} /></div>
 				<div class="field"><label for="loc">{t(locale, 'bins.labelLocation')}</label><input id="loc" name="location" placeholder={t(locale, 'bins.placeholderLocation')} /></div>
@@ -25,14 +27,14 @@
 
 	<div class="grid">
 		{#each data.bins as b}
-			<div class="card bin">
+			<div class="card bin" data-undo-item>
 				<img src={b.qrDataUrl} alt={t(locale, 'bins.qrAlt', { label: b.label })} />
 				<strong>{b.label}</strong>
 				{#if b.location}<span class="muted small">{b.location}</span>{/if}
 				<span class="small">{t(locale, b.itemCount > 1 ? 'bins.itemsMany' : 'bins.itemsOne', { n: b.itemCount })}</span>
 				<div class="actions">
 					<button onclick={() => window.print()}>🖨 {t(locale, 'bins.print')}</button>
-					<form method="POST" action="?/delete" use:enhance><input type="hidden" name="id" value={b.id} /><button class="del" type="submit">🗑</button></form>
+					<form method="POST" action="?/delete" use:enhance={undoableDelete()}><input type="hidden" name="id" value={b.id} /><button class="del" type="submit">🗑</button></form>
 				</div>
 			</div>
 		{/each}

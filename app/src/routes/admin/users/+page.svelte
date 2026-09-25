@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import { withFeedback } from '$lib/feedback';
 	import { t } from '$lib/i18n';
 	let { data, form } = $props();
 	const locale = $derived(data.locale);
@@ -56,11 +57,11 @@
 							{#if u.isAdmin}<span class="tag">{t(locale, 'admin.admin')}</span>{:else}<span class="muted">{t(locale, 'admin.member')}</span>{/if}
 						</td>
 						<td class="row-actions">
-							<form method="POST" action="?/resetLink" use:enhance>
+							<form method="POST" action="?/resetLink" use:enhance={withFeedback()}>
 								<input type="hidden" name="id" value={u.id} />
 								<button type="submit">🔑 {t(locale, 'admin.generateLink')}</button>
 							</form>
-							<form method="POST" action="?/toggleAdmin" use:enhance>
+							<form method="POST" action="?/toggleAdmin" use:enhance={withFeedback()}>
 								<input type="hidden" name="id" value={u.id} />
 								<input type="hidden" name="makeAdmin" value={u.isAdmin ? 'false' : 'true'} />
 								<button type="submit">{u.isAdmin ? t(locale, 'admin.demote') : t(locale, 'admin.promote')}</button>

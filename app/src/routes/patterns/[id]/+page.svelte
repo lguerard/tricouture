@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import { withFeedback } from '$lib/feedback';
 	import { invalidateAll } from '$app/navigation';
 	import { craftLabel, difficultyLabel } from '$lib/labels';
 	import { t } from '$lib/i18n';
@@ -151,7 +152,7 @@
 			</a>
 			{#if data.isOwner}
 				<a class="btn" href={`/patterns/${p.id}/edit`}>{t(locale, 'patterns.detail.edit')}</a>
-				<form method="POST" action="?/toggleShare" use:enhance>
+				<form method="POST" action="?/toggleShare" use:enhance={withFeedback()}>
 					<button type="submit" class:on={p.isShared}>
 						{p.isShared ? t(locale, 'patterns.detail.shareOn') : t(locale, 'patterns.detail.share')}
 					</button>
@@ -182,7 +183,7 @@
 				</button>
 				{#if showCoverTools || form?.covers || form?.coverError}
 					<div class="cover-tools">
-						<form method="POST" action="?/findCovers" use:enhance={coverEnhance}>
+						<form method="POST" action="?/findCovers" use:enhance={withFeedback({ inner: coverEnhance })}>
 							<button type="submit" disabled={coverBusy}>
 								{coverBusy ? t(locale, 'patterns.cover.searching') : `🔍 ${t(locale, 'patterns.cover.search')}`}
 							</button>
@@ -190,7 +191,7 @@
 						{#if form?.covers}
 							<div class="candidates">
 								{#each form.covers as c}
-									<form method="POST" action="?/setCover" use:enhance={coverEnhance}>
+									<form method="POST" action="?/setCover" use:enhance={withFeedback({ success: 'toast.saved', inner: coverEnhance })}>
 										<input type="hidden" name="url" value={c.imageUrl} />
 										<button type="submit" class="candidate" title={c.title || c.pageUrl} disabled={coverBusy}>
 											<img src={c.imageUrl} alt={c.title} loading="lazy" referrerpolicy="no-referrer" />
@@ -199,12 +200,12 @@
 								{/each}
 							</div>
 						{/if}
-						<form method="POST" action="?/setCover" class="cover-url" use:enhance={coverEnhance}>
+						<form method="POST" action="?/setCover" class="cover-url" use:enhance={withFeedback({ success: 'toast.saved', inner: coverEnhance })}>
 							<input name="url" type="url" required placeholder={t(locale, 'patterns.cover.urlPlaceholder')} />
 							<button type="submit" disabled={coverBusy}>{t(locale, 'patterns.cover.use')}</button>
 						</form>
 						{#if p.coverPath}
-							<form method="POST" action="?/removeCover" use:enhance={coverEnhance}>
+							<form method="POST" action="?/removeCover" use:enhance={withFeedback({ inner: coverEnhance })}>
 								<button type="submit" class="link small danger">{t(locale, 'patterns.cover.remove')}</button>
 							</form>
 						{/if}
@@ -275,7 +276,7 @@
 					<li>
 						<span>{piece.name}</span>
 						{#if data.isOwner && (p.craft === 'tricot' || p.craft === 'crochet')}
-							<form method="POST" action="?/updatePieceDefaults" use:enhance class="piece-default">
+							<form method="POST" action="?/updatePieceDefaults" use:enhance={withFeedback({ success: 'toast.saved' })} class="piece-default">
 								<input type="hidden" name="pieceId" value={piece.id} />
 								<input
 									name="defaultTotalRows"
@@ -287,7 +288,7 @@
 								/>
 							</form>
 						{:else if data.isOwner && p.craft === 'couture'}
-							<form method="POST" action="?/updatePieceDefaults" use:enhance class="piece-default">
+							<form method="POST" action="?/updatePieceDefaults" use:enhance={withFeedback({ success: 'toast.saved' })} class="piece-default">
 								<input type="hidden" name="pieceId" value={piece.id} />
 								<input
 									name="quantity"
@@ -304,7 +305,7 @@
 							<span class="muted small">{t(locale, 'patterns.detail.piecesQuantityBadge', { n: piece.quantity })}</span>
 						{/if}
 						{#if data.isOwner}
-							<form method="POST" action="?/removePiece" use:enhance>
+							<form method="POST" action="?/removePiece" use:enhance={withFeedback()}>
 								<input type="hidden" name="pieceId" value={piece.id} />
 								<button type="submit" class="link-btn" title={t(locale, 'patterns.detail.piecesRemove')}>✕</button>
 							</form>
@@ -314,7 +315,7 @@
 			</ul>
 		{/if}
 		{#if data.isOwner}
-			<form method="POST" action="?/addPiece" use:enhance class="add-piece">
+			<form method="POST" action="?/addPiece" use:enhance={withFeedback({ success: 'toast.saved' })} class="add-piece">
 				<input name="name" placeholder={t(locale, 'patterns.detail.piecesAddPlaceholder')} required />
 				<button type="submit">{t(locale, 'patterns.detail.piecesAdd')}</button>
 			</form>

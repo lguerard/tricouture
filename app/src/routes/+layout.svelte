@@ -1,12 +1,16 @@
 <script lang="ts">
 	import '../app.css';
 	import { page } from '$app/stores';
-	import { invalidateAll } from '$app/navigation';
+	import { beforeNavigate, invalidateAll } from '$app/navigation';
 	import { t, LOCALES, type Locale } from '$lib/i18n';
 	import { craftLabel, CRAFTS } from '$lib/labels';
 	import type { Craft } from '$lib/server/db/schema';
+	import Toaster from '$lib/components/Toaster.svelte';
+	import { flushPendingDeletes } from '$lib/undo';
 
 	let { data, children } = $props();
+
+	beforeNavigate(flushPendingDeletes);
 
 	const CRAFT_ICONS: Record<Craft, string> = { couture: '✂️', tricot: '🧶', crochet: '🪝' };
 	const craftParam = $derived($page.url.searchParams.get('craft'));
@@ -115,6 +119,9 @@
 		{@render children()}
 	</main>
 {/if}
+
+<Toaster {locale} />
+<svelte:window onpagehide={flushPendingDeletes} />
 
 <style>
 	.shell {
