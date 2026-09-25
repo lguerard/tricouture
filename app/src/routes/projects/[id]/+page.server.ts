@@ -11,8 +11,12 @@ import {
 	yarns,
 	fabrics,
 	projectYarns,
-	projectFabrics
+	projectFabrics,
+	projectPhotos
 } from '$lib/server/db/schema';
+import { deleteStored, isSupportedImage, saveImageUpload } from '$lib/server/storage';
+import { isUuid } from '$lib/uuid';
+import { t } from '$lib/i18n';
 import type { PieceStatus } from '$lib/server/db/schema';
 import {
 	accessFor,
@@ -115,6 +119,12 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 	const remaining = project.totalRows ? Math.max(0, project.totalRows - project.currentRow) : null;
 	const hoursLeft = rowsPerHour && remaining !== null ? remaining / rowsPerHour : null;
 
+	const photos = await db
+		.select({ id: projectPhotos.id, storedPath: projectPhotos.storedPath, caption: projectPhotos.caption })
+		.from(projectPhotos)
+		.where(eq(projectPhotos.projectId, project.id))
+		.orderBy(desc(projectPhotos.createdAt));
+
 	// Stash-backed materials: what's available to log, and what this project
 	// has already consumed (each consumption already deducted from the stash).
 	const [yarnStash, fabricStash, usedYarns, usedFabrics] = await Promise.all([
@@ -186,9 +196,12 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 		yarnStash,
 		fabricStash,
 		usedYarns,
-		usedFabrics
+		usedFabrics,
+		photos
 	};
 };
+
+const MAX_PHOTOS_PER_UPLOAD = 10;
 
 // Merges a partial update into a piece's progress row and derives `completed`
 // from whichever craft-specific signal applies: a couture piece is done once
@@ -422,8 +435,55 @@ export const actions: Actions = {
 		// The shares table has no foreign key to projects (one per shareable table
 		// would mean one shares table per type), so its rows are dropped here.
 		await dropSharesOf('project', p.id);
+		// The rows go with the project (cascade), the files on disk don't.
+		const photos = await db
+			.select({ storedPath: projectPhotos.storedPath })
+			.from(projectPhotos)
+			.where(eq(projectPhotos.projectId, p.id));
 		await db.delete(projects).where(eq(projects.id, p.id));
+		for (const ph of photos) await deleteStored(ph.storedPath);
 		throw redirect(303, '/projects/board');
+	},
+
+	// Progress / finished-object photos. Stored under the project OWNER's media
+	// folder even when a collaborator uploads them, so they live and die with
+	// the project's owner like everything else in it.
+	addPhoto: async ({ locals, params, request }) => {
+		const uid = locals.user!.id;
+		const p = await editable(uid, params.id);
+		if (!p) return fail(404, { error: 'Not found' });
+		const form = await request.formData();
+		const files = form
+			.getAll('photos')
+			.filter((f): f is File => f instanceof File && f.size > 0)
+			.slice(0, MAX_PHOTOS_PER_UPLOAD);
+		if (files.length === 0) return fail(400, { photoError: t(locals.locale, 'projects.photos.errorMissing') });
+		if (!files.every(isSupportedImage)) {
+			return fail(400, { photoError: t(locals.locale, 'projects.photos.errorFormat') });
+		}
+		const caption = String(form.get('caption') ?? '').trim().slice(0, 255) || null;
+		for (const file of files) {
+			const saved = await saveImageUpload(p.ownerId, file, 'projects');
+			await db.insert(projectPhotos).values({ projectId: p.id, storedPath: saved.storedPath, caption });
+		}
+		await db.update(projects).set({ updatedAt: new Date() }).where(eq(projects.id, p.id));
+		return { ok: true };
+	},
+
+	deletePhoto: async ({ locals, params, request }) => {
+		const uid = locals.user!.id;
+		const p = await editable(uid, params.id);
+		if (!p) return fail(404, { error: 'Not found' });
+		const photoId = String((await request.formData()).get('photoId') ?? '');
+		if (!isUuid(photoId)) return fail(400, { error: 'photoId required' });
+		const photo = (
+			await db
+				.delete(projectPhotos)
+				.where(and(eq(projectPhotos.id, photoId), eq(projectPhotos.projectId, p.id)))
+				.returning({ storedPath: projectPhotos.storedPath })
+		)[0];
+		if (photo) await deleteStored(photo.storedPath);
+		return { ok: true };
 	},
 
 	togglePiece: async ({ locals, params, request }) => {

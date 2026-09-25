@@ -50,6 +50,12 @@ export class UnsupportedImageError extends Error {
 	}
 }
 
+// Whether saveImageUpload will accept this file -- lets a multi-file upload
+// reject a bad file before saving any of the others.
+export function isSupportedImage(file: File): boolean {
+	return Object.hasOwn(EXT_BY_MIME, (file.type || '').split(';')[0].trim().toLowerCase());
+}
+
 // Enregistre une photo de stock (pelote, tissu, mercerie, outil).
 //
 // Contrairement à saveUpload — qui sert aussi aux PDF de patrons et accepte

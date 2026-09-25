@@ -4,7 +4,11 @@
 	import { mediaUrl } from '$lib/media';
 	import type { SearchHit } from '../../routes/api/search/+server';
 
-	let { locale, open = $bindable(false) }: { locale: Locale; open?: boolean } = $props();
+	// `ai`: Ollama is configured, so "close in meaning" matches can be added
+	// after the instant keyword results.
+	let { locale, ai = false, open = $bindable(false) }: { locale: Locale; ai?: boolean; open?: boolean } = $props();
+
+	type Hit = SearchHit & { similar?: boolean };
 
 	const KIND_ICON: Record<SearchHit['kind'], string> = {
 		pattern: '📄',
@@ -22,12 +26,38 @@
 	};
 
 	let query = $state('');
-	let hits = $state<SearchHit[]>([]);
+	let hits = $state<Hit[]>([]);
 	let loading = $state(false);
 	let selected = $state(0);
 	let input = $state<HTMLInputElement>();
 	let timer: ReturnType<typeof setTimeout> | undefined;
 	let controller: AbortController | undefined;
+	let aiController: AbortController | undefined;
+
+	const groupOf = (hit: Hit) => (hit.similar ? 'search.similar' : KIND_GROUP[hit.kind]);
+
+	// Semantic matches the keyword search didn't already return, appended as
+	// their own group. Slower (the query goes through the embedding model),
+	// so it never delays the keyword results.
+	async function addSimilar(q: string) {
+		aiController = new AbortController();
+		try {
+			const res = await fetch('/api/ai/search', {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({ query: q }),
+				signal: aiController.signal
+			});
+			if (!res.ok || query.trim() !== q) return;
+			const seen = new Set(hits.map((h) => h.kind + h.id));
+			const extra = ((await res.json()).hits as SearchHit[])
+				.filter((h) => !seen.has(h.kind + h.id))
+				.map((h) => ({ ...h, similar: true }));
+			if (extra.length && query.trim() === q) hits = [...hits, ...extra];
+		} catch {
+			/* aborted, or AI unavailable — keyword results stand alone */
+		}
+	}
 
 	$effect(() => {
 		if (open) {
@@ -41,6 +71,7 @@
 	function onInput() {
 		clearTimeout(timer);
 		controller?.abort();
+		aiController?.abort();
 		const q = query.trim();
 		if (q.length < 2) {
 			hits = [];
@@ -55,6 +86,7 @@
 				hits = res.ok ? ((await res.json()).hits as SearchHit[]) : [];
 				selected = 0;
 				loading = false;
+				if (ai && q.length >= 3) void addSimilar(q);
 			} catch (e) {
 				if ((e as Error).name !== 'AbortError') loading = false;
 			}
@@ -115,9 +147,9 @@
 				autocomplete="off"
 			/>
 			<ul id="search-results" role="listbox">
-				{#each hits as hit, i (hit.kind + hit.id)}
-					{#if i === 0 || KIND_GROUP[hits[i - 1].kind] !== KIND_GROUP[hit.kind]}
-						<li class="group" role="presentation">{t(locale, KIND_GROUP[hit.kind])}</li>
+				{#each hits as hit, i (hit.kind + hit.id + (hit.similar ? '~' : ''))}
+					{#if i === 0 || groupOf(hits[i - 1]) !== groupOf(hit)}
+						<li class="group" role="presentation">{t(locale, groupOf(hit))}</li>
 					{/if}
 					<li id={`hit-${i}`} role="option" aria-selected={i === selected}>
 						<button type="button" class:sel={i === selected} onmouseenter={() => (selected = i)} onclick={() => pick(hit)}>

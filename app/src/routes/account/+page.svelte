@@ -27,6 +27,24 @@
 		</div>
 	</form>
 
+	{#if data.unindexed}
+		<form class="card ai-toggle" method="POST" action="?/indexLibrary" use:enhance={withFeedback()}>
+			<div class="ai-toggle-row">
+				<div>
+					<h2>{t(locale, 'account.search.title')}</h2>
+					<p class="muted small">
+						{data.unindexed.patterns + data.unindexed.yarns === 0
+							? t(locale, 'account.search.allIndexed')
+							: t(locale, 'account.search.pending', { patterns: data.unindexed.patterns, yarns: data.unindexed.yarns })}
+					</p>
+				</div>
+				{#if data.unindexed.patterns + data.unindexed.yarns > 0}
+					<button type="submit">{t(locale, 'account.search.index')}</button>
+				{/if}
+			</div>
+		</form>
+	{/if}
+
 	<form class="card" method="POST" action="?/changePassword" use:enhance={withFeedback()}>
 		<h2>{t(locale, 'account.changePassword')}</h2>
 		<div class="field">

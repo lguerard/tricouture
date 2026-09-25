@@ -37,6 +37,7 @@
 		['/recipients', 'nav.recipients'],
 		['/assistant', 'nav.assistant'],
 		['/gallery', 'nav.gallery'],
+		['/moodboards', 'nav.moodboards'],
 		['/account', 'nav.account']
 	];
 	const pageTitle = $derived.by(() => {
@@ -47,7 +48,7 @@
 		if (path === '/patterns' && CRAFTS.includes(craftParam as Craft)) {
 			section += ` — ${craftLabel(locale, craftParam as Craft)}`;
 		}
-		const entity: string | undefined = $page.data.project?.title ?? $page.data.pattern?.title;
+		const entity: string | undefined = $page.data.project?.title ?? $page.data.pattern?.title ?? $page.data.board?.title;
 		return [entity, section, 'Tricouture'].filter(Boolean).join(' · ');
 	});
 
@@ -71,6 +72,7 @@
 		{ href: '/recipients', key: 'nav.recipients', icon: '🎁' },
 		{ href: '/assistant', key: 'nav.assistant', icon: '🤖' },
 		{ href: '/gallery', key: 'nav.gallery', icon: '🖼️' },
+		{ href: '/moodboards', key: 'nav.moodboards', icon: '🎨' },
 		{ href: '/account', key: 'nav.account', icon: '👤' },
 		// Reset links and roles: administrators only.
 		...(data.user?.isAdmin ? [{ href: '/admin/users', key: 'nav.users', icon: '🔐' }] : [])
@@ -190,7 +192,7 @@
 <svelte:head><title>{pageTitle}</title></svelte:head>
 
 <Toaster {locale} />
-{#if data.user}<SearchPalette {locale} bind:open={searchOpen} />{/if}
+{#if data.user}<SearchPalette {locale} ai={data.ai} bind:open={searchOpen} />{/if}
 <svelte:window onpagehide={flushPendingDeletes} onkeydown={(e) => e.key === 'Escape' && (drawerOpen = false)} />
 
 <style>
@@ -215,7 +217,7 @@
 		color: var(--accent);
 		padding: 0 0.5rem 1rem;
 	}
-	nav {
+	.sidebar nav {
 		display: flex;
 		flex-direction: column;
 		gap: 0.2rem;
@@ -360,11 +362,17 @@
 			overflow-y: auto;
 			z-index: 900;
 			transform: translateX(-100%);
-			transition: transform 0.2s ease-out;
+			/* Hidden (not just off-screen) while closed: its shadow no longer
+			   bleeds onto the page edge and its links leave the tab order. */
+			visibility: hidden;
+			transition:
+				transform 0.2s ease-out,
+				visibility 0.2s;
 			box-shadow: 4px 0 24px rgba(0, 0, 0, 0.15);
 		}
 		.sidebar.open {
 			transform: none;
+			visibility: visible;
 		}
 		.backdrop {
 			display: block;

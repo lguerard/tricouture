@@ -6,6 +6,7 @@ import { saveUpload, saveDataUrl } from '$lib/server/storage';
 import { autoFindCover, isStorableImage, resolveImageFromUrl } from '$lib/server/cover-search';
 import { extractPdfText } from '$lib/server/pdf';
 import { embed, aiConfigured } from '$lib/server/ai/ollama';
+import { patternEmbeddingText } from '$lib/server/embeddings';
 import { suggestPatternInfo, mergePatternInfo, normalizeInfoLanguage } from '$lib/server/ai/patternInfo';
 import { getPatternVocabulary } from '$lib/server/patternVocabulary';
 import { t } from '$lib/i18n';
@@ -135,8 +136,17 @@ export const actions: Actions = {
 
 		if (aiConfigured()) {
 			try {
-				const parts = [title, craft, form.get('garmentType'), form.get('designer'), tags.join(' '), form.get('notes'), extractedText?.slice(0, 800)].filter(Boolean).join(' ');
-				updates.embedding = await embed(parts);
+				updates.embedding = await embed(
+					patternEmbeddingText({
+						title,
+						craft,
+						garmentType: (updates.garmentType as string | undefined) ?? garmentType,
+						designer: (updates.designer as string | undefined) ?? designer,
+						tags,
+						notes: String(form.get('notes') ?? '').trim(),
+						extractedText
+					})
+				);
 			} catch { /* Ollama absent — semantic search unavailable */ }
 		}
 
