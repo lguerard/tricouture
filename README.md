@@ -76,6 +76,8 @@ besoin :
   (et recrédités si on annule), pour que l'inventaire reste fiable.
 - **Prédiction d'échéance** basée sur la vitesse réelle.
 - Suivi du temps, du coût et des **économies** vs prêt-à-porter.
+- **Photos** d'avancement et du résultat (plusieurs à la fois, avec légende),
+  visibles aussi par les personnes avec qui le projet est partagé.
 
 ### Motivation
 
@@ -83,13 +85,25 @@ besoin :
 - **Calendrier** des échéances (idéal cadeaux).
 - **Objectifs / défis** avec progression.
 - **Succès façon Steam/Xbox** : paliers bronze→platine, points, déblocage.
+- **Galerie des réalisations** : chaque projet terminé y apparaît
+  automatiquement, illustré par sa photo la plus récente.
 - **Bacs de rangement à QR**, profils destinataires.
+
+### Inspiration
+
+- **Planches d'inspiration** (mood boards) : images, liens et notes par projet
+  rêvé ; les **couleurs dominantes** de chaque image sont extraites
+  automatiquement (clic sur une pastille = hex copié) pour choisir fils et
+  tissus.
 
 ### IA locale (sur GPU)
 
 - **Traduction** de patrons EN/JP/DE → FR (glossaire tricot/crochet).
 - **Copilote** et **génération de patron**.
 - **OCR** d'étiquettes, **transcription vocale** (compteur mains-libres).
+- **Recherche par le sens** (Ctrl K) : « pull chaud pour l'hiver » retrouve un
+  patron intitulé « Aran ». La page *Mon compte* indexe les patrons et laines
+  créés pendant que l'IA était indisponible.
 
 ---
 
@@ -337,6 +351,7 @@ npm run db:migrate     # applique les migrations
 npm run dev            # http://localhost:5173
 
 npm run check          # vérification de types (svelte-check)
+npm test               # tests unitaires (vitest)
 npm run build          # build de production
 ```
 
@@ -364,5 +379,6 @@ Chaque **push sur `main`** déclenche le workflow *Release* :
 - ✅ IA vision/voix (OCR étiquette, compteur vocal)
 - ✅ App Android (Capacitor) + CI release
 - ✅ Aperçu coloris (Stable Diffusion)
-- ⏳ Recherche sémantique (peuplement des embeddings)
-- ⏳ Mood boards, plugins natifs (code-barres, push)
+- ✅ Recherche sémantique (indexation + résultats « proches par le sens »)
+- ✅ Mood boards (palette de couleurs automatique), photos de projets, galerie
+- ⏳ Plugins natifs (code-barres, push)
