@@ -2,9 +2,17 @@
 	import { craftLabel, CRAFTS, difficultyLabel } from '$lib/labels';
 	import { t } from '$lib/i18n';
 	import { goto } from '$app/navigation';
+	import { page } from '$app/stores';
 	import { tagStyle } from '$lib/tagColor';
 	let { data } = $props();
 	const locale = $derived(data.locale);
+
+	// Keeps the current search/filters, only swaps the page number.
+	function pageHref(n: number): string {
+		const params = new URLSearchParams($page.url.searchParams);
+		params.set('page', String(n));
+		return `?${params}`;
+	}
 </script>
 
 <div class="container">
@@ -51,6 +59,7 @@
 	{#if data.rows.length === 0}
 		<p class="muted">{t(locale, 'patterns.list.empty')} <a href="/patterns/new">{t(locale, 'patterns.list.addFirst')}</a>.</p>
 	{:else}
+		<p class="muted small count">{t(locale, 'patterns.list.count', { n: data.total })}</p>
 		<div class="grid">
 			{#each data.rows as p}
 				<a class="card item" href={`/patterns/${p.id}`}>
@@ -105,10 +114,27 @@
 				</a>
 			{/each}
 		</div>
+		{#if data.pageCount > 1}
+			<nav class="pager" aria-label={t(locale, 'pager.label')}>
+				{#if data.pageNum > 1}<a class="btn" href={pageHref(data.pageNum - 1)}>← {t(locale, 'pager.prev')}</a>{/if}
+				<span class="muted">{t(locale, 'pager.status', { page: data.pageNum, pages: data.pageCount })}</span>
+				{#if data.pageNum < data.pageCount}<a class="btn" href={pageHref(data.pageNum + 1)}>{t(locale, 'pager.next')} →</a>{/if}
+			</nav>
+		{/if}
 	{/if}
 </div>
 
 <style>
+	.count {
+		margin: -0.8rem 0 1rem;
+	}
+	.pager {
+		display: flex;
+		justify-content: center;
+		align-items: center;
+		gap: 1rem;
+		margin: 1.5rem 0;
+	}
 	.head {
 		display: flex;
 		justify-content: space-between;

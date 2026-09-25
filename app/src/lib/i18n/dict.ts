@@ -32,6 +32,11 @@ export const dict: Record<Locale, Table> = {
 		'toast.saved': 'Enregistré ✓',
 		'toast.deleted': 'Supprimé.',
 		'toast.undo': 'Annuler',
+		'pager.label': 'Pagination',
+		'pager.prev': 'Précédent',
+		'pager.next': 'Suivant',
+		'pager.status': 'Page {page} sur {pages}',
+		'patterns.list.count': 'Patrons trouvés : {n}',
 		'common.language': 'Langue',
 
 		// Auth
@@ -631,6 +636,11 @@ export const dict: Record<Locale, Table> = {
 		'toast.saved': 'Saved ✓',
 		'toast.deleted': 'Deleted.',
 		'toast.undo': 'Undo',
+		'pager.label': 'Pagination',
+		'pager.prev': 'Previous',
+		'pager.next': 'Next',
+		'pager.status': 'Page {page} of {pages}',
+		'patterns.list.count': 'Patterns found: {n}',
 		'common.language': 'Language',
 
 		// Auth

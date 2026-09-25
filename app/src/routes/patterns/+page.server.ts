@@ -6,6 +6,8 @@ import { getTagColorOverrides } from '$lib/server/tagColorOverrides';
 import { assignTagColors } from '$lib/tagColor';
 import type { PageServerLoad } from './$types';
 
+const PAGE_SIZE = 48;
+
 export const load: PageServerLoad = async ({ locals, url }) => {
 	const uid = locals.user!.id;
 	const q = (url.searchParams.get('q') ?? '').trim();
@@ -13,6 +15,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	const craftFilter: Craft | '' = rawCraft === 'couture' || rawCraft === 'tricot' || rawCraft === 'crochet' ? rawCraft : '';
 	const scope = url.searchParams.get('scope') ?? ''; // '', 'mine', 'shared'
 	const tagFilter = (url.searchParams.get('tag') ?? '').trim();
+	const pageNum = Math.max(1, parseInt(url.searchParams.get('page') ?? '1', 10) || 1);
 
 	// Visible: own patterns + those shared by others.
 	const conds = [or(eq(patterns.ownerId, uid), eq(patterns.isShared, true))!];
@@ -73,7 +76,12 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		.innerJoin(users, eq(patterns.ownerId, users.id))
 		.where(and(...conds))
 		.orderBy(desc(patterns.updatedAt))
-		.limit(200);
+		.limit(PAGE_SIZE)
+		.offset((pageNum - 1) * PAGE_SIZE);
+
+	const total = Number(
+		(await db.select({ n: sql<number>`count(*)` }).from(patterns).where(and(...conds)))[0]?.n ?? 0
+	);
 
 	// Tag ownership for display (without exposing the raw ownerId to the client).
 	const mapped = rows.map(({ ownerId, source, ...r }) => ({
@@ -84,5 +92,16 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		hasLink: /^https?:\/\//i.test((source ?? '').trim())
 	}));
 
-	return { rows: mapped, q, craftFilter, scope, tagFilter, allTags, tagColors };
+	return {
+		rows: mapped,
+		q,
+		craftFilter,
+		scope,
+		tagFilter,
+		allTags,
+		tagColors,
+		pageNum,
+		pageCount: Math.max(1, Math.ceil(total / PAGE_SIZE)),
+		total
+	};
 };
