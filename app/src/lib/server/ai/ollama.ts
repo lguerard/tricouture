@@ -4,6 +4,8 @@ const OLLAMA_URL = () => env.OLLAMA_URL?.replace(/\/$/, '') || '';
 // Default models (overridable via env). Chosen to fit within ~10 GB VRAM.
 const CHAT_MODEL = () => env.OLLAMA_CHAT_MODEL || 'qwen2.5:7b';
 const EMBED_MODEL = () => env.OLLAMA_EMBED_MODEL || 'nomic-embed-text';
+// Generous enough for the embedding model's cold start on a busy GPU.
+const EMBED_TIMEOUT_MS = 30_000;
 
 export function aiConfigured(): boolean {
 	return OLLAMA_URL().length > 0;
@@ -61,11 +63,17 @@ export async function generate(
 }
 
 // Embedding vector (768 dims with nomic-embed-text → vector(768) column).
+// Bounded: it runs inline when a pattern or yarn is saved, and a hung Ollama
+// must not hang the save with it (callers treat a failure as "no vector").
 export async function embed(text: string): Promise<number[]> {
-	const data = (await call('/api/embeddings', {
-		model: EMBED_MODEL(),
-		prompt: text
-	})) as { embedding?: number[] };
+	const data = (await call(
+		'/api/embeddings',
+		{
+			model: EMBED_MODEL(),
+			prompt: text
+		},
+		EMBED_TIMEOUT_MS
+	)) as { embedding?: number[] };
 	if (!data.embedding) throw new Error('Empty embedding');
 	return data.embedding;
 }

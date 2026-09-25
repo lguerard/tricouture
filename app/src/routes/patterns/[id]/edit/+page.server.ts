@@ -5,6 +5,7 @@ import { patterns, patternFiles } from '$lib/server/db/schema';
 import { saveUpload } from '$lib/server/storage';
 import { extractPdfText } from '$lib/server/pdf';
 import { embed, aiConfigured } from '$lib/server/ai/ollama';
+import { patternEmbeddingText } from '$lib/server/embeddings';
 import { t } from '$lib/i18n';
 import type { Actions, PageServerLoad } from './$types';
 import type { Craft } from '$lib/server/db/schema';
@@ -99,10 +100,17 @@ export const actions: Actions = {
 
 		if (aiConfigured()) {
 			try {
-				const parts = [title, craft, updates.garmentType, updates.designer, tags.join(' '), updates.notes, (updates.extractedText as string | undefined)?.slice(0, 800)]
-					.filter(Boolean)
-					.join(' ');
-				updates.embedding = await embed(parts);
+				updates.embedding = await embed(
+					patternEmbeddingText({
+						title,
+						craft,
+						garmentType: updates.garmentType as string | null | undefined,
+						designer: updates.designer as string | null | undefined,
+						tags,
+						notes: updates.notes as string | null | undefined,
+						extractedText: updates.extractedText as string | null | undefined
+					})
+				);
 			} catch {
 				/* Ollama absent — semantic search unavailable */
 			}

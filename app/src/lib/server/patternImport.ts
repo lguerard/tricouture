@@ -5,6 +5,7 @@ import { saveUpload, saveDataUrl } from '$lib/server/storage';
 import { autoFindCover, isStorableImage } from '$lib/server/cover-search';
 import { extractPdfText } from '$lib/server/pdf';
 import { embed, aiConfigured } from '$lib/server/ai/ollama';
+import { patternEmbeddingText } from '$lib/server/embeddings';
 import { suggestPatternInfo, mergePatternInfo, DEFAULT_INFO_LANGUAGE, type InfoLanguage } from '$lib/server/ai/patternInfo';
 import { getPatternVocabulary } from '$lib/server/patternVocabulary';
 import type { Craft } from '$lib/server/db/schema';
@@ -131,8 +132,16 @@ export async function importOnePattern(opts: {
 	// Semantic search is a bonus: an embedding failing must not abort the import.
 	if (aiConfigured()) {
 		try {
-			const parts = [title, craft, tags.join(' '), extractedText?.slice(0, 800)].filter(Boolean).join(' ');
-			updates.embedding = await embed(parts);
+			updates.embedding = await embed(
+				patternEmbeddingText({
+					title,
+					craft,
+					tags,
+					extractedText,
+					garmentType: updates.garmentType as string | undefined,
+					designer: updates.designer as string | undefined
+				})
+			);
 		} catch {
 			/* Ollama absent or busy — the pattern is imported either way */
 		}

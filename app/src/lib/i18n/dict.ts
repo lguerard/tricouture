@@ -58,6 +58,7 @@ export const dict: Record<Locale, Table> = {
 		'search.patterns': 'Patrons',
 		'search.projects': 'Projets',
 		'search.stash': 'Stock',
+		'search.similar': 'Proches par le sens (IA)',
 		'theme.label': 'Thème',
 		'theme.auto': 'Auto (comme le système)',
 		'theme.light': 'Clair',
@@ -110,6 +111,11 @@ export const dict: Record<Locale, Table> = {
 			"Quand tu ajoutes un patron (à la main ou en lot), l'IA propose automatiquement titre, tags et autres infos à partir du PDF. Le bouton « Compléter avec l'IA » sur la fiche d'un patron reste disponible même désactivé.",
 		'account.aiAutoFill.on': 'Activé',
 		'account.aiAutoFill.off': 'Désactivé',
+		'account.search.title': 'Recherche intelligente',
+		'account.search.pending': '{patterns} patron(s) et {yarns} pelote(s) ne sont pas encore indexés : la recherche (Ctrl K) ne peut pas encore les retrouver « par le sens ».',
+		'account.search.allIndexed': 'Toute ta bibliothèque est indexée : la recherche (Ctrl K) propose aussi des résultats proches par le sens.',
+		'account.search.index': 'Indexer maintenant',
+		'account.search.unavailable': 'L\'IA locale ne répond pas pour l\'instant, réessaie plus tard.',
 
 		// Mot de passe oublié
 		'forgot.title': 'Mot de passe oublié',
@@ -720,6 +726,7 @@ export const dict: Record<Locale, Table> = {
 		'search.patterns': 'Patterns',
 		'search.projects': 'Projects',
 		'search.stash': 'Stash',
+		'search.similar': 'Close in meaning (AI)',
 		'theme.label': 'Theme',
 		'theme.auto': 'Auto (follow system)',
 		'theme.light': 'Light',
@@ -771,6 +778,11 @@ export const dict: Record<Locale, Table> = {
 			'When you add a pattern (manually or in a batch import), AI automatically suggests title, tags, and other info from the PDF. The "Complete with AI" button on a pattern\'s own page stays available either way.',
 		'account.aiAutoFill.on': 'On',
 		'account.aiAutoFill.off': 'Off',
+		'account.search.title': 'Smart search',
+		'account.search.pending': '{patterns} pattern(s) and {yarns} yarn(s) are not indexed yet: search (Ctrl K) cannot find them "by meaning" yet.',
+		'account.search.allIndexed': 'Your whole library is indexed: search (Ctrl K) also suggests results close in meaning.',
+		'account.search.index': 'Index now',
+		'account.search.unavailable': 'The local AI is not responding right now, try again later.',
 
 		// Forgot password
 		'forgot.title': 'Forgot password',

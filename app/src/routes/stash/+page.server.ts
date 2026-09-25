@@ -4,6 +4,7 @@ import { db } from '$lib/server/db';
 import { yarns, fabrics, notions, tools } from '$lib/server/db/schema';
 import { saveImageUpload, saveDataUrl, deleteStored, UnsupportedImageError } from '$lib/server/storage';
 import { embed, aiConfigured } from '$lib/server/ai/ollama';
+import { yarnEmbeddingText } from '$lib/server/embeddings';
 import type { Actions, PageServerLoad } from './$types';
 import type { toolType } from '$lib/server/db/schema';
 
@@ -78,7 +79,13 @@ export const actions: Actions = {
 
 		if (aiConfigured()) {
 			try {
-				const parts = [str(form.get('brand')), str(form.get('name')), str(form.get('colorway')), str(form.get('fiber')), str(form.get('weightCategory'))].filter(Boolean).join(' ');
+				const parts = yarnEmbeddingText({
+					brand: str(form.get('brand')),
+					name: str(form.get('name')),
+					colorway: str(form.get('colorway')),
+					fiber: str(form.get('fiber')),
+					weightCategory: str(form.get('weightCategory'))
+				});
 				if (parts) {
 					const vec = await embed(parts);
 					await db.update(yarns).set({ embedding: vec }).where(eq(yarns.id, inserted.id));

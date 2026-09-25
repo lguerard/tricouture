@@ -192,7 +192,7 @@
 <svelte:head><title>{pageTitle}</title></svelte:head>
 
 <Toaster {locale} />
-{#if data.user}<SearchPalette {locale} bind:open={searchOpen} />{/if}
+{#if data.user}<SearchPalette {locale} ai={data.ai} bind:open={searchOpen} />{/if}
 <svelte:window onpagehide={flushPendingDeletes} onkeydown={(e) => e.key === 'Escape' && (drawerOpen = false)} />
 
 <style>
