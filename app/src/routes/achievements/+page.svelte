@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import { tierLabel, TIER_COLOR, type Tier } from '$lib/achievements';
 	import { t } from '$lib/i18n';
+	import { formatDate } from '$lib/format';
 	let { data } = $props();
 
 	const locale = $derived(data.locale);
@@ -37,14 +38,7 @@
 		}
 	});
 
-	function fmtDate(d: string | Date | null) {
-		if (!d) return '';
-		return new Date(d).toLocaleDateString(locale === 'fr' ? 'fr-FR' : 'en-US', {
-			day: 'numeric',
-			month: 'short',
-			year: 'numeric'
-		});
-	}
+	const fmtDate = (d: string | Date | null) => formatDate(locale, d);
 </script>
 
 <div class="container">

@@ -3,6 +3,7 @@
 	import { withFeedback } from '$lib/feedback';
 	import { onMount } from 'svelte';
 	import { statusLabel, STATUS_ORDER, pieceStatusLabel, PIECE_STATUS_ORDER } from '$lib/labels';
+	import { formatDeadline } from '$lib/format';
 	import { scheduleDeadlineReminder } from '$lib/capacitor';
 	import { t } from '$lib/i18n';
 	let { data } = $props();
@@ -152,7 +153,7 @@
 						m: p.timeSpentMinutes % 60
 					})}
 				</dd>
-				{#if p.deadline}<dt>{t(locale, 'projects.detail.deadline')}</dt><dd>{p.deadline}</dd>{/if}
+				{#if p.deadline}<dt>{t(locale, 'projects.detail.deadline')}</dt><dd>{formatDeadline(locale, p.deadline)}</dd>{/if}
 			</dl>
 			<form
 				method="POST"
