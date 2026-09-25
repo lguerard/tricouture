@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { page } from '$app/stores';
 	import { mediaUrl } from '$lib/media';
 	import { enhance } from '$app/forms';
 	import { withFeedback } from '$lib/feedback';
@@ -10,7 +11,10 @@
 	const locale = $derived(data.locale);
 
 	type Tab = 'yarn' | 'fabric' | 'notion' | 'tool';
-	let tab = $state<Tab>('yarn');
+	// ?tab=fabric&q=lin (links from the global search) opens the right tab, pre-filtered.
+	const TABS_ALLOWED: Tab[] = ['yarn', 'fabric', 'notion', 'tool'];
+	const initialTab = $page.url.searchParams.get('tab') as Tab | null;
+	let tab = $state<Tab>(initialTab && TABS_ALLOWED.includes(initialTab) ? initialTab : 'yarn');
 	let adding = $state(false);
 
 	const tabs: { id: Tab; icon: string; key: string; count: number }[] = $derived([
@@ -264,7 +268,7 @@
 
 	// Smart search: color name/hex, material/fiber, motif, or any plain text — client-side,
 	// works instantly on the already-loaded stash without needing AI.
-	let searchQuery = $state('');
+	let searchQuery = $state($page.url.searchParams.get('q') ?? '');
 
 	function normalize(s: string): string {
 		return s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();

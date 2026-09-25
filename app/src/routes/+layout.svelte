@@ -6,6 +6,7 @@
 	import { craftLabel, CRAFTS } from '$lib/labels';
 	import type { Craft } from '$lib/server/db/schema';
 	import Toaster from '$lib/components/Toaster.svelte';
+	import SearchPalette from '$lib/components/SearchPalette.svelte';
 	import { flushPendingDeletes } from '$lib/undo';
 
 	let { data, children } = $props();
@@ -81,6 +82,7 @@
 
 	// Mobile: the sidebar becomes a drawer opened from the tab bar's "More".
 	let drawerOpen = $state(false);
+	let searchOpen = $state(false);
 	afterNavigate(() => (drawerOpen = false));
 	const TABS = [
 		{ href: '/', key: 'nav.dashboard', icon: '🏠', match: '/' },
@@ -107,6 +109,9 @@
 		{/if}
 		<aside class="sidebar" class:open={drawerOpen}>
 			<div class="brand">🪡 Tricouture</div>
+			<button type="button" class="search-btn" onclick={() => (searchOpen = true)}>
+				🔍 {t(locale, 'search.open')}<kbd>Ctrl K</kbd>
+			</button>
 			<nav>
 				{#each nav as item}
 					{#if item.href === '/patterns'}
@@ -183,6 +188,7 @@
 <svelte:head><title>{pageTitle}</title></svelte:head>
 
 <Toaster {locale} />
+{#if data.user}<SearchPalette {locale} bind:open={searchOpen} />{/if}
 <svelte:window onpagehide={flushPendingDeletes} onkeydown={(e) => e.key === 'Escape' && (drawerOpen = false)} />
 
 <style>
@@ -308,6 +314,23 @@
 		background: var(--accent);
 		color: #fff;
 		border-color: var(--accent);
+	}
+	.search-btn {
+		display: flex;
+		align-items: center;
+		gap: 0.4rem;
+		margin: 0 0 0.8rem;
+		color: var(--muted);
+		font-size: 0.88rem;
+		text-align: left;
+	}
+	.search-btn kbd {
+		margin-left: auto;
+		font-size: 0.7rem;
+		font-family: inherit;
+		border: 1px solid var(--border);
+		border-radius: 4px;
+		padding: 0 0.3rem;
 	}
 	.tabbar,
 	.backdrop {
