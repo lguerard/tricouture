@@ -297,12 +297,16 @@ mémorise : aucune adresse n'est codée en dur dans le dépôt.
    (ou un tag déclenche la [release](#versions-et-releases)).
 2. Récupère l'artefact `tricouture-android-debug` (`app-debug.apk`),
    installe-le sur le téléphone (autoriser les sources inconnues).
-3. Au lancement, saisis l'URL de ton serveur.
+3. Au lancement, saisis l'URL de ton serveur : le site s'ouvre **dans l'app**
+   (pas dans le navigateur) et l'adresse est retenue. Si le serveur ne répond
+   pas au démarrage suivant, l'écran de saisie réapparaît, pré-rempli.
 
-> Optionnel : pour figer l'URL au build (sans écran de saisie), définis la
+> Recommandé : pour figer l'URL au build (sans écran de saisie), définis la
 > variable de dépôt **`SERVER_URL`** (*Settings → Actions → Variables*).
-> Cette valeur reste privée (variable d'Actions), elle n'apparaît pas dans le
-> code source.
+> C'est aussi ce qui active les fonctions natives (rappels d'échéance,
+> scan de code-barres) : Capacitor ne les injecte que pour une adresse connue
+> au build. Cette valeur reste privée (variable d'Actions), elle n'apparaît
+> pas dans le code source.
 
 ---
 
