@@ -14,7 +14,9 @@ import {
 	projectFabrics,
 	projectPhotos
 } from '$lib/server/db/schema';
-import { deleteStored, saveImageUpload, UnsupportedImageError } from '$lib/server/storage';
+import { deleteStored, isSupportedImage, saveImageUpload } from '$lib/server/storage';
+import { isUuid } from '$lib/uuid';
+import { t } from '$lib/i18n';
 import type { PieceStatus } from '$lib/server/db/schema';
 import {
 	accessFor,
@@ -117,14 +119,14 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 	const remaining = project.totalRows ? Math.max(0, project.totalRows - project.currentRow) : null;
 	const hoursLeft = rowsPerHour && remaining !== null ? remaining / rowsPerHour : null;
 
-	// Stash-backed materials: what's available to log, and what this project
-	// has already consumed (each consumption already deducted from the stash).
 	const photos = await db
 		.select({ id: projectPhotos.id, storedPath: projectPhotos.storedPath, caption: projectPhotos.caption })
 		.from(projectPhotos)
 		.where(eq(projectPhotos.projectId, project.id))
 		.orderBy(desc(projectPhotos.createdAt));
 
+	// Stash-backed materials: what's available to log, and what this project
+	// has already consumed (each consumption already deducted from the stash).
 	const [yarnStash, fabricStash, usedYarns, usedFabrics] = await Promise.all([
 		db
 			.select({
@@ -455,16 +457,14 @@ export const actions: Actions = {
 			.getAll('photos')
 			.filter((f): f is File => f instanceof File && f.size > 0)
 			.slice(0, MAX_PHOTOS_PER_UPLOAD);
-		if (files.length === 0) return fail(400, { photoError: 'photo required' });
+		if (files.length === 0) return fail(400, { photoError: t(locals.locale, 'projects.photos.errorMissing') });
+		if (!files.every(isSupportedImage)) {
+			return fail(400, { photoError: t(locals.locale, 'projects.photos.errorFormat') });
+		}
 		const caption = String(form.get('caption') ?? '').trim().slice(0, 255) || null;
-		try {
-			for (const file of files) {
-				const saved = await saveImageUpload(p.ownerId, file, 'projects');
-				await db.insert(projectPhotos).values({ projectId: p.id, storedPath: saved.storedPath, caption });
-			}
-		} catch (e) {
-			if (e instanceof UnsupportedImageError) return fail(400, { photoError: 'unsupported image type' });
-			throw e;
+		for (const file of files) {
+			const saved = await saveImageUpload(p.ownerId, file, 'projects');
+			await db.insert(projectPhotos).values({ projectId: p.id, storedPath: saved.storedPath, caption });
 		}
 		await db.update(projects).set({ updatedAt: new Date() }).where(eq(projects.id, p.id));
 		return { ok: true };
@@ -475,7 +475,7 @@ export const actions: Actions = {
 		const p = await editable(uid, params.id);
 		if (!p) return fail(404, { error: 'Not found' });
 		const photoId = String((await request.formData()).get('photoId') ?? '');
-		if (!photoId) return fail(400, { error: 'photoId required' });
+		if (!isUuid(photoId)) return fail(400, { error: 'photoId required' });
 		const photo = (
 			await db
 				.delete(projectPhotos)

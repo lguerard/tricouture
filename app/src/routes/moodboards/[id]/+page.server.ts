@@ -2,7 +2,8 @@ import { error, fail } from '@sveltejs/kit';
 import { and, desc, eq } from 'drizzle-orm';
 import { db } from '$lib/server/db';
 import { moodBoards, moodItems } from '$lib/server/db/schema';
-import { absolutePath, deleteStored, saveImageUpload, UnsupportedImageError } from '$lib/server/storage';
+import { absolutePath, deleteStored, isSupportedImage, saveImageUpload } from '$lib/server/storage';
+import { t } from '$lib/i18n';
 import { extractPalette } from '$lib/server/palette';
 import { isUuid } from '$lib/uuid';
 import type { Actions, PageServerLoad } from './$types';
@@ -67,21 +68,17 @@ export const actions: Actions = {
 		const note = String(form.get('note') ?? '').trim().slice(0, 2000) || null;
 		const rawUrl = String(form.get('sourceUrl') ?? '').trim();
 		const sourceUrl = cleanUrl(rawUrl);
-		if (rawUrl && !sourceUrl) return fail(400, { itemError: 'invalid link' });
-		if (files.length === 0 && !note && !sourceUrl) return fail(400, { itemError: 'empty item' });
+		const locale = locals.locale;
+		if (rawUrl && !sourceUrl) return fail(400, { itemError: t(locale, 'moodboards.errorLink') });
+		if (files.length === 0 && !note && !sourceUrl) return fail(400, { itemError: t(locale, 'moodboards.errorEmpty') });
+		if (!files.every(isSupportedImage)) return fail(400, { itemError: t(locale, 'moodboards.errorFormat') });
 
 		if (files.length === 0) {
 			await db.insert(moodItems).values({ boardId: board.id, note, sourceUrl });
 			return { ok: true };
 		}
 		for (const file of files) {
-			let imagePath: string;
-			try {
-				imagePath = (await saveImageUpload(uid, file, 'moodboards')).storedPath;
-			} catch (e) {
-				if (e instanceof UnsupportedImageError) return fail(400, { itemError: 'unsupported image type' });
-				throw e;
-			}
+			const imagePath = (await saveImageUpload(uid, file, 'moodboards')).storedPath;
 			// Best-effort: an image sharp can't read still gets pinned, just
 			// without swatches.
 			const palette = await extractPalette(absolutePath(imagePath)).catch(() => []);
