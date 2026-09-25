@@ -78,11 +78,19 @@ devine JAMAIS une valeur : omets le champ plutôt que d'approximer.
 - "title" : le titre/nom réel du patron tel qu'il apparaît dans le document (page
   de couverture, gros titre...) -- UNIQUEMENT s'il est clairement identifiable
   comme LE titre du patron, jamais une phrase de description ou un résumé
-- "tags" : 2 à 6 étiquettes courtes pour classer le patron -- PAS le type de
-  vêtement ni la difficulté (déjà couverts ci-dessous), plutôt le public visé
-  ("homme", "femme", "enfant", "bébé", "unisexe"), la saison ("hiver", "été",
-  "mi-saison"), l'occasion/style ("quotidien", "fête", "sport", "grossesse"), une
-  technique ou matière notable ("sans couture", "dentelle", "jacquard")
+- "tags" : 0 à 6 étiquettes courtes, chacune JUSTIFIÉE par le texte -- mieux vaut
+  aucun tag qu'un tag deviné. PAS le type de vêtement ni la difficulté (champs
+  dédiés ci-dessous). Catégories possibles :
+  * public visé ("homme", "femme", "enfant", "bébé", "unisexe") : seulement si le
+    texte le dit (ou le montre par ses tailles, ex. "6 mois" → bébé)
+  * saison ("hiver", "été", "mi-saison") : seulement si le texte la nomme OU si
+    le vêtement l'impose sans ambiguïté (débardeur, short, top à bretelles → été ;
+    moufles, bonnet épais → hiver). JAMAIS une saison qui contredit le vêtement
+    (pas "hiver" pour un débardeur, pas "été" pour des moufles). Dans le doute,
+    pas de saison.
+  * technique ou matière notable citée dans le texte ("sans couture", "dentelle",
+    "jacquard", "top-down", "coton", "mohair")
+  * occasion/style seulement si le texte l'indique ("cérémonie", "grossesse")
 - "garmentType" : le type d'objet réalisé, un ou deux mots (ex. "pull", "chaussettes",
   "jupe", "bonnet")
 - "designer" : le nom du·de la créateur·rice ou de la marque du patron, si indiqué --
@@ -111,15 +119,14 @@ fourni : dans ce cas, si une valeur de ce vocabulaire correspond, reprends-la
 réécrire différemment.
 Si un bloc "VOCABULAIRE DÉJÀ UTILISÉ" est fourni avec le patron, il liste les
 tags / types d'objet / créateur·rice·s déjà utilisés par cette personne pour ses
-autres patrons : réutilise une valeur existante de cette liste quand elle
-convient, plutôt que d'en inventer une nouvelle qui dit la même chose autrement
-(ex. si "Hiver" y figure déjà, ne propose pas "hiver" avec une autre casse, ni
-"d'hiver" ou "chaud" comme tag à part). Ce vocabulaire sert seulement à rester
-cohérent avec ce qui existe déjà -- n'utilise jamais une valeur de cette liste
-si elle ne correspond pas vraiment à CE patron.
+AUTRES patrons. Il sert UNIQUEMENT à l'orthographe : décide d'abord des tags
+justifiés pour CE patron, puis, si l'un d'eux existe déjà dans la liste sous une
+autre forme ("Hiver" vs "hiver" vs "d'hiver"), reprends la forme existante. Ne
+choisis JAMAIS un tag parce qu'il figure dans la liste.
 Réponds STRICTEMENT avec un objet JSON contenant uniquement les champs déterminés
-avec certitude, sans aucun texte autour, sans balises markdown. Exemple :
-{"title": "Pull Islandais", "tags": ["Homme", "Hiver"], "garmentType": "Pull", "difficulty": 3, "gaugeStitches": 20, "gaugeRows": 28}`;
+avec certitude, sans aucun texte autour, sans balises markdown. Forme attendue
+(valeurs à remplacer, champs incertains à omettre) :
+{"title": "…", "tags": ["…"], "garmentType": "…", "designer": "…", "language": "…", "difficulty": 0, "sizes": "…", "gaugeStitches": 0, "gaugeRows": 0, "yardageRequired": 0}`;
 }
 
 function vocabularyBlock(vocabulary?: PatternVocabulary): string {
@@ -130,8 +137,21 @@ function vocabularyBlock(vocabulary?: PatternVocabulary): string {
 	return lines.length ? `\n\nVOCABULAIRE DÉJÀ UTILISÉ :\n${lines.join('\n')}` : '';
 }
 
-export function patternInfoPrompt(context: string, vocabulary?: PatternVocabulary): string {
-	return `PATRON:\n${context.slice(0, 12000)}${vocabularyBlock(vocabulary)}\n\nExtrais les informations pour ce patron, au format JSON demandé.`;
+// What the person already told us about the pattern: the model can't see the
+// form, and without it guesses the craft/garment from a title alone.
+export type PatternInfoHints = { craft?: string; garmentType?: string | null };
+
+const CRAFT_NAMES: Record<string, string> = { couture: 'couture', tricot: 'tricot', crochet: 'crochet' };
+
+function hintsBlock(hints?: PatternInfoHints): string {
+	const lines: string[] = [];
+	if (hints?.craft && CRAFT_NAMES[hints.craft]) lines.push(`Type d'ouvrage : ${CRAFT_NAMES[hints.craft]}`);
+	if (hints?.garmentType) lines.push(`Objet réalisé : ${hints.garmentType}`);
+	return lines.length ? `${lines.join('\n')}\n\n` : '';
+}
+
+export function patternInfoPrompt(context: string, vocabulary?: PatternVocabulary, hints?: PatternInfoHints): string {
+	return `${hintsBlock(hints)}PATRON:\n${context.slice(0, 12000)}${vocabularyBlock(vocabulary)}\n\nExtrais les informations pour ce patron, au format JSON demandé.`;
 }
 
 export function copilotPrompt(context: string, question: string): string {

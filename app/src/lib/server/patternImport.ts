@@ -90,7 +90,8 @@ export async function importOnePattern(opts: {
 			const suggested = await suggestPatternInfo(
 				[title, extractedText].filter(Boolean).join('\n\n'),
 				aiLanguage,
-				vocabulary
+				vocabulary,
+				{ craft }
 			);
 			if (suggested.title) {
 				title = suggested.title;

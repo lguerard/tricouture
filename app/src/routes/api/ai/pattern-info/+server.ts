@@ -17,6 +17,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		await db
 			.select({
 				title: patterns.title,
+				craft: patterns.craft,
 				notes: patterns.notes,
 				extractedText: patterns.extractedText,
 				tags: patterns.tags,
@@ -40,7 +41,10 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 	try {
 		const context = [pat.title, pat.notes, pat.extractedText].filter(Boolean).join('\n\n');
 		vocabulary = await getPatternVocabulary(locals.user!.id);
-		suggested = await suggestPatternInfo(context, language, vocabulary);
+		suggested = await suggestPatternInfo(context, language, vocabulary, {
+			craft: pat.craft,
+			garmentType: pat.garmentType
+		});
 	} catch (e) {
 		if (e instanceof AiUnavailable) return json({ error: e.message }, { status: 503 });
 		return json({ error: 'Analysis failed' }, { status: 500 });

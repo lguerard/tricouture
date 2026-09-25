@@ -101,9 +101,10 @@ export const actions: Actions = {
 			try {
 				const vocabulary = await getPatternVocabulary(uid);
 				const suggested = await suggestPatternInfo(
-					[title, extractedText].filter(Boolean).join('\n\n'),
+					[title, String(form.get('notes') ?? '').trim(), extractedText].filter(Boolean).join('\n\n'),
 					aiLanguage,
-					vocabulary
+					vocabulary,
+					{ craft, garmentType }
 				);
 				const merged = mergePatternInfo(
 					{ tags, garmentType, designer, language, difficulty, sizes, gaugeStitches, gaugeRows, yardageRequired },

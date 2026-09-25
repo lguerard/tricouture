@@ -1,5 +1,6 @@
 import { generate } from './ollama';
-import { patternInfoSystem, patternInfoPrompt } from './prompts';
+import { patternInfoSystem, patternInfoPrompt, type PatternInfoHints } from './prompts';
+import { groundTags } from './tagGrounding';
 import type { PatternVocabulary } from '$lib/server/patternVocabulary';
 
 const MAX_TAGS = 6;
@@ -48,6 +49,11 @@ export type PatternInfoBaseline = {
 	yardageRequired: number | null;
 };
 
+// A copied placeholder from the prompt's output template ("…", "?", "-").
+function isPlaceholder(s: string): boolean {
+	return /^[\s.…\-_?]*$/.test(s);
+}
+
 function cleanTags(values: unknown): string[] {
 	if (!Array.isArray(values)) return [];
 	// Casing is kept as the model wrote it (not forced to lowercase): a
@@ -59,7 +65,7 @@ function cleanTags(values: unknown): string[] {
 	for (const v of values) {
 		const tag = String(v ?? '').trim();
 		const key = tag.toLowerCase();
-		if (tag && tag.length <= MAX_TAG_LENGTH && !seen.has(key)) {
+		if (tag && !isPlaceholder(tag) && tag.length <= MAX_TAG_LENGTH && !seen.has(key)) {
 			seen.add(key);
 			out.push(tag);
 		}
@@ -69,7 +75,7 @@ function cleanTags(values: unknown): string[] {
 
 function cleanText(v: unknown, maxLength = MAX_TEXT_FIELD_LENGTH): string | undefined {
 	const s = String(v ?? '').trim();
-	return s ? s.slice(0, maxLength) : undefined;
+	return s && !isPlaceholder(s) ? s.slice(0, maxLength) : undefined;
 }
 
 function cleanNumber(v: unknown, min: number, max: number, decimals: number): number | undefined {
@@ -117,9 +123,16 @@ function parsePatternInfo(raw: string): SuggestedPatternInfo {
 export async function suggestPatternInfo(
 	context: string,
 	language: InfoLanguage = DEFAULT_INFO_LANGUAGE,
-	vocabulary?: PatternVocabulary
+	vocabulary?: PatternVocabulary,
+	hints?: PatternInfoHints
 ): Promise<SuggestedPatternInfo> {
-	return parsePatternInfo(await generate(patternInfoPrompt(context, vocabulary), patternInfoSystem(language)));
+	const raw = await generate(patternInfoPrompt(context, vocabulary, hints), patternInfoSystem(language), undefined, {
+		temperature: 0,
+		json: true
+	});
+	const info = parsePatternInfo(raw);
+	info.tags = groundTags(info.tags, { text: context, garmentType: hints?.garmentType || info.garmentType });
+	return info;
 }
 
 // If `value` case-insensitively matches something already in `pool` (the
