@@ -1,9 +1,12 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import { page } from '$app/stores';
 	import { craftLabel, CRAFTS, difficultyLabel } from '$lib/labels';
 	import { t } from '$lib/i18n';
 	let { data, form } = $props();
 	const locale = $derived(data.locale);
+	// Opened from a craft submenu (/patterns/new?craft=tricot) → preselect it.
+	const presetCraft = $derived($page.url.searchParams.get('craft') ?? '');
 	const DIFFICULTY_LEVELS = [1, 2, 3, 4, 5];
 	let submitting = $state(false);
 
@@ -65,7 +68,7 @@
 			<div class="field">
 				<label for="craft">{t(locale, 'patterns.new.typeLabel')}</label>
 				<select id="craft" name="craft" required>
-					{#each CRAFTS as c}<option value={c}>{craftLabel(locale, c)}</option>{/each}
+					{#each CRAFTS as c}<option value={c} selected={presetCraft === c}>{craftLabel(locale, c)}</option>{/each}
 				</select>
 			</div>
 			<div class="field">

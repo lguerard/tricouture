@@ -9,8 +9,12 @@
 
 <div class="container">
 	<header class="head">
-		<h1>{t(locale, 'patterns.list.title')}</h1>
-		<a class="btn btn-primary" href="/patterns/new">{t(locale, 'patterns.list.new')}</a>
+		<h1>
+			{t(locale, 'patterns.list.title')}{#if data.craftFilter}&nbsp;— {craftLabel(locale, data.craftFilter)}{/if}
+		</h1>
+		<a class="btn btn-primary" href={data.craftFilter ? `/patterns/new?craft=${data.craftFilter}` : '/patterns/new'}>
+			{t(locale, 'patterns.list.new')}
+		</a>
 		<a class="btn" href="/patterns/import">{t(locale, 'patterns.list.import')}</a>
 		<a class="btn" href="/patterns/tags">{t(locale, 'patterns.list.tagColors')}</a>
 	</header>

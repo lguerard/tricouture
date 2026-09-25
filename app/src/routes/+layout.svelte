@@ -3,8 +3,16 @@
 	import { page } from '$app/stores';
 	import { invalidateAll } from '$app/navigation';
 	import { t, LOCALES, type Locale } from '$lib/i18n';
+	import { craftLabel, CRAFTS } from '$lib/labels';
+	import type { Craft } from '$lib/server/db/schema';
 
 	let { data, children } = $props();
+
+	const CRAFT_ICONS: Record<Craft, string> = { couture: '✂️', tricot: '🧶', crochet: '🪝' };
+	const craftParam = $derived($page.url.searchParams.get('craft'));
+	// Patterns submenu: open on any /patterns page unless the user collapsed it.
+	let patternsToggle = $state<boolean | null>(null);
+	const patternsOpen = $derived(patternsToggle ?? $page.url.pathname.startsWith('/patterns'));
 
 	const locale = $derived(data.locale);
 	const nav = $derived([
@@ -47,9 +55,37 @@
 			<div class="brand">🪡 Tricouture</div>
 			<nav>
 				{#each nav as item}
-					<a class="nav-item" class:active={active(item.href)} href={item.href}>
-						<span class="ico">{item.icon}</span>{t(locale, item.key)}
-					</a>
+					{#if item.href === '/patterns'}
+						<div class="nav-row">
+							<a class="nav-item grow" class:active={active(item.href) && !craftParam} href={item.href}>
+								<span class="ico">{item.icon}</span>{t(locale, item.key)}
+							</a>
+							<button
+								class="caret"
+								class:open={patternsOpen}
+								aria-expanded={patternsOpen}
+								aria-label={t(locale, item.key)}
+								onclick={() => (patternsToggle = !patternsOpen)}>▾</button
+							>
+						</div>
+						{#if patternsOpen}
+							<div class="subnav">
+								{#each CRAFTS as c}
+									<a
+										class="nav-item sub"
+										class:active={active('/patterns') && craftParam === c}
+										href={`/patterns?craft=${c}`}
+									>
+										<span class="ico">{CRAFT_ICONS[c]}</span>{craftLabel(locale, c)}
+									</a>
+								{/each}
+							</div>
+						{/if}
+					{:else}
+						<a class="nav-item" class:active={active(item.href)} href={item.href}>
+							<span class="ico">{item.icon}</span>{t(locale, item.key)}
+						</a>
+					{/if}
 				{/each}
 			</nav>
 			<div class="spacer"></div>
@@ -127,6 +163,35 @@
 	.ico {
 		width: 1.3rem;
 		text-align: center;
+	}
+	.nav-row {
+		display: flex;
+		align-items: center;
+		gap: 0.2rem;
+	}
+	.grow {
+		flex: 1;
+	}
+	.caret {
+		background: none;
+		border: none;
+		padding: 0.3rem 0.5rem;
+		color: var(--muted);
+		transform: rotate(-90deg);
+		transition: transform 0.15s;
+	}
+	.caret.open {
+		transform: none;
+	}
+	.subnav {
+		display: flex;
+		flex-direction: column;
+		gap: 0.1rem;
+		padding-left: 1.2rem;
+	}
+	.nav-item.sub {
+		padding: 0.4rem 0.7rem;
+		font-size: 0.88rem;
 	}
 	.spacer {
 		flex: 1;

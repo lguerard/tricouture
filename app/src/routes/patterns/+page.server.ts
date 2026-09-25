@@ -1,6 +1,6 @@
 import { and, or, eq, desc, sql } from 'drizzle-orm';
 import { db } from '$lib/server/db';
-import { patterns, patternFiles, users } from '$lib/server/db/schema';
+import { patterns, patternFiles, users, type Craft } from '$lib/server/db/schema';
 import { getAllVisibleTags } from '$lib/server/patternTags';
 import { getTagColorOverrides } from '$lib/server/tagColorOverrides';
 import { assignTagColors } from '$lib/tagColor';
@@ -9,7 +9,8 @@ import type { PageServerLoad } from './$types';
 export const load: PageServerLoad = async ({ locals, url }) => {
 	const uid = locals.user!.id;
 	const q = (url.searchParams.get('q') ?? '').trim();
-	const craftFilter = url.searchParams.get('craft') ?? '';
+	const rawCraft = url.searchParams.get('craft') ?? '';
+	const craftFilter: Craft | '' = rawCraft === 'couture' || rawCraft === 'tricot' || rawCraft === 'crochet' ? rawCraft : '';
 	const scope = url.searchParams.get('scope') ?? ''; // '', 'mine', 'shared'
 	const tagFilter = (url.searchParams.get('tag') ?? '').trim();
 
@@ -17,9 +18,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	const conds = [or(eq(patterns.ownerId, uid), eq(patterns.isShared, true))!];
 	if (scope === 'mine') conds.push(eq(patterns.ownerId, uid));
 	if (scope === 'shared') conds.push(and(eq(patterns.isShared, true), sql`${patterns.ownerId} <> ${uid}`)!);
-	if (craftFilter === 'couture' || craftFilter === 'tricot' || craftFilter === 'crochet') {
-		conds.push(eq(patterns.craft, craftFilter));
-	}
+	if (craftFilter) conds.push(eq(patterns.craft, craftFilter));
 	if (tagFilter) {
 		// jsonb containment: patterns.tags is a jsonb string[] column.
 		conds.push(sql`${patterns.tags} @> ${JSON.stringify([tagFilter])}::jsonb`);
