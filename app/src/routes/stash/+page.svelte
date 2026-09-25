@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { mediaUrl } from '$lib/media';
 	import { enhance } from '$app/forms';
 	import { withFeedback } from '$lib/feedback';
 	import { undoableDelete } from '$lib/undo';
@@ -509,7 +510,7 @@
 					{#if previewYarnId === y.id && previewSrc}
 						<img src={previewSrc} alt={t(locale, 'stash.yarn.previewAlt')} class="preview-img" />
 					{:else if y.photoPath}
-						<img src={`/media/${y.photoPath}`} alt={y.name ?? t(locale, 'stash.yarn.altFallback')} />
+						<img src={mediaUrl(y.photoPath, 400)} loading="lazy" alt={y.name ?? t(locale, 'stash.yarn.altFallback')} />
 					{:else}
 						<div class="swatch" style={`background:${y.colorHex ?? '#eee'}`}></div>
 					{/if}
@@ -549,7 +550,7 @@
 			{#each filteredFabrics as f}
 				<div class="card stash-item" data-undo-item>
 					{#if f.photoPath}
-						<img src={`/media/${f.photoPath}`} alt={f.name ?? t(locale, 'stash.fabric.fallbackName')} />
+						<img src={mediaUrl(f.photoPath, 400)} loading="lazy" alt={f.name ?? t(locale, 'stash.fabric.fallbackName')} />
 					{:else}
 						<div class="swatch" style={`background:${f.colorHex ?? '#eee'}`}></div>
 					{/if}
@@ -575,7 +576,7 @@
 			{#each filteredNotions as n}
 				<div class="card stash-item" data-undo-item>
 					{#if n.photoPath}
-						<img src={`/media/${n.photoPath}`} alt={n.name} />
+						<img src={mediaUrl(n.photoPath, 400)} loading="lazy" alt={n.name} />
 					{/if}
 					{#if n.photoPath}
 						<form method="POST" action="?/removePhoto" use:enhance={withFeedback({ inner: refresh })} class="photo-rm">
@@ -599,7 +600,7 @@
 			{#each filteredTools as tl}
 				<div class="card stash-item" data-undo-item>
 					{#if tl.photoPath}
-						<img src={`/media/${tl.photoPath}`} alt={toolTypeLabel(locale, tl.type)} />
+						<img src={mediaUrl(tl.photoPath, 400)} loading="lazy" alt={toolTypeLabel(locale, tl.type)} />
 					{/if}
 					{#if tl.photoPath}
 						<form method="POST" action="?/removePhoto" use:enhance={withFeedback({ inner: refresh })} class="photo-rm">

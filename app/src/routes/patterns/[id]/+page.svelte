@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { mediaUrl } from '$lib/media';
 	import { enhance } from '$app/forms';
 	import { withFeedback } from '$lib/feedback';
 	import { invalidateAll } from '$app/navigation';
@@ -173,7 +174,7 @@
 	<div class="cols">
 		<section class="meta card">
 			{#if p.coverPath}
-				<img class="cover" src={`/media/${p.coverPath}`} alt={p.title} />
+				<img class="cover" src={mediaUrl(p.coverPath, 800)} alt={p.title} />
 			{:else}
 				<div class="cover placeholder">📄</div>
 			{/if}
@@ -248,7 +249,7 @@
 							<a href={`/media/${f.storedPath}`} target="_blank" rel="noopener">{t(locale, 'patterns.detail.open')}</a>
 						</div>
 						{#if isImage(f.mimeType)}
-							<img src={`/media/${f.storedPath}`} alt={f.filename} />
+							<img src={mediaUrl(f.storedPath, 800)} loading="lazy" alt={f.filename} />
 						{:else if isPdf(f.mimeType)}
 							<iframe src={`/media/${f.storedPath}`} title={f.filename}></iframe>
 						{/if}

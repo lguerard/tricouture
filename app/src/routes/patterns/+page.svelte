@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { mediaUrl } from '$lib/media';
 	import { craftLabel, CRAFTS, difficultyLabel } from '$lib/labels';
 	import { t } from '$lib/i18n';
 	import { goto } from '$app/navigation';
@@ -64,7 +65,7 @@
 			{#each data.rows as p}
 				<a class="card item" href={`/patterns/${p.id}`}>
 					{#if p.coverPath}
-						<img class="thumb" src={`/media/${p.coverPath}`} alt={p.title} loading="lazy" />
+						<img class="thumb" src={mediaUrl(p.coverPath, 400)} alt={p.title} loading="lazy" />
 					{:else}
 						<div class="thumb placeholder">📄</div>
 					{/if}
