@@ -3,9 +3,8 @@ import { and, eq, sql } from 'drizzle-orm';
 import { db } from '$lib/server/db';
 import { projects, projectStatus } from '$lib/server/db/schema';
 import { visibleTo } from '$lib/server/access';
+import { isUuid } from '$lib/uuid';
 import type { RequestHandler } from './$types';
-
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // Persists a column state after a drag-and-drop:
 // { status, ids: [...] } -> each project receives this status + its position = index.
@@ -23,7 +22,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 
 	await Promise.all(
 		ids.map((id, index) => {
-			if (typeof id !== 'string' || !UUID.test(id)) return null;
+			if (!isUuid(id)) return null;
 			return db
 				.update(projects)
 				.set({

@@ -37,6 +37,7 @@
 		['/recipients', 'nav.recipients'],
 		['/assistant', 'nav.assistant'],
 		['/gallery', 'nav.gallery'],
+		['/moodboards', 'nav.moodboards'],
 		['/account', 'nav.account']
 	];
 	const pageTitle = $derived.by(() => {
@@ -47,7 +48,7 @@
 		if (path === '/patterns' && CRAFTS.includes(craftParam as Craft)) {
 			section += ` — ${craftLabel(locale, craftParam as Craft)}`;
 		}
-		const entity: string | undefined = $page.data.project?.title ?? $page.data.pattern?.title;
+		const entity: string | undefined = $page.data.project?.title ?? $page.data.pattern?.title ?? $page.data.board?.title;
 		return [entity, section, 'Tricouture'].filter(Boolean).join(' · ');
 	});
 
@@ -71,6 +72,7 @@
 		{ href: '/recipients', key: 'nav.recipients', icon: '🎁' },
 		{ href: '/assistant', key: 'nav.assistant', icon: '🤖' },
 		{ href: '/gallery', key: 'nav.gallery', icon: '🖼️' },
+		{ href: '/moodboards', key: 'nav.moodboards', icon: '🎨' },
 		{ href: '/account', key: 'nav.account', icon: '👤' },
 		// Reset links and roles: administrators only.
 		...(data.user?.isAdmin ? [{ href: '/admin/users', key: 'nav.users', icon: '🔐' }] : [])
