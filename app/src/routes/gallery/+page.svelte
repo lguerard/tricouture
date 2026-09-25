@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { mediaUrl } from '$lib/media';
 	import { t } from '$lib/i18n';
 	let { data } = $props();
 	const locale = $derived(data.locale);
@@ -14,7 +15,7 @@
 		<div class="grid">
 			{#each data.items as fo}
 				<div class="card">
-					{#if fo.photoPath}<img src={`/media/${fo.photoPath}`} alt={fo.title} />{/if}
+					{#if fo.photoPath}<img src={mediaUrl(fo.photoPath, 800)} loading="lazy" alt={fo.title} />{/if}
 					<strong>{fo.title}</strong>
 					{#if fo.notes}<p class="muted small">{fo.notes}</p>{/if}
 				</div>

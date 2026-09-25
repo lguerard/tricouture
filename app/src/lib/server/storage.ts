@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { mkdir, writeFile, unlink } from 'node:fs/promises';
 import { join, extname, normalize, sep } from 'node:path';
 import { env } from '$env/dynamic/private';
+import { THUMB_WIDTHS, thumbPath } from '$lib/server/thumbnails';
 
 const MEDIA_DIR = env.MEDIA_DIR || join(process.cwd(), 'media');
 
@@ -94,10 +95,14 @@ export async function saveDataUrl(
 }
 
 export async function deleteStored(relative: string): Promise<void> {
-	try {
-		await unlink(absolutePath(relative));
-	} catch {
-		// file already gone — ignore
+	const abs = absolutePath(relative);
+	// The original plus any cached thumbnails generated from it.
+	for (const path of [abs, ...THUMB_WIDTHS.map((w) => thumbPath(abs, w))]) {
+		try {
+			await unlink(path);
+		} catch {
+			// file already gone (or thumbnail never generated) — ignore
+		}
 	}
 }
 

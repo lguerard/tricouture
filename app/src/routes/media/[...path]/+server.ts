@@ -7,6 +7,7 @@ import { and, eq } from 'drizzle-orm';
 import { db } from '$lib/server/db';
 import { patternFiles, patterns } from '$lib/server/db/schema';
 import { absolutePath, ownsPath } from '$lib/server/storage';
+import { ensureThumbnail, isResizable, isThumbWidth } from '$lib/server/thumbnails';
 import type { RequestHandler } from './$types';
 
 // A file not owned by the user is still accessible if it belongs to a shared
@@ -40,14 +41,29 @@ const MIME: Record<string, string> = {
 	'.gif': 'image/gif'
 };
 
-export const GET: RequestHandler = async ({ params, locals }) => {
+export const GET: RequestHandler = async ({ params, locals, url }) => {
 	const rel = params.path;
 	if (!locals.user) throw error(403, 'Access denied');
 	if (!ownsPath(locals.user.id, rel) && !(await isSharedPatternFile(rel))) {
 		throw error(403, 'Access denied');
 	}
 
-	const abs = absolutePath(rel);
+	let abs = absolutePath(rel);
+	let type = MIME[extname(rel).toLowerCase()] ?? 'application/octet-stream';
+	let cacheControl = 'private, max-age=3600';
+
+	// ?w=200|400|800 → resized WebP (grids and cards); falls back to the
+	// original when the image can't be processed.
+	const width = Number(url.searchParams.get('w'));
+	if (isThumbWidth(width) && isResizable(rel)) {
+		const thumb = await ensureThumbnail(abs, width);
+		if (thumb) {
+			abs = thumb;
+			type = 'image/webp';
+			cacheControl = 'private, max-age=604800';
+		}
+	}
+
 	let size: number;
 	try {
 		size = (await stat(abs)).size;
@@ -55,7 +71,6 @@ export const GET: RequestHandler = async ({ params, locals }) => {
 		throw error(404, 'File not found');
 	}
 
-	const type = MIME[extname(rel).toLowerCase()] ?? 'application/octet-stream';
 	// Readable.toWeb, et surtout PAS un cast du flux Node vers ReadableStream :
 	// undici finissait par appeler close() sur un contrôleur déjà fermé, ce qui
 	// lève ERR_INVALID_STATE dans une micro-tâche — donc hors de tout try/catch,
@@ -67,7 +82,7 @@ export const GET: RequestHandler = async ({ params, locals }) => {
 		headers: {
 			'content-type': type,
 			'content-length': String(size),
-			'cache-control': 'private, max-age=3600'
+			'cache-control': cacheControl
 		}
 	});
 };
