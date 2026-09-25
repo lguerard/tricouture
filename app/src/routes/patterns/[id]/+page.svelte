@@ -4,7 +4,7 @@
 	import { craftLabel, difficultyLabel } from '$lib/labels';
 	import { t } from '$lib/i18n';
 	import { tagStyle } from '$lib/tagColor';
-	let { data } = $props();
+	let { data, form } = $props();
 	const locale = $derived(data.locale);
 	const p = $derived(data.pattern);
 
@@ -77,6 +77,17 @@
 			return null;
 		}
 	}
+
+	// Cover tools: web search candidates, pasted URL, removal.
+	let coverBusy = $state(false);
+	let showCoverTools = $state(false);
+	const coverEnhance = () => {
+		coverBusy = true;
+		return async ({ update }: { update: () => Promise<void> }) => {
+			await update();
+			coverBusy = false;
+		};
+	};
 
 	function isImage(mime: string) {
 		return mime.startsWith('image/');
@@ -160,6 +171,47 @@
 
 	<div class="cols">
 		<section class="meta card">
+			{#if p.coverPath}
+				<img class="cover" src={`/media/${p.coverPath}`} alt={p.title} />
+			{:else}
+				<div class="cover placeholder">📄</div>
+			{/if}
+			{#if data.isOwner}
+				<button type="button" class="link small" onclick={() => (showCoverTools = !showCoverTools)}>
+					🖼️ {t(locale, 'patterns.cover.change')}
+				</button>
+				{#if showCoverTools || form?.covers || form?.coverError}
+					<div class="cover-tools">
+						<form method="POST" action="?/findCovers" use:enhance={coverEnhance}>
+							<button type="submit" disabled={coverBusy}>
+								{coverBusy ? t(locale, 'patterns.cover.searching') : `🔍 ${t(locale, 'patterns.cover.search')}`}
+							</button>
+						</form>
+						{#if form?.covers}
+							<div class="candidates">
+								{#each form.covers as c}
+									<form method="POST" action="?/setCover" use:enhance={coverEnhance}>
+										<input type="hidden" name="url" value={c.imageUrl} />
+										<button type="submit" class="candidate" title={c.title || c.pageUrl} disabled={coverBusy}>
+											<img src={c.imageUrl} alt={c.title} loading="lazy" referrerpolicy="no-referrer" />
+										</button>
+									</form>
+								{/each}
+							</div>
+						{/if}
+						<form method="POST" action="?/setCover" class="cover-url" use:enhance={coverEnhance}>
+							<input name="url" type="url" required placeholder={t(locale, 'patterns.cover.urlPlaceholder')} />
+							<button type="submit" disabled={coverBusy}>{t(locale, 'patterns.cover.use')}</button>
+						</form>
+						{#if p.coverPath}
+							<form method="POST" action="?/removeCover" use:enhance={coverEnhance}>
+								<button type="submit" class="link small danger">{t(locale, 'patterns.cover.remove')}</button>
+							</form>
+						{/if}
+						{#if form?.coverError}<p class="error small">{form.coverError}</p>{/if}
+					</div>
+				{/if}
+			{/if}
 			<dl>
 				{#if p.garmentType}<dt>{t(locale, 'patterns.detail.garmentType')}</dt><dd>{p.garmentType}</dd>{/if}
 				{#if p.designer}<dt>{t(locale, 'patterns.detail.designer')}</dt><dd>{p.designer}</dd>{/if}
@@ -344,6 +396,67 @@
 	}
 	.copilot {
 		margin-top: 1.2rem;
+	}
+	.cover {
+		width: 100%;
+		aspect-ratio: 4 / 5;
+		object-fit: cover;
+		border-radius: var(--radius);
+		margin-bottom: 0.4rem;
+	}
+	.cover.placeholder {
+		display: grid;
+		place-items: center;
+		font-size: 3rem;
+		background: var(--accent-soft);
+	}
+	.cover-tools {
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+		margin: 0.5rem 0 1rem;
+	}
+	.candidates {
+		display: grid;
+		grid-template-columns: repeat(3, 1fr);
+		gap: 0.4rem;
+	}
+	.candidate {
+		padding: 0;
+		border: 2px solid transparent;
+		border-radius: var(--radius);
+		overflow: hidden;
+		cursor: pointer;
+	}
+	.candidate:hover {
+		border-color: var(--accent);
+	}
+	.candidate img {
+		display: block;
+		width: 100%;
+		aspect-ratio: 1;
+		object-fit: cover;
+	}
+	.cover-url {
+		display: flex;
+		gap: 0.4rem;
+	}
+	.cover-url input {
+		flex: 1;
+		min-width: 0;
+	}
+	.link {
+		background: none;
+		border: none;
+		padding: 0;
+		color: var(--accent);
+		cursor: pointer;
+	}
+	.link.danger {
+		color: var(--danger);
+	}
+	.small {
+		font-size: 0.82rem;
 	}
 	.ask {
 		display: flex;

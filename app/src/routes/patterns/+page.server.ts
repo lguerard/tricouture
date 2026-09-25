@@ -59,6 +59,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 			designer: patterns.designer,
 			difficulty: patterns.difficulty,
 			tags: patterns.tags,
+			coverPath: patterns.coverPath,
 			ownerId: patterns.ownerId,
 			isShared: patterns.isShared,
 			source: patterns.source,

@@ -9,9 +9,10 @@ import { patternFiles, patterns } from '$lib/server/db/schema';
 import { absolutePath, ownsPath } from '$lib/server/storage';
 import type { RequestHandler } from './$types';
 
-// A file not owned by the user is still accessible if it belongs to a shared pattern.
+// A file not owned by the user is still accessible if it belongs to a shared
+// pattern — either one of its files or its cover image.
 async function isSharedPatternFile(rel: string): Promise<boolean> {
-	const row = (
+	const file = (
 		await db
 			.select({ shared: patterns.isShared })
 			.from(patternFiles)
@@ -19,7 +20,15 @@ async function isSharedPatternFile(rel: string): Promise<boolean> {
 			.where(and(eq(patternFiles.storedPath, rel), eq(patterns.isShared, true)))
 			.limit(1)
 	)[0];
-	return !!row;
+	if (file) return true;
+	const cover = (
+		await db
+			.select({ id: patterns.id })
+			.from(patterns)
+			.where(and(eq(patterns.coverPath, rel), eq(patterns.isShared, true)))
+			.limit(1)
+	)[0];
+	return !!cover;
 }
 
 const MIME: Record<string, string> = {

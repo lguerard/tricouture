@@ -50,6 +50,11 @@
 		<div class="grid">
 			{#each data.rows as p}
 				<a class="card item" href={`/patterns/${p.id}`}>
+					{#if p.coverPath}
+						<img class="thumb" src={`/media/${p.coverPath}`} alt={p.title} loading="lazy" />
+					{:else}
+						<div class="thumb placeholder">📄</div>
+					{/if}
 					<div class="row">
 						<strong>{p.title}</strong>
 						<span class="tag">{craftLabel(locale, p.craft)}</span>
@@ -125,6 +130,18 @@
 	.item:hover {
 		text-decoration: none;
 		border-color: var(--accent);
+	}
+	.thumb {
+		width: 100%;
+		height: 170px;
+		object-fit: cover;
+		border-radius: var(--radius);
+	}
+	.thumb.placeholder {
+		display: grid;
+		place-items: center;
+		font-size: 2.2rem;
+		background: var(--accent-soft);
 	}
 	.row {
 		display: flex;

@@ -2,7 +2,8 @@ import { fail, redirect } from '@sveltejs/kit';
 import { eq } from 'drizzle-orm';
 import { db } from '$lib/server/db';
 import { patterns, patternFiles } from '$lib/server/db/schema';
-import { saveUpload } from '$lib/server/storage';
+import { saveUpload, saveDataUrl } from '$lib/server/storage';
+import { autoFindCover, isStorableImage, resolveImageFromUrl } from '$lib/server/cover-search';
 import { extractPdfText } from '$lib/server/pdf';
 import { embed, aiConfigured } from '$lib/server/ai/ollama';
 import { suggestPatternInfo, mergePatternInfo, normalizeInfoLanguage } from '$lib/server/ai/patternInfo';
@@ -70,9 +71,11 @@ export const actions: Actions = {
 		// Files (PDF/images). The first PDF feeds the full-text search index.
 		const files = form.getAll('files').filter((f): f is File => f instanceof File && f.size > 0);
 		let extractedText: string | null = null;
+		let firstImagePath: string | null = null;
 		let first = true;
 		for (const file of files) {
 			const saved = await saveUpload(uid, file, 'patterns');
+			if (!firstImagePath && saved.mimeType.startsWith('image/')) firstImagePath = saved.storedPath;
 			await db.insert(patternFiles).values({
 				patternId: inserted.id,
 				filename: saved.filename,
@@ -112,6 +115,21 @@ export const actions: Actions = {
 			} catch {
 				/* Ollama absent — the pattern is created as typed */
 			}
+		}
+
+		// Cover: explicit URL > uploaded image > web search on designer + title.
+		// Runs after auto-fill so a designer read off the PDF can drive the search.
+		const coverUrl = String(form.get('coverUrl') ?? '').trim();
+		const coverDesigner = (updates.designer as string | undefined) ?? designer;
+		let coverData: string | null = null;
+		if (coverUrl) coverData = await resolveImageFromUrl(coverUrl);
+		else if (!firstImagePath && coverDesigner) {
+			coverData = await autoFindCover({ designer: coverDesigner, title, craft });
+		}
+		if (coverData && isStorableImage(coverData)) {
+			updates.coverPath = (await saveDataUrl(uid, coverData, 'patterns/covers'))?.storedPath ?? firstImagePath;
+		} else if (firstImagePath) {
+			updates.coverPath = firstImagePath;
 		}
 
 		if (aiConfigured()) {

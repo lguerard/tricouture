@@ -152,6 +152,12 @@
 			<span class="muted small">{t(locale, 'patterns.new.aiLanguageHint')}</span>
 		</div>
 
+		<div class="field">
+			<label for="coverUrl">{t(locale, 'patterns.new.coverUrlLabel')}</label>
+			<input id="coverUrl" name="coverUrl" type="url" placeholder="https://…" />
+			<span class="muted small">{t(locale, 'patterns.new.coverUrlHint')}</span>
+		</div>
+
 		{#if form?.error}<p class="error">{form.error}</p>{/if}
 
 		<button class="btn-primary" type="submit" disabled={submitting}>
