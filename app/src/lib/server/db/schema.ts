@@ -139,6 +139,7 @@ export const patterns = pgTable(
 		tags: jsonb('tags').$type<string[]>().notNull().default([]),
 		notes: text('notes'),
 		isShared: boolean('is_shared').notNull().default(false),
+		coverPath: text('cover_path'), // cover image (relative to MEDIA_DIR)
 		extractedText: text('extracted_text'), // PDF text for FTS
 		embedding: vector('embedding', { dimensions: 768 }), // semantic search (phase 3)
 		createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
