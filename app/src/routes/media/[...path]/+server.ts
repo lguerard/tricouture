@@ -5,7 +5,8 @@ import { Readable } from 'node:stream';
 import { extname } from 'node:path';
 import { and, eq } from 'drizzle-orm';
 import { db } from '$lib/server/db';
-import { patternFiles, patterns } from '$lib/server/db/schema';
+import { patternFiles, patterns, projectPhotos, projects } from '$lib/server/db/schema';
+import { visibleTo } from '$lib/server/access';
 import { absolutePath, ownsPath } from '$lib/server/storage';
 import { ensureThumbnail, isResizable, isThumbWidth } from '$lib/server/thumbnails';
 import type { RequestHandler } from './$types';
@@ -32,6 +33,20 @@ async function isSharedPatternFile(rel: string): Promise<boolean> {
 	return !!cover;
 }
 
+// A photo of a project shared with the user (view or edit): the file sits in
+// the owner's folder, so ownsPath alone would hide it from the collaborator.
+async function isVisibleProjectPhoto(uid: string, rel: string): Promise<boolean> {
+	const row = (
+		await db
+			.select({ id: projectPhotos.id })
+			.from(projectPhotos)
+			.innerJoin(projects, eq(projectPhotos.projectId, projects.id))
+			.where(and(eq(projectPhotos.storedPath, rel), visibleTo(uid, 'project', projects.ownerId, projects.id)))
+			.limit(1)
+	)[0];
+	return !!row;
+}
+
 const MIME: Record<string, string> = {
 	'.pdf': 'application/pdf',
 	'.png': 'image/png',
@@ -44,7 +59,11 @@ const MIME: Record<string, string> = {
 export const GET: RequestHandler = async ({ params, locals, url }) => {
 	const rel = params.path;
 	if (!locals.user) throw error(403, 'Access denied');
-	if (!ownsPath(locals.user.id, rel) && !(await isSharedPatternFile(rel))) {
+	if (
+		!ownsPath(locals.user.id, rel) &&
+		!(await isSharedPatternFile(rel)) &&
+		!(await isVisibleProjectPhoto(locals.user.id, rel))
+	) {
 		throw error(403, 'Access denied');
 	}
 

@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import { withFeedback } from '$lib/feedback';
+	import { undoableDelete } from '$lib/undo';
+	import { mediaUrl } from '$lib/media';
 	import { onMount } from 'svelte';
 	import { statusLabel, STATUS_ORDER, pieceStatusLabel, PIECE_STATUS_ORDER } from '$lib/labels';
 	import { formatDeadline } from '$lib/format';
@@ -400,6 +402,50 @@
 			</div>
 		</section>
 
+		<!-- Progress / finished-object photos (also feed the gallery once finished). -->
+		<section class="card detail photos">
+			<h2>{t(locale, 'projects.photos.title')}</h2>
+			{#if data.photos.length === 0}
+				<p class="muted small">{t(locale, 'projects.photos.empty')}</p>
+			{:else}
+				<ul class="photo-grid">
+					{#each data.photos as ph (ph.id)}
+						<li data-undo-item>
+							<a href={mediaUrl(ph.storedPath)} target="_blank" rel="noopener">
+								<img src={mediaUrl(ph.storedPath, 400)} alt={ph.caption ?? p.title} loading="lazy" />
+							</a>
+							{#if ph.caption}<span class="small muted">{ph.caption}</span>{/if}
+							{#if !readOnly}
+								<form method="POST" action="?/deletePhoto" use:enhance={undoableDelete()}>
+									<input type="hidden" name="photoId" value={ph.id} />
+									<button type="submit" class="photo-del" aria-label={t(locale, 'projects.photos.delete')}>✕</button>
+								</form>
+							{/if}
+						</li>
+					{/each}
+				</ul>
+			{/if}
+			{#if !readOnly}
+				<form
+					class="photo-form"
+					method="POST"
+					action="?/addPhoto"
+					enctype="multipart/form-data"
+					use:enhance={withFeedback({
+						success: 'projects.photos.added',
+						inner: () => async ({ update }) => update({ reset: true })
+					})}
+				>
+					<input name="photos" type="file" accept="image/jpeg,image/png,image/webp,image/gif" multiple required />
+					<input name="caption" maxlength="255" placeholder={t(locale, 'projects.photos.captionPlaceholder')} />
+					<button type="submit">{t(locale, 'projects.photos.add')}</button>
+				</form>
+				{#if p.status === 'fini'}
+					<p class="muted small">{t(locale, 'projects.photos.galleryHint')}</p>
+				{/if}
+			{/if}
+		</section>
+
 	{#if isOwner}
 		<section class="card detail share">
 			<h2>{t(locale, 'projects.share.title')}</h2>
@@ -461,6 +507,48 @@
 </div>
 
 <style>
+	.photo-grid {
+		list-style: none;
+		padding: 0;
+		margin: 0 0 0.8rem;
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+		gap: 0.6rem;
+	}
+	.photo-grid li {
+		position: relative;
+		display: flex;
+		flex-direction: column;
+		gap: 0.2rem;
+	}
+	.photo-grid img {
+		width: 100%;
+		aspect-ratio: 1;
+		object-fit: cover;
+		border-radius: var(--radius);
+		display: block;
+	}
+	.photo-del {
+		position: absolute;
+		top: 0.3rem;
+		right: 0.3rem;
+		padding: 0.1rem 0.45rem;
+		font-size: 0.8rem;
+		opacity: 0.85;
+	}
+	.photo-form {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.5rem;
+		align-items: center;
+	}
+	.photo-form input[type='file'] {
+		flex: 1 1 14rem;
+	}
+	.photo-form input[name='caption'] {
+		flex: 1 1 10rem;
+		width: auto;
+	}
 	.head {
 		display: flex;
 		justify-content: space-between;
