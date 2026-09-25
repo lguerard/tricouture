@@ -41,12 +41,21 @@ async function call(path: string, body: unknown, timeoutMs?: number): Promise<un
 // Text generation (non-streaming for simplicity). `model` defaults to the
 // configured chat model; the model-watch evaluation passes a candidate's tag
 // instead, so it runs the exact same call production uses.
-export async function generate(prompt: string, system?: string, model?: string): Promise<string> {
+// `opts.json` turns on Ollama's JSON mode and `opts.temperature` overrides the
+// model default (~0.8) — extraction wants 0: same text, same answer.
+export async function generate(
+	prompt: string,
+	system?: string,
+	model?: string,
+	opts: { temperature?: number; json?: boolean } = {}
+): Promise<string> {
 	const data = (await call('/api/generate', {
 		model: model || CHAT_MODEL(),
 		prompt,
 		system,
-		stream: false
+		stream: false,
+		...(opts.json ? { format: 'json' } : {}),
+		...(opts.temperature != null ? { options: { temperature: opts.temperature } } : {})
 	})) as { response?: string };
 	return (data.response ?? '').trim();
 }
