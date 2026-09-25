@@ -130,6 +130,13 @@ export const dict: Record<Locale, Table> = {
 		'dash.none': "Aucun projet pour l'instant.",
 		'dash.create': 'Créer un projet',
 		'dash.deadline': 'échéance',
+		'dash.resume': 'Reprendre',
+		'dash.row': 'Rang {n}',
+		'dash.rowOf': 'Rang {n} / {total}',
+		'dash.open': 'Ouvrir',
+		'dash.deadlines': 'Échéances proches',
+		'dash.recentPatterns': 'Derniers patrons',
+		'dash.allPatterns': 'Tous les patrons',
 
 		// Shared labels: project status
 		'status.idee': 'Idée / Queue',
@@ -748,6 +755,13 @@ export const dict: Record<Locale, Table> = {
 		'dash.none': 'No project yet.',
 		'dash.create': 'Create a project',
 		'dash.deadline': 'due',
+		'dash.resume': 'Pick up where you left off',
+		'dash.row': 'Row {n}',
+		'dash.rowOf': 'Row {n} / {total}',
+		'dash.open': 'Open',
+		'dash.deadlines': 'Upcoming deadlines',
+		'dash.recentPatterns': 'Latest patterns',
+		'dash.allPatterns': 'All patterns',
 
 		// Shared labels: project status
 		'status.idee': 'Idea / Queue',
