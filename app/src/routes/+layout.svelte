@@ -1,7 +1,7 @@
 <script lang="ts">
 	import '../app.css';
 	import { page } from '$app/stores';
-	import { beforeNavigate, invalidateAll } from '$app/navigation';
+	import { afterNavigate, beforeNavigate, invalidateAll } from '$app/navigation';
 	import { t, LOCALES, type Locale } from '$lib/i18n';
 	import { craftLabel, CRAFTS } from '$lib/labels';
 	import type { Craft } from '$lib/server/db/schema';
@@ -79,6 +79,16 @@
 		return href === '/' ? current === '/' : current.startsWith(href);
 	}
 
+	// Mobile: the sidebar becomes a drawer opened from the tab bar's "More".
+	let drawerOpen = $state(false);
+	afterNavigate(() => (drawerOpen = false));
+	const TABS = [
+		{ href: '/', key: 'nav.dashboard', icon: '🏠', match: '/' },
+		{ href: '/patterns', key: 'nav.patterns', icon: '📄', match: '/patterns' },
+		{ href: '/projects/board', key: 'nav.projects', icon: '🧶', match: '/projects' },
+		{ href: '/stash', key: 'nav.stash', icon: '🧵', match: '/stash' }
+	];
+
 	async function setLocale(code: Locale) {
 		if (code === locale) return;
 		await fetch('/api/locale', {
@@ -92,7 +102,10 @@
 
 {#if data.user}
 	<div class="shell">
-		<aside class="sidebar">
+		{#if drawerOpen}
+			<button class="backdrop" aria-label={t(locale, 'nav.close')} onclick={() => (drawerOpen = false)}></button>
+		{/if}
+		<aside class="sidebar" class:open={drawerOpen}>
 			<div class="brand">🪡 Tricouture</div>
 			<nav>
 				{#each nav as item}
@@ -145,6 +158,16 @@
 		<main class="content">
 			{@render children()}
 		</main>
+		<nav class="tabbar" aria-label={t(locale, 'nav.main')}>
+			{#each TABS as tab}
+				<a href={tab.href} class:active={active(tab.match) && !drawerOpen} aria-current={active(tab.match) ? 'page' : undefined}>
+					<span class="tab-ico">{tab.icon}</span>{t(locale, tab.key)}
+				</a>
+			{/each}
+			<button type="button" class:active={drawerOpen} aria-expanded={drawerOpen} onclick={() => (drawerOpen = !drawerOpen)}>
+				<span class="tab-ico">☰</span>{t(locale, 'nav.more')}
+			</button>
+		</nav>
 	</div>
 {:else}
 	<main class="auth-wrap">
@@ -160,7 +183,7 @@
 <svelte:head><title>{pageTitle}</title></svelte:head>
 
 <Toaster {locale} />
-<svelte:window onpagehide={flushPendingDeletes} />
+<svelte:window onpagehide={flushPendingDeletes} onkeydown={(e) => e.key === 'Escape' && (drawerOpen = false)} />
 
 <style>
 	.shell {
@@ -286,23 +309,85 @@
 		color: #fff;
 		border-color: var(--accent);
 	}
+	.tabbar,
+	.backdrop {
+		display: none;
+	}
+	:global(:root) {
+		--tabbar-height: 0px;
+	}
 	@media (max-width: 720px) {
+		:global(:root) {
+			--tabbar-height: calc(60px + env(safe-area-inset-bottom));
+		}
 		.shell {
 			grid-template-columns: 1fr;
 		}
+		.content {
+			padding-bottom: var(--tabbar-height);
+		}
+		/* Full sidebar content, as a drawer sliding in from the left. */
 		.sidebar {
-			position: static;
+			position: fixed;
+			inset: 0 auto var(--tabbar-height) 0;
+			width: min(290px, 85vw);
 			height: auto;
-			flex-direction: row;
-			flex-wrap: wrap;
+			overflow-y: auto;
+			z-index: 900;
+			transform: translateX(-100%);
+			transition: transform 0.2s ease-out;
+			box-shadow: 4px 0 24px rgba(0, 0, 0, 0.15);
+		}
+		.sidebar.open {
+			transform: none;
+		}
+		.backdrop {
+			display: block;
+			position: fixed;
+			inset: 0;
+			z-index: 850;
+			border: none;
+			border-radius: 0;
+			padding: 0;
+			background: rgba(0, 0, 0, 0.35);
+		}
+		.tabbar {
+			display: flex;
+			position: fixed;
+			left: 0;
+			right: 0;
+			bottom: 0;
+			z-index: 950;
+			height: var(--tabbar-height);
+			padding-bottom: env(safe-area-inset-bottom);
+			background: var(--surface);
+			border-top: 1px solid var(--border);
+		}
+		.tabbar a,
+		.tabbar button {
+			flex: 1;
+			display: flex;
+			flex-direction: column;
 			align-items: center;
+			justify-content: center;
+			gap: 0.1rem;
+			font-size: 0.7rem;
+			color: var(--muted);
+			background: none;
+			border: none;
+			border-radius: 0;
+			padding: 0.3rem 0;
 		}
-		.sidebar nav {
-			flex-direction: row;
-			flex-wrap: wrap;
+		.tabbar a:hover {
+			text-decoration: none;
 		}
-		.spacer {
-			display: none;
+		.tabbar .active {
+			color: var(--accent);
+			font-weight: 600;
+		}
+		.tab-ico {
+			font-size: 1.25rem;
+			line-height: 1;
 		}
 	}
 </style>
