@@ -12,6 +12,43 @@
 
 	beforeNavigate(flushPendingDeletes);
 
+	// Tab title: "<pattern/project> · <section> · Tricouture". Most specific
+	// prefix first; "/" only matches exactly.
+	const SECTION_TITLES: [string, string][] = [
+		['/patterns/new', 'patterns.new.title'],
+		['/patterns/import', 'patterns.import.title'],
+		['/patterns/tags', 'patterns.tags.title'],
+		['/projects/new', 'projects.new.title'],
+		['/admin', 'admin.title'],
+		['/forgot-password', 'forgot.title'],
+		['/reset-password', 'reset.title'],
+		['/login', 'auth.signin'],
+		['/register', 'auth.register.title'],
+		['/patterns', 'nav.patterns'],
+		['/projects', 'nav.projects'],
+		['/stash', 'nav.stash'],
+		['/calendar', 'nav.calendar'],
+		['/goals', 'nav.goals'],
+		['/stats', 'nav.stats'],
+		['/achievements', 'nav.achievements'],
+		['/bins', 'nav.bins'],
+		['/recipients', 'nav.recipients'],
+		['/assistant', 'nav.assistant'],
+		['/gallery', 'nav.gallery'],
+		['/account', 'nav.account']
+	];
+	const pageTitle = $derived.by(() => {
+		if ($page.error) return `${t(locale, $page.status === 404 ? 'error.notFound' : 'error.generic')} · Tricouture`;
+		const path = $page.url.pathname;
+		const key = path === '/' ? 'nav.dashboard' : SECTION_TITLES.find(([p]) => path.startsWith(p))?.[1];
+		let section = key ? t(locale, key) : '';
+		if (path === '/patterns' && CRAFTS.includes(craftParam as Craft)) {
+			section += ` — ${craftLabel(locale, craftParam as Craft)}`;
+		}
+		const entity: string | undefined = $page.data.project?.title ?? $page.data.pattern?.title;
+		return [entity, section, 'Tricouture'].filter(Boolean).join(' · ');
+	});
+
 	const CRAFT_ICONS: Record<Craft, string> = { couture: '✂️', tricot: '🧶', crochet: '🪝' };
 	const craftParam = $derived($page.url.searchParams.get('craft'));
 	// Patterns submenu: open on any /patterns page unless the user collapsed it.
@@ -119,6 +156,8 @@
 		{@render children()}
 	</main>
 {/if}
+
+<svelte:head><title>{pageTitle}</title></svelte:head>
 
 <Toaster {locale} />
 <svelte:window onpagehide={flushPendingDeletes} />
