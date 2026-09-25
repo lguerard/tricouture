@@ -1,7 +1,8 @@
 import { eq } from 'drizzle-orm';
 import { db } from '$lib/server/db';
 import { patterns, patternFiles } from '$lib/server/db/schema';
-import { saveUpload } from '$lib/server/storage';
+import { saveUpload, saveDataUrl } from '$lib/server/storage';
+import { autoFindCover, isStorableImage } from '$lib/server/cover-search';
 import { extractPdfText } from '$lib/server/pdf';
 import { embed, aiConfigured } from '$lib/server/ai/ollama';
 import { suggestPatternInfo, mergePatternInfo, DEFAULT_INFO_LANGUAGE, type InfoLanguage } from '$lib/server/ai/patternInfo';
@@ -117,6 +118,14 @@ export async function importOnePattern(opts: {
 		} catch {
 			/* Ollama absent or busy — the pattern is imported as-is */
 		}
+	}
+
+	// A designer read off the PDF is enough to look for a cover. Capped shorter
+	// than on single creation: it runs once per file of the batch.
+	if (typeof updates.designer === 'string') {
+		const cover = await autoFindCover({ designer: updates.designer, title, craft }, 8_000);
+		const saved = cover && isStorableImage(cover) ? await saveDataUrl(uid, cover, 'patterns/covers') : null;
+		if (saved) updates.coverPath = saved.storedPath;
 	}
 
 	// Semantic search is a bonus: an embedding failing must not abort the import.
