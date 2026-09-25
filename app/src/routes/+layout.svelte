@@ -215,7 +215,7 @@
 		color: var(--accent);
 		padding: 0 0.5rem 1rem;
 	}
-	nav {
+	.sidebar nav {
 		display: flex;
 		flex-direction: column;
 		gap: 0.2rem;
@@ -360,11 +360,17 @@
 			overflow-y: auto;
 			z-index: 900;
 			transform: translateX(-100%);
-			transition: transform 0.2s ease-out;
+			/* Hidden (not just off-screen) while closed: its shadow no longer
+			   bleeds onto the page edge and its links leave the tab order. */
+			visibility: hidden;
+			transition:
+				transform 0.2s ease-out,
+				visibility 0.2s;
 			box-shadow: 4px 0 24px rgba(0, 0, 0, 0.15);
 		}
 		.sidebar.open {
 			transform: none;
+			visibility: visible;
 		}
 		.backdrop {
 			display: block;
