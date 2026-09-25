@@ -638,7 +638,7 @@
 	}
 	.tab.active {
 		background: var(--accent);
-		color: #fff;
+		color: var(--on-accent);
 		border-color: var(--accent);
 	}
 	.count {
@@ -692,7 +692,7 @@
 		margin: -0.15rem 0 0.15rem;
 	}
 	.add-error {
-		color: #b91c1c;
+		color: var(--danger);
 		font-size: 0.85rem;
 	}
 	.row3 {

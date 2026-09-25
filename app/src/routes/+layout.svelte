@@ -6,6 +6,7 @@
 	import { craftLabel, CRAFTS } from '$lib/labels';
 	import type { Craft } from '$lib/server/db/schema';
 	import Toaster from '$lib/components/Toaster.svelte';
+	import ThemeSwitch from '$lib/components/ThemeSwitch.svelte';
 	import SearchPalette from '$lib/components/SearchPalette.svelte';
 	import { flushPendingDeletes } from '$lib/undo';
 
@@ -148,6 +149,7 @@
 				{/each}
 			</nav>
 			<div class="spacer"></div>
+			<ThemeSwitch {locale} />
 			<div class="langswitch">
 				{#each LOCALES as l}
 					<button class:on={locale === l.code} onclick={() => setLocale(l.code)}>{l.label}</button>
@@ -233,7 +235,7 @@
 	}
 	.nav-item.active {
 		background: var(--accent);
-		color: #fff;
+		color: var(--on-accent);
 	}
 	.ico {
 		width: 1.3rem;
@@ -312,7 +314,7 @@
 	}
 	.langswitch button.on {
 		background: var(--accent);
-		color: #fff;
+		color: var(--on-accent);
 		border-color: var(--accent);
 	}
 	.search-btn {

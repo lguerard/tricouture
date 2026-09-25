@@ -135,7 +135,7 @@
 
 <style>
 	.tabs { display: flex; gap: 0.5rem; margin: 1rem 0; }
-	.tabs button.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+	.tabs button.active { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
 	.two { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
 	.form { display: flex; flex-direction: column; }
 	textarea { font-family: ui-monospace, monospace; font-size: 0.85rem; }

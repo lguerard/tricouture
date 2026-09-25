@@ -172,11 +172,11 @@
 		color: var(--accent);
 	}
 	.badge.soon {
-		background: #fceccb;
+		background: var(--warn-soft);
 		color: var(--warn);
 	}
 	.badge.late {
-		background: #f6d6d3;
+		background: var(--danger-soft);
 		color: var(--danger);
 	}
 	.empty {

@@ -639,7 +639,7 @@
 		}
 	}
 	.savings {
-		background: #e7f4ec;
+		background: var(--ok-soft);
 		color: var(--ok);
 		padding: 0.5rem 0.7rem;
 		border-radius: var(--radius);
@@ -654,7 +654,7 @@
 	}
 
 	.shared-banner {
-		background: #eef3fb;
+		background: var(--info-soft);
 		border-radius: var(--radius);
 		padding: 0.5rem 0.7rem;
 		font-size: 0.9rem;

@@ -11,6 +11,58 @@
 	--danger: #c0473f;
 	--radius: 10px;
 	--shadow: 0 1px 3px rgba(43, 35, 48, 0.08);
+	--on-accent: #fff;
+	--accent-hover: #693f76;
+	--warn-soft: #fceccb;
+	--danger-soft: #f6d6d3;
+	--info-soft: #eef3fb;
+	--ok-soft: #e7f4ec;
+	color-scheme: light;
+}
+
+/* Dark palette: follows the system unless the person picked a theme
+   (data-theme on <html>, set before first paint by app.html). */
+:root[data-theme='dark'] {
+	--bg: #17131a;
+	--surface: #211b25;
+	--border: #3a3040;
+	--text: #ece6f0;
+	--muted: #a99fb0;
+	--accent: #c49ad4;
+	--accent-soft: #33263b;
+	--on-accent: #1b1320;
+	--accent-hover: #d4b1e1;
+	--ok: #5fc08e;
+	--warn: #e0a54a;
+	--danger: #ec7a70;
+	--warn-soft: #3b2f17;
+	--danger-soft: #45221f;
+	--info-soft: #1d2839;
+	--ok-soft: #1b3326;
+	--shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
+	color-scheme: dark;
+}
+@media (prefers-color-scheme: dark) {
+	:root:not([data-theme='light']) {
+		--bg: #17131a;
+		--surface: #211b25;
+		--border: #3a3040;
+		--text: #ece6f0;
+		--muted: #a99fb0;
+		--accent: #c49ad4;
+		--accent-soft: #33263b;
+		--on-accent: #1b1320;
+		--accent-hover: #d4b1e1;
+		--ok: #5fc08e;
+		--warn: #e0a54a;
+		--danger: #ec7a70;
+		--warn-soft: #3b2f17;
+		--danger-soft: #45221f;
+		--info-soft: #1d2839;
+		--ok-soft: #1b3326;
+		--shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
+		color-scheme: dark;
+	}
 }
 
 * {
@@ -66,11 +118,11 @@ button:hover,
 }
 .btn-primary {
 	background: var(--accent);
-	color: #fff;
+	color: var(--on-accent);
 	border-color: var(--accent);
 }
 .btn-primary:hover {
-	background: #693f76;
+	background: var(--accent-hover);
 }
 
 input,

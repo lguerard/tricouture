@@ -489,7 +489,7 @@
 	}
 	.owner-actions button.on {
 		background: var(--accent);
-		color: #fff;
+		color: var(--on-accent);
 		border-color: var(--accent);
 	}
 	.shared {

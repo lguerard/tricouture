@@ -196,7 +196,7 @@
 		gap: 0.3rem;
 	}
 	.tag.fmt {
-		background: #eef3fb;
+		background: var(--info-soft);
 		font-size: 0.72rem;
 	}
 	.tag[role='link'] {

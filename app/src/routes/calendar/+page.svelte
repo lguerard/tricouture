@@ -62,6 +62,6 @@
 	.bar { height: 6px; background: var(--accent-soft); border-radius: 999px; overflow: hidden; margin-top: 0.3rem; }
 	.fill { height: 100%; background: var(--accent); }
 	.badge { font-size: 0.78rem; padding: 0.15rem 0.55rem; border-radius: 999px; background: var(--accent-soft); color: var(--accent); white-space: nowrap; }
-	.badge.soon { background: #fceccb; color: var(--warn); }
-	.badge.late { background: #f6d6d3; color: var(--danger); }
+	.badge.soon { background: var(--warn-soft); color: var(--warn); }
+	.badge.late { background: var(--danger-soft); color: var(--danger); }
 </style>
