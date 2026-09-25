@@ -1,0 +1,43 @@
+name: Regenerate release notes
+
+# Rewrites the notes of an already published release from its own commit
+# range (previous tag..tag) -- for a release whose notes came out wrong.
+# Assets are left untouched.
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to regenerate (e.g. 0.16.0)"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  notes:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install git-cliff
+        uses: taiki-e/install-action@git-cliff
+
+      - name: Generate notes
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          set -e
+          git rev-parse --verify "refs/tags/$TAG" >/dev/null
+          PREV=$(git describe --tags --abbrev=0 "$TAG^" 2>/dev/null || true)
+          git cliff --config cliff.release.toml --strip all -o RELEASE_NOTES.md "${PREV:+$PREV..}$TAG"
+          cat RELEASE_NOTES.md
+
+      - name: Update the release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.tag }}
+          body_path: RELEASE_NOTES.md
