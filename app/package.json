@@ -29,6 +29,7 @@
     "drizzle-orm": "^0.36.0",
     "postgres": "^3.4.5",
     "qrcode": "^1.5.4",
+    "sharp": "^0.35.4",
     "svelte-dnd-action": "^0.9.50",
     "unpdf": "^0.12.0"
   }
