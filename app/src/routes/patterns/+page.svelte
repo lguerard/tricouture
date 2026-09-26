@@ -138,19 +138,31 @@
 	}
 	.head {
 		display: flex;
+		flex-wrap: wrap;
 		justify-content: space-between;
 		align-items: center;
+		gap: 0.5rem;
+	}
+	.head h1 {
+		margin-right: auto;
 	}
 	.filters {
 		display: flex;
+		flex-wrap: wrap;
 		gap: 0.5rem;
 		margin: 1rem 0 1.5rem;
 	}
 	.filters input {
-		flex: 1;
+		flex: 1 1 14rem;
+		min-width: 0;
 	}
 	.filters select {
+		flex: 1 1 8rem;
 		width: auto;
+		min-width: 0;
+	}
+	.filters button {
+		flex: none;
 	}
 	.item {
 		display: flex;

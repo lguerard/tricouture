@@ -88,7 +88,7 @@
 	let searchOpen = $state(false);
 	afterNavigate(() => (drawerOpen = false));
 	const TABS = [
-		{ href: '/', key: 'nav.dashboard', icon: '🏠', match: '/' },
+		{ href: '/', key: 'nav.home', icon: '🏠', match: '/' },
 		{ href: '/patterns', key: 'nav.patterns', icon: '📄', match: '/patterns' },
 		{ href: '/projects/board', key: 'nav.projects', icon: '🧶', match: '/projects' },
 		{ href: '/stash', key: 'nav.stash', icon: '🧵', match: '/stash' }
@@ -151,11 +151,15 @@
 				{/each}
 			</nav>
 			<div class="spacer"></div>
-			<ThemeSwitch {locale} />
-			<div class="langswitch">
-				{#each LOCALES as l}
-					<button class:on={locale === l.code} onclick={() => setLocale(l.code)}>{l.label}</button>
-				{/each}
+			<div class="prefs">
+				<ThemeSwitch {locale} />
+				<div class="langswitch" role="group" aria-label={t(locale, 'common.language')}>
+					{#each LOCALES as l}
+						<button class:on={locale === l.code} aria-pressed={locale === l.code} onclick={() => setLocale(l.code)}
+							>{l.label}</button
+						>
+					{/each}
+				</div>
 			</div>
 			<div class="user">
 				<span class="muted">{data.user.displayName}</span>
@@ -210,6 +214,11 @@
 		position: sticky;
 		top: 0;
 		height: 100vh;
+		height: 100dvh;
+		/* A short window (laptop, phone in landscape) must still reach the
+		   theme, language and logout controls at the bottom. */
+		overflow-y: auto;
+		overscroll-behavior: contain;
 	}
 	.brand {
 		font-size: 1.2rem;
@@ -291,6 +300,10 @@
 	}
 	.content {
 		min-width: 0;
+		/* Safety net: one over-wide element must never widen the whole page --
+		   on a phone that zooms everything out and pushes the tab bar's "More"
+		   off screen. Wide content (tables) scrolls in its own container. */
+		overflow-x: clip;
 	}
 	.auth-wrap {
 		min-height: 100vh;
@@ -343,7 +356,9 @@
 	:global(:root) {
 		--tabbar-height: 0px;
 	}
-	@media (max-width: 720px) {
+	/* Phone layout: narrow screens, and short ones too -- a phone held in
+	   landscape is wide enough for the sidebar but far too short for it. */
+	@media (max-width: 720px), (max-height: 520px) {
 		:global(:root) {
 			--tabbar-height: calc(60px + env(safe-area-inset-bottom));
 		}
@@ -373,6 +388,24 @@
 		.sidebar.open {
 			transform: none;
 			visibility: visible;
+		}
+		/* Theme and language first in the drawer, where a thumb finds them,
+		   instead of below fifteen menu entries. */
+		.brand {
+			order: -2;
+		}
+		.prefs {
+			order: -1;
+			display: flex;
+			flex-wrap: wrap;
+			justify-content: space-between;
+			margin-bottom: 0.4rem;
+			border-bottom: 1px solid var(--border);
+		}
+		.prefs :global(button) {
+			min-width: 2.75rem;
+			min-height: 2.75rem;
+			font-size: 1rem;
 		}
 		.backdrop {
 			display: block;
@@ -404,12 +437,16 @@
 			align-items: center;
 			justify-content: center;
 			gap: 0.1rem;
+			min-width: 0;
 			font-size: 0.7rem;
+			white-space: nowrap;
+			overflow: hidden;
+			text-overflow: ellipsis;
 			color: var(--muted);
 			background: none;
 			border: none;
 			border-radius: 0;
-			padding: 0.3rem 0;
+			padding: 0.3rem 0.15rem;
 		}
 		.tabbar a:hover {
 			text-decoration: none;

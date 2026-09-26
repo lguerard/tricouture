@@ -30,7 +30,7 @@ export async function computeMetrics(uid: string): Promise<Metrics> {
 			await db
 				.select({
 					finishedTotal: sql<number>`coalesce(sum(case when ${projects.status} = 'fini' then 1 else 0 end), 0)::int`,
-					finishedYear: sql<number>`coalesce(sum(case when ${projects.status} = 'fini' and ${projects.finishedAt} >= ${yearStart} then 1 else 0 end), 0)::int`,
+					finishedYear: sql<number>`coalesce(sum(case when ${projects.status} = 'fini' and ${projects.finishedAt} >= ${yearStart.toISOString()}::timestamptz then 1 else 0 end), 0)::int`,
 					wip: sql<number>`coalesce(sum(case when ${projects.status} = 'monte' then 1 else 0 end), 0)::int`,
 					total: sql<number>`count(*)::int`,
 					minutes: sql<number>`coalesce(sum(case when ${projects.status} = 'fini' then ${projects.timeSpentMinutes} else 0 end), 0)::int`,
