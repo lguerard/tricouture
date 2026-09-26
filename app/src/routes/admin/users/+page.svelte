@@ -39,6 +39,7 @@
 	{/if}
 
 	<div class="card">
+		<div class="table-scroll">
 		<table>
 			<thead>
 				<tr>
@@ -71,6 +72,7 @@
 				{/each}
 			</tbody>
 		</table>
+		</div>
 	</div>
 </div>
 
