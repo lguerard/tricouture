@@ -14,6 +14,7 @@ export const dict: Record<Locale, Table> = {
 	fr: {
 		// Navigation
 		'nav.dashboard': 'Tableau de bord',
+		'nav.home': 'Accueil',
 		'nav.patterns': 'Patrons',
 		'nav.projects': 'Projets',
 		'nav.stash': 'Stock',
@@ -102,13 +103,14 @@ export const dict: Record<Locale, Table> = {
 
 		// Mon compte
 		'account.title': 'Mon compte',
-		'account.subtitle': 'Modifie ton mot de passe.',
+		'account.subtitle': 'Tes préférences, l\'IA et ton mot de passe.',
 		'account.changePassword': 'Changer le mot de passe',
 		'account.currentPassword': 'Mot de passe actuel',
 		'account.confirmPassword': 'Confirme le nouveau mot de passe',
 		'account.passwordChanged': 'Mot de passe modifié.',
 		'account.logoutNote':
 			'Tes autres appareils seront déconnectés ; ce navigateur reste connecté.',
+		'account.prefs.title': 'Préférences',
 		'account.aiAutoFill.title': "Remplissage automatique par l'IA",
 		'account.aiAutoFill.hint':
 			"Quand tu ajoutes un patron (à la main ou en lot), l'IA propose automatiquement titre, tags et autres infos à partir du PDF. Le bouton « Compléter avec l'IA » sur la fiche d'un patron reste disponible même désactivé.",
@@ -687,6 +689,7 @@ export const dict: Record<Locale, Table> = {
 	en: {
 		// Navigation
 		'nav.dashboard': 'Dashboard',
+		'nav.home': 'Home',
 		'nav.patterns': 'Patterns',
 		'nav.projects': 'Projects',
 		'nav.stash': 'Stash',
@@ -775,12 +778,13 @@ export const dict: Record<Locale, Table> = {
 
 		// My account
 		'account.title': 'My account',
-		'account.subtitle': 'Change your password.',
+		'account.subtitle': 'Your preferences, AI and password.',
 		'account.changePassword': 'Change password',
 		'account.currentPassword': 'Current password',
 		'account.confirmPassword': 'Confirm the new password',
 		'account.passwordChanged': 'Password changed.',
 		'account.logoutNote': 'Your other devices will be signed out; this browser stays signed in.',
+		'account.prefs.title': 'Preferences',
 		'account.aiAutoFill.title': 'AI auto-fill',
 		'account.aiAutoFill.hint':
 			'When you add a pattern (manually or in a batch import), AI automatically suggests title, tags, and other info from the PDF. The "Complete with AI" button on a pattern\'s own page stays available either way.',

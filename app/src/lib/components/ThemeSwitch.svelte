@@ -1,47 +1,27 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { t, type Locale } from '$lib/i18n';
+	import { theme, type Theme } from '$lib/theme.svelte';
 
 	let { locale }: { locale: Locale } = $props();
 
-	type Theme = 'auto' | 'light' | 'dark';
 	const OPTIONS: { value: Theme; icon: string; key: string }[] = [
 		{ value: 'auto', icon: '🖥️', key: 'theme.auto' },
 		{ value: 'light', icon: '☀️', key: 'theme.light' },
 		{ value: 'dark', icon: '🌙', key: 'theme.dark' }
 	];
-	let theme = $state<Theme>('auto');
 
-	onMount(() => {
-		const saved = document.documentElement.dataset.theme;
-		theme = saved === 'dark' || saved === 'light' ? saved : 'auto';
-	});
-
-	function choose(value: Theme) {
-		theme = value;
-		const root = document.documentElement;
-		try {
-			if (value === 'auto') {
-				delete root.dataset.theme;
-				localStorage.removeItem('theme');
-			} else {
-				root.dataset.theme = value;
-				localStorage.setItem('theme', value);
-			}
-		} catch {
-			// storage blocked (private mode): the choice still applies for this visit
-		}
-	}
+	onMount(() => theme.init());
 </script>
 
 <div class="themeswitch" role="group" aria-label={t(locale, 'theme.label')}>
 	{#each OPTIONS as o}
 		<button
 			type="button"
-			class:on={theme === o.value}
-			aria-pressed={theme === o.value}
+			class:on={theme.value === o.value}
+			aria-pressed={theme.value === o.value}
 			title={t(locale, o.key)}
-			onclick={() => choose(o.value)}>{o.icon}</button
+			onclick={() => theme.set(o.value)}>{o.icon}</button
 		>
 	{/each}
 </div>

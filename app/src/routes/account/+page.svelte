@@ -1,9 +1,21 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import { withFeedback } from '$lib/feedback';
-	import { t } from '$lib/i18n';
+	import { invalidateAll } from '$app/navigation';
+	import ThemeSwitch from '$lib/components/ThemeSwitch.svelte';
+	import { t, LOCALES, type Locale } from '$lib/i18n';
 	let { data, form } = $props();
 	const locale = $derived(data.locale);
+
+	async function setLocale(code: Locale) {
+		if (code === locale) return;
+		await fetch('/api/locale', {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({ locale: code })
+		});
+		await invalidateAll();
+	}
 </script>
 
 <div class="container narrow">
@@ -14,6 +26,24 @@
 		<div><span class="muted">{t(locale, 'auth.displayName')}</span><strong>{data.account.displayName}</strong></div>
 		<div><span class="muted">{t(locale, 'auth.email')}</span><strong>{data.account.email}</strong></div>
 	</div>
+
+	<section class="card prefs">
+		<h2>{t(locale, 'account.prefs.title')}</h2>
+		<div class="pref-row">
+			<span>{t(locale, 'common.language')}</span>
+			<div class="choice" role="group" aria-label={t(locale, 'common.language')}>
+				{#each LOCALES as l}
+					<button type="button" class:on={locale === l.code} aria-pressed={locale === l.code} onclick={() => setLocale(l.code)}
+						>{l.label}</button
+					>
+				{/each}
+			</div>
+		</div>
+		<div class="pref-row">
+			<span>{t(locale, 'theme.label')}</span>
+			<ThemeSwitch {locale} />
+		</div>
+	</section>
 
 	<form class="card ai-toggle" method="POST" action="?/toggleAiAutoFill" use:enhance={withFeedback()}>
 		<div class="ai-toggle-row">
@@ -78,6 +108,33 @@
 	.identity { display: flex; flex-direction: column; gap: 0.5rem; }
 	.identity div { display: flex; justify-content: space-between; gap: 1rem; }
 	.small { font-size: 0.8rem; }
+	.prefs h2 {
+		margin-bottom: 0.4rem;
+	}
+	.pref-row {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		gap: 1rem;
+		padding: 0.3rem 0;
+	}
+	.choice {
+		display: flex;
+		gap: 0.3rem;
+	}
+	.choice button,
+	.pref-row :global(.themeswitch button) {
+		min-width: 2.75rem;
+		min-height: 2.75rem;
+	}
+	.choice button.on {
+		background: var(--accent);
+		color: var(--on-accent);
+		border-color: var(--accent);
+	}
+	.pref-row :global(.themeswitch) {
+		padding: 0;
+	}
 	.ai-toggle-row {
 		display: flex;
 		justify-content: space-between;
