@@ -38,6 +38,7 @@
 		['/assistant', 'nav.assistant'],
 		['/gallery', 'nav.gallery'],
 		['/moodboards', 'nav.moodboards'],
+		['/embroidery', 'nav.embroidery'],
 		['/account', 'nav.account']
 	];
 	const pageTitle = $derived.by(() => {
@@ -73,6 +74,7 @@
 		{ href: '/assistant', key: 'nav.assistant', icon: '🤖' },
 		{ href: '/gallery', key: 'nav.gallery', icon: '🖼️' },
 		{ href: '/moodboards', key: 'nav.moodboards', icon: '🎨' },
+		{ href: '/embroidery', key: 'nav.embroidery', icon: '🪡' },
 		{ href: '/account', key: 'nav.account', icon: '👤' },
 		// Reset links and roles: administrators only.
 		...(data.user?.isAdmin ? [{ href: '/admin/users', key: 'nav.users', icon: '🔐' }] : [])

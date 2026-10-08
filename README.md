@@ -38,6 +38,7 @@ besoin :
 - un **inventaire** de laine, tissu, mercerie et outils ;
 - un **suivi de projets** (Kanban, compteur de rangs, prédiction d'échéance) ;
 - une **couche de motivation** (statistiques annuelles, objectifs, succès) ;
+- un **atelier d'écussons brodés** : n'importe quelle image devient un fichier `.pes` pour la Brother Skitch PP1 (via l'appli Artspira) ;
 - un **assistant IA** local (traduction de patrons, copilote, génération).
 
 ---
@@ -385,4 +386,5 @@ Chaque **push sur `main`** déclenche le workflow *Release* :
 - ✅ Aperçu coloris (Stable Diffusion)
 - ✅ Recherche sémantique (indexation + résultats « proches par le sens »)
 - ✅ Mood boards (palette de couleurs automatique), photos de projets, galerie
+- ✅ Écussons brodés : image → fichier .pes pour la Brother Skitch PP1 (Artspira), calculé dans le navigateur
 - ⏳ Plugins natifs (code-barres, push)

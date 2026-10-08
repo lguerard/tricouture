@@ -1,0 +1,124 @@
+// Brother's PEC thread palette: the 64 colours a PES/PEC file can name. The
+// index is what the file stores; the machine and Artspira show the name.
+// Values from pyembroidery (MIT, https://github.com/EmbroidePy/pyembroidery).
+
+export type Thread = { index: number; name: string; rgb: [number, number, number] };
+
+export const PEC_THREADS: readonly Thread[] = [
+	{ index: 1, name: 'Prussian Blue', rgb: [14, 31, 124] },
+	{ index: 2, name: 'Blue', rgb: [10, 85, 163] },
+	{ index: 3, name: 'Teal Green', rgb: [0, 135, 119] },
+	{ index: 4, name: 'Cornflower Blue', rgb: [75, 107, 175] },
+	{ index: 5, name: 'Red', rgb: [237, 23, 31] },
+	{ index: 6, name: 'Reddish Brown', rgb: [209, 92, 0] },
+	{ index: 7, name: 'Magenta', rgb: [145, 54, 151] },
+	{ index: 8, name: 'Light Lilac', rgb: [228, 154, 203] },
+	{ index: 9, name: 'Lilac', rgb: [145, 95, 172] },
+	{ index: 10, name: 'Mint Green', rgb: [158, 214, 125] },
+	{ index: 11, name: 'Deep Gold', rgb: [232, 169, 0] },
+	{ index: 12, name: 'Orange', rgb: [254, 186, 53] },
+	{ index: 13, name: 'Yellow', rgb: [255, 255, 0] },
+	{ index: 14, name: 'Lime Green', rgb: [112, 188, 31] },
+	{ index: 15, name: 'Brass', rgb: [186, 152, 0] },
+	{ index: 16, name: 'Silver', rgb: [168, 168, 168] },
+	{ index: 17, name: 'Russet Brown', rgb: [125, 111, 0] },
+	{ index: 18, name: 'Cream Brown', rgb: [255, 255, 179] },
+	{ index: 19, name: 'Pewter', rgb: [79, 85, 86] },
+	{ index: 20, name: 'Black', rgb: [0, 0, 0] },
+	{ index: 21, name: 'Ultramarine', rgb: [11, 61, 145] },
+	{ index: 22, name: 'Royal Purple', rgb: [119, 1, 118] },
+	{ index: 23, name: 'Dark Gray', rgb: [41, 49, 51] },
+	{ index: 24, name: 'Dark Brown', rgb: [42, 19, 1] },
+	{ index: 25, name: 'Deep Rose', rgb: [246, 74, 138] },
+	{ index: 26, name: 'Light Brown', rgb: [178, 118, 36] },
+	{ index: 27, name: 'Salmon Pink', rgb: [252, 187, 197] },
+	{ index: 28, name: 'Vermilion', rgb: [254, 55, 15] },
+	{ index: 29, name: 'White', rgb: [240, 240, 240] },
+	{ index: 30, name: 'Violet', rgb: [106, 28, 138] },
+	{ index: 31, name: 'Seacrest', rgb: [168, 221, 196] },
+	{ index: 32, name: 'Sky Blue', rgb: [37, 132, 187] },
+	{ index: 33, name: 'Pumpkin', rgb: [254, 179, 67] },
+	{ index: 34, name: 'Cream Yellow', rgb: [255, 243, 107] },
+	{ index: 35, name: 'Khaki', rgb: [208, 166, 96] },
+	{ index: 36, name: 'Clay Brown', rgb: [209, 84, 0] },
+	{ index: 37, name: 'Leaf Green', rgb: [102, 186, 73] },
+	{ index: 38, name: 'Peacock Blue', rgb: [19, 74, 70] },
+	{ index: 39, name: 'Gray', rgb: [135, 135, 135] },
+	{ index: 40, name: 'Warm Gray', rgb: [216, 204, 198] },
+	{ index: 41, name: 'Dark Olive', rgb: [67, 86, 7] },
+	{ index: 42, name: 'Flesh Pink', rgb: [253, 217, 222] },
+	{ index: 43, name: 'Pink', rgb: [249, 147, 188] },
+	{ index: 44, name: 'Deep Green', rgb: [0, 56, 34] },
+	{ index: 45, name: 'Lavender', rgb: [178, 175, 212] },
+	{ index: 46, name: 'Wisteria Violet', rgb: [104, 106, 176] },
+	{ index: 47, name: 'Beige', rgb: [239, 227, 185] },
+	{ index: 48, name: 'Carmine', rgb: [247, 56, 102] },
+	{ index: 49, name: 'Amber Red', rgb: [181, 75, 100] },
+	{ index: 50, name: 'Olive Green', rgb: [19, 43, 26] },
+	{ index: 51, name: 'Dark Fuchsia', rgb: [199, 1, 86] },
+	{ index: 52, name: 'Tangerine', rgb: [254, 158, 50] },
+	{ index: 53, name: 'Light Blue', rgb: [168, 222, 235] },
+	{ index: 54, name: 'Emerald Green', rgb: [0, 103, 62] },
+	{ index: 55, name: 'Purple', rgb: [78, 41, 144] },
+	{ index: 56, name: 'Moss Green', rgb: [47, 126, 32] },
+	{ index: 57, name: 'Flesh Pink', rgb: [255, 204, 204] },
+	{ index: 58, name: 'Harvest Gold', rgb: [255, 217, 17] },
+	{ index: 59, name: 'Electric Blue', rgb: [9, 91, 166] },
+	{ index: 60, name: 'Lemon Yellow', rgb: [240, 249, 112] },
+	{ index: 61, name: 'Fresh Green', rgb: [227, 243, 91] },
+	{ index: 62, name: 'Orange', rgb: [255, 153, 0] },
+	{ index: 63, name: 'Cream Yellow', rgb: [255, 240, 141] },
+	{ index: 64, name: 'Applique', rgb: [255, 200, 200] }
+];
+
+// Perceptual-ish RGB distance (the "redmean" approximation pyembroidery and
+// most embroidery software use to match a colour to a thread).
+export function colorDistance(a: readonly number[], b: readonly number[]): number {
+	const rMean = (a[0] + b[0]) / 2;
+	const r = a[0] - b[0];
+	const g = a[1] - b[1];
+	const bl = a[2] - b[2];
+	return ((512 + rMean) * r * r) / 256 + 4 * g * g + ((767 - rMean) * bl * bl) / 256;
+}
+
+export function nearestThread(rgb: readonly number[], exclude: ReadonlySet<number> = new Set()): Thread {
+	let best = PEC_THREADS[0];
+	let bestD = Infinity;
+	for (const t of PEC_THREADS) {
+		// "Applique" is a placeholder for fabric, not a thread to pick.
+		if (exclude.has(t.index) || t.name === 'Applique') continue;
+		const d = colorDistance(rgb, t.rgb);
+		if (d < bestD) {
+			bestD = d;
+			best = t;
+		}
+	}
+	return best;
+}
+
+export function threadHex(t: Thread): string {
+	return '#' + t.rgb.map((c) => c.toString(16).padStart(2, '0')).join('');
+}
+
+// The 48x38 one-bit frame every PEC thumbnail starts from (6 bytes per row).
+export const PEC_ICON_BLANK: readonly number[] = [
+	0, 0, 0, 0, 0, 0, 240, 255, 255, 255, 255, 15,
+	8, 0, 0, 0, 0, 16, 4, 0, 0, 0, 0, 32,
+	2, 0, 0, 0, 0, 64, 2, 0, 0, 0, 0, 64,
+	2, 0, 0, 0, 0, 64, 2, 0, 0, 0, 0, 64,
+	2, 0, 0, 0, 0, 64, 2, 0, 0, 0, 0, 64,
+	2, 0, 0, 0, 0, 64, 2, 0, 0, 0, 0, 64,
+	2, 0, 0, 0, 0, 64, 2, 0, 0, 0, 0, 64,
+	2, 0, 0, 0, 0, 64, 2, 0, 0, 0, 0, 64,
+	2, 0, 0, 0, 0, 64, 2, 0, 0, 0, 0, 64,
+	2, 0, 0, 0, 0, 64, 2, 0, 0, 0, 0, 64,
+	2, 0, 0, 0, 0, 64, 2, 0, 0, 0, 0, 64,
+	2, 0, 0, 0, 0, 64, 2, 0, 0, 0, 0, 64,
+	2, 0, 0, 0, 0, 64, 2, 0, 0, 0, 0, 64,
+	2, 0, 0, 0, 0, 64, 2, 0, 0, 0, 0, 64,
+	2, 0, 0, 0, 0, 64, 2, 0, 0, 0, 0, 64,
+	2, 0, 0, 0, 0, 64, 2, 0, 0, 0, 0, 64,
+	2, 0, 0, 0, 0, 64, 2, 0, 0, 0, 0, 64,
+	4, 0, 0, 0, 0, 32, 8, 0, 0, 0, 0, 16,
+	240, 255, 255, 255, 255, 15, 0, 0, 0, 0, 0, 0
+];
