@@ -15,14 +15,16 @@
 		project: '🧶',
 		yarn: '🧵',
 		fabric: '✂️',
-		notion: '🔘'
+		notion: '🔘',
+		embroidery: '🪡'
 	};
 	const KIND_GROUP: Record<SearchHit['kind'], string> = {
 		pattern: 'search.patterns',
 		project: 'search.projects',
 		yarn: 'search.stash',
 		fabric: 'search.stash',
-		notion: 'search.stash'
+		notion: 'search.stash',
+		embroidery: 'search.embroidery'
 	};
 
 	let query = $state('');

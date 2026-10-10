@@ -1,12 +1,12 @@
 import { json } from '@sveltejs/kit';
 import { and, desc, eq, ilike, or, sql } from 'drizzle-orm';
 import { db } from '$lib/server/db';
-import { fabrics, notions, patterns, projects, yarns } from '$lib/server/db/schema';
+import { embroideryDesigns, fabrics, notions, patterns, projects, yarns } from '$lib/server/db/schema';
 import { visibleTo } from '$lib/server/access';
 import type { RequestHandler } from './$types';
 
 export type SearchHit = {
-	kind: 'pattern' | 'project' | 'yarn' | 'fabric' | 'notion';
+	kind: 'pattern' | 'project' | 'yarn' | 'fabric' | 'notion' | 'embroidery';
 	id: string;
 	title: string;
 	subtitle?: string;
@@ -28,7 +28,7 @@ export const GET: RequestHandler = async ({ url, locals }) => {
 	if (q.length < 2) return json({ hits: [] });
 	const like = likePattern(q);
 
-	const [pats, projs, yarnRows, fabricRows, notionRows] = await Promise.all([
+	const [pats, projs, yarnRows, fabricRows, notionRows, patchRows] = await Promise.all([
 		db
 			.select({
 				id: patterns.id,
@@ -81,6 +81,12 @@ export const GET: RequestHandler = async ({ url, locals }) => {
 			.select({ id: notions.id, name: notions.name, category: notions.category, photoPath: notions.photoPath })
 			.from(notions)
 			.where(and(eq(notions.ownerId, uid), or(ilike(notions.name, like), ilike(notions.category, like))))
+			.limit(4),
+		db
+			.select({ id: embroideryDesigns.id, title: embroideryDesigns.title, previewPath: embroideryDesigns.previewPath })
+			.from(embroideryDesigns)
+			.where(and(eq(embroideryDesigns.ownerId, uid), ilike(embroideryDesigns.title, like)))
+			.orderBy(desc(embroideryDesigns.updatedAt))
 			.limit(4)
 	]);
 
@@ -118,6 +124,13 @@ export const GET: RequestHandler = async ({ url, locals }) => {
 			subtitle: n.category ?? undefined,
 			href: stashHref('notion'),
 			image: n.photoPath
+		})),
+		...patchRows.map((d) => ({
+			kind: 'embroidery' as const,
+			id: d.id,
+			title: d.title,
+			href: `/embroidery#design-${d.id}`,
+			image: d.previewPath
 		}))
 	];
 

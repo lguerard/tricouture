@@ -1,12 +1,18 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { invalidateAll } from '$app/navigation';
 	import { t } from '$lib/i18n';
 	import { toasts } from '$lib/toast.svelte';
+	import { mediaUrl } from '$lib/media';
 	import { digitize, sewingMinutes, HOOP_MM, type Design, type PatchShape, type RasterImage } from '$lib/embroidery/digitize';
 	import { writePes } from '$lib/embroidery/pes';
 	import { PEC_THREADS, threadHex } from '$lib/embroidery/threads';
+	import { canvasBlob, drawStitches, renderThumbnail } from '$lib/embroidery/render';
+	import type { PageData } from './$types';
 
 	let { data } = $props();
+	type EmbroideryDesign = PageData['designs'][number];
+	type EmbroiderySettings = EmbroideryDesign['settings'];
 	const locale = $derived(data.locale);
 
 	const THREADS = PEC_THREADS.filter((th) => th.name !== 'Applique');
@@ -16,7 +22,7 @@
 
 	let image = $state<RasterImage | null>(null);
 	let imageUrl = $state<string | null>(null);
-	let fileBase = $state('ecusson');
+	let title = $state('');
 	let sizeMm = $state(70);
 	let colors = $state(4);
 	let removeBackground = $state(true);
@@ -33,6 +39,14 @@
 	let canvas = $state<HTMLCanvasElement>();
 	let inApp = $state(false);
 
+	// Library: every patch made here is saved automatically (picture, preview,
+	// .pes and settings); changes to the open one update the same entry.
+	let sourceCanvas: HTMLCanvasElement | null = null; // the downscaled picture
+	let currentId = $state<string | null>(null);
+	let session = $state(0); // bumps with each picture loaded
+	let savedKey = '';
+	let saveState = $state<'idle' | 'saving' | 'saved' | 'error'>('idle');
+
 	onMount(() => {
 		// Android app (WebView): file downloads don't reach the phone there.
 		inApp = '__capacitor' in window || 'Capacitor' in window || / wv\)/.test(navigator.userAgent);
@@ -41,7 +55,25 @@
 	const threads = $derived(design ? design.threads.map((i) => swaps[i] ?? i) : []);
 	const uniqueThreads = $derived([...new Set(design?.threads ?? [])]);
 
-	async function load(file: File | undefined) {
+	// File name for a title: ASCII, no spaces (machines and Artspira are picky).
+	function safeName(s: string) {
+		return (
+			s
+				.normalize('NFD')
+				.replace(/[^A-Za-z0-9_-]+/g, '_')
+				.replace(/^_+|_+$/g, '')
+				.slice(0, 40) || 'ecusson'
+		);
+	}
+	const fileBase = $derived(safeName(title));
+
+	function currentSettings(): EmbroiderySettings {
+		return { sizeMm, colors, removeBackground, shape, borderThread, backgroundThread, density, fabric, swaps };
+	}
+	const keyFor = () => JSON.stringify({ session, title, settings: currentSettings() });
+
+	// `from`: a design reopened from the library, to edit in place.
+	async function load(file: File | undefined, from?: EmbroideryDesign) {
 		if (!file) return;
 		try {
 			const bitmap = await createImageBitmap(file);
@@ -54,17 +86,25 @@
 			const ctx = c.getContext('2d')!;
 			ctx.drawImage(bitmap, 0, 0, w, h);
 			bitmap.close();
-			image = { width: w, height: h, data: ctx.getImageData(0, 0, w, h).data };
+			sourceCanvas = c;
 			if (imageUrl) URL.revokeObjectURL(imageUrl);
 			imageUrl = URL.createObjectURL(file);
-			fileBase =
-				file.name
-					.replace(/\.[^.]+$/, '')
-					.normalize('NFD')
-					.replace(/[^A-Za-z0-9_-]+/g, '_')
-					.replace(/^_+|_+$/g, '')
-					.slice(0, 40) || 'ecusson';
-			swaps = {};
+			session++;
+			if (from) {
+				const st = from.settings;
+				({ sizeMm, colors, removeBackground, shape, borderThread, backgroundThread, density, fabric } = st);
+				swaps = Object.fromEntries(Object.entries(st.swaps ?? {}).map(([k, v]) => [Number(k), v]));
+				title = from.title;
+				currentId = from.id;
+				savedKey = keyFor(); // already in the library as it is
+				saveState = 'saved';
+			} else {
+				title = file.name.replace(/\.[^.]+$/, '').slice(0, 200) || 'Écusson';
+				swaps = {};
+				currentId = null;
+				saveState = 'idle';
+			}
+			image = { width: w, height: h, data: ctx.getImageData(0, 0, w, h).data };
 		} catch {
 			toasts.push({ kind: 'error', key: 'embroidery.errorImage' }, 6000);
 		}
@@ -112,43 +152,66 @@
 		ctx.fillStyle = bg;
 		ctx.fillRect(0, 0, px, px);
 		// The 100 mm hoop area, design centred like on the machine.
-		const scale = px / (HOOP_MM * 10);
-		ctx.save();
-		ctx.translate(px / 2, px / 2);
-		ctx.scale(scale, scale);
-		ctx.lineCap = 'round';
-		ctx.lineJoin = 'round';
-		ctx.lineWidth = 3.5; // ~0.35 mm thread
-		let block = 0;
-		let prev: { x: number; y: number } | null = null;
-		const stroke = () => {
-			const thread = threadByIndex.get(th[block] ?? 20);
-			ctx.strokeStyle = thread ? threadHex(thread) : '#000';
-			ctx.stroke();
-			ctx.beginPath();
-		};
-		ctx.beginPath();
-		for (const c of d.commands) {
-			if (c.kind === 'stitch') {
-				if (prev) ctx.lineTo(c.x, c.y);
-				else ctx.moveTo(c.x, c.y);
-				prev = c;
-			} else if (c.kind === 'jump') {
-				prev = null;
-			} else if (c.kind === 'color') {
-				stroke();
-				block++;
-				prev = null;
-			}
-		}
-		stroke();
-		ctx.restore();
+		drawStitches(ctx, d.commands, th, px / (HOOP_MM * 10), px / 2, px / 2);
 		// Hoop outline.
 		ctx.strokeStyle = 'rgba(0,0,0,0.25)';
 		ctx.setLineDash([6 * dpr, 6 * dpr]);
 		ctx.lineWidth = dpr;
 		ctx.strokeRect(dpr, dpr, px - 2 * dpr, px - 2 * dpr);
 	});
+
+	// Autosave, a moment after the design stops changing.
+	$effect(() => {
+		const d = design;
+		const key = keyFor();
+		if (!d || busy || key === savedKey) return;
+		const timer = setTimeout(save, 1200);
+		return () => clearTimeout(timer);
+	});
+
+	let saving: Promise<void> | null = null;
+	async function save(): Promise<void> {
+		while (saving) await saving;
+		const d = design;
+		const key = keyFor();
+		if (!d || !sourceCanvas || busy || key === savedKey) return;
+		const th = [...threads];
+		const src = sourceCanvas;
+		saving = (async () => {
+			saveState = 'saving';
+			try {
+				const form = new FormData();
+				form.set(
+					'meta',
+					JSON.stringify({
+						title: title.trim() || 'Écusson',
+						settings: currentSettings(),
+						threads: th,
+						widthMm: d.widthMm,
+						heightMm: d.heightMm,
+						stitchCount: d.stitchCount
+					})
+				);
+				form.set('image', await canvasBlob(src), 'source');
+				form.set('preview', await canvasBlob(renderThumbnail(d.commands, th)), 'preview');
+				form.set('pes', new Blob([writePes(d.commands, th, fileBase)]), 'design.pes');
+				const send = (id: string | null) =>
+					fetch(id ? `/api/embroidery/${id}` : '/api/embroidery', { method: id ? 'PUT' : 'POST', body: form });
+				let res = await send(currentId);
+				if (res.status === 404 && currentId) res = await send(null); // deleted meanwhile
+				if (!res.ok) throw new Error(`save failed: ${res.status}`);
+				currentId = (await res.json()).id;
+				savedKey = key;
+				saveState = 'saved';
+				await invalidateAll();
+			} catch (e) {
+				console.error(e);
+				saveState = 'error';
+			}
+		})();
+		await saving;
+		saving = null;
+	}
 
 	function pesFile(): File | null {
 		if (!design) return null;
@@ -167,6 +230,7 @@
 		a.click();
 		a.remove();
 		setTimeout(() => URL.revokeObjectURL(url), 10_000);
+		save();
 	}
 
 	const canShare = $derived.by(() => {
@@ -181,12 +245,58 @@
 	async function share() {
 		const file = pesFile();
 		if (!file) return;
+		const shared = navigator.share({ files: [file], title: file.name });
+		save();
 		try {
-			await navigator.share({ files: [file], title: file.name });
+			await shared;
 		} catch (e) {
 			if ((e as Error).name !== 'AbortError') toasts.push({ kind: 'error', key: 'embroidery.errorShare' }, 6000);
 		}
 	}
+
+	async function shareSaved(d: EmbroideryDesign) {
+		try {
+			const blob = await (await fetch(`/media/${d.pesPath}`)).blob();
+			await navigator.share({ files: [new File([blob], `${safeName(d.title)}.pes`, { type: 'application/octet-stream' })], title: d.title });
+		} catch (e) {
+			if ((e as Error).name !== 'AbortError') toasts.push({ kind: 'error', key: 'embroidery.errorShare' }, 6000);
+		}
+	}
+
+	async function reopen(d: EmbroideryDesign) {
+		try {
+			const blob = await (await fetch(`/media/${d.imagePath}`)).blob();
+			await load(new File([blob], d.title, { type: blob.type }), d);
+			window.scrollTo({ top: 0, behavior: 'smooth' });
+		} catch {
+			toasts.push({ kind: 'error', key: 'toast.error' }, 6000);
+		}
+	}
+
+	function clearEditor() {
+		image = null;
+		design = null;
+		sourceCanvas = null;
+		currentId = null;
+		saveState = 'idle';
+		if (imageUrl) URL.revokeObjectURL(imageUrl);
+		imageUrl = null;
+	}
+
+	// Permanent: the entry and its files are gone, no undo.
+	async function remove(d: EmbroideryDesign) {
+		if (!confirm(t(locale, 'embroidery.confirmDelete', { title: d.title }))) return;
+		const res = await fetch(`/api/embroidery/${d.id}`, { method: 'DELETE' });
+		if (!res.ok && res.status !== 404) {
+			toasts.push({ kind: 'error', key: 'toast.error' }, 6000);
+			return;
+		}
+		if (d.id === currentId) clearEditor();
+		toasts.push({ kind: 'success', key: 'embroidery.deleted' });
+		await invalidateAll();
+	}
+
+	const dateFmt = $derived(new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'short', year: 'numeric' }));
 
 	const minutes = $derived(design ? Math.max(1, Math.round(sewingMinutes(design))) : 0);
 </script>
@@ -224,10 +334,20 @@
 				<input
 					type="file"
 					accept="image/png,image/jpeg,image/webp,image/gif,image/bmp"
-					onchange={(e) => load((e.currentTarget as HTMLInputElement).files?.[0])}
+					onchange={(e) => {
+						const input = e.currentTarget as HTMLInputElement;
+						load(input.files?.[0]);
+						input.value = ''; // picking the same file again still counts
+					}}
 				/>
 			</label>
 
+			{#if image}
+				<div class="field">
+					<label for="emb-title">{t(locale, 'embroidery.name')}</label>
+					<input id="emb-title" maxlength="200" bind:value={title} />
+				</div>
+			{/if}
 			<div class="field">
 				<label for="emb-size">{t(locale, 'embroidery.size', { n: sizeMm })}</label>
 				<input id="emb-size" type="range" min="30" max={HOOP_MM} step="5" bind:value={sizeMm} />
@@ -315,11 +435,54 @@
 							<button type="button" onclick={share}>📤 {t(locale, 'embroidery.share')}</button>
 						{/if}
 					</div>
-					<p class="muted small">{t(locale, 'embroidery.howto')}</p>
+					<p class="save-state small" class:error={saveState === 'error'} aria-live="polite">
+					{#if saveState === 'saving'}{t(locale, 'embroidery.saving')}{:else if saveState === 'saved'}✓ {t(locale, 'embroidery.saved')}{:else if saveState === 'error'}{t(locale, 'embroidery.saveError')}{/if}
+				</p>
+				<p class="muted small">{t(locale, 'embroidery.howto')}</p>
 				{/if}
 			{/if}
 		</section>
 	</div>
+
+	<section class="library">
+		<h2>{t(locale, 'embroidery.library')} <span class="muted">({data.designs.length})</span></h2>
+		{#if data.designs.length === 0}
+			<p class="muted">{t(locale, 'embroidery.libraryEmpty')}</p>
+		{:else}
+			<div class="lib-grid">
+				{#each data.designs as d (d.id)}
+					<article class="card lib-item" id={`design-${d.id}`} class:current={d.id === currentId}>
+						<button type="button" class="lib-thumb" style:background={d.settings.fabric} onclick={() => reopen(d)} aria-label={t(locale, 'embroidery.edit')}>
+							<img src={mediaUrl(d.previewPath, 400)} alt={d.title} loading="lazy" />
+						</button>
+						<strong class="lib-title">{d.title}</strong>
+						<span class="muted small">
+							{t(locale, 'embroidery.libraryMeta', {
+								w: Math.round(d.widthMm),
+								h: Math.round(d.heightMm),
+								n: d.stitchCount.toLocaleString(locale),
+								date: dateFmt.format(new Date(d.updatedAt))
+							})}
+						</span>
+						<span class="lib-swatches">
+							{#each [...new Set(d.threads)] as idx}
+								{@const th = threadByIndex.get(idx)}
+								<span class="swatch-sm" style:background={th ? threadHex(th) : '#000'} title={th?.name}></span>
+							{/each}
+						</span>
+						<div class="lib-actions">
+							<a class="btn" href={`/media/${d.pesPath}`} download={`${safeName(d.title)}.pes`}>⬇ .pes</a>
+							{#if canShare}
+								<button type="button" onclick={() => shareSaved(d)} aria-label={t(locale, 'embroidery.share')}>📤</button>
+							{/if}
+							<button type="button" onclick={() => reopen(d)}>✏️ {t(locale, 'embroidery.edit')}</button>
+							<button type="button" class="danger" onclick={() => remove(d)} aria-label={t(locale, 'embroidery.delete')} title={t(locale, 'embroidery.delete')}>🗑</button>
+						</div>
+					</article>
+				{/each}
+			</div>
+		{/if}
+	</section>
 </div>
 
 <style>
@@ -484,5 +647,84 @@
 	}
 	.small {
 		font-size: 0.85rem;
+	}
+	.save-state {
+		min-height: 1.2em;
+		margin: 0 0 0.3rem;
+		color: var(--ok);
+	}
+	.save-state.error {
+		color: var(--danger);
+	}
+	.library {
+		margin-top: 2rem;
+	}
+	.library h2 {
+		font-size: 1.2rem;
+	}
+	.lib-grid {
+		display: grid;
+		gap: 1rem;
+		grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+	}
+	.lib-item {
+		display: flex;
+		flex-direction: column;
+		gap: 0.35rem;
+		min-width: 0;
+	}
+	.lib-item.current,
+	.lib-item:target {
+		outline: 2px solid var(--accent);
+	}
+	.lib-thumb {
+		padding: 0;
+		border-radius: var(--radius);
+		aspect-ratio: 1;
+		overflow: hidden;
+		display: block;
+		width: 100%;
+	}
+	.lib-thumb img {
+		width: 100%;
+		height: 100%;
+		object-fit: contain;
+		display: block;
+	}
+	.lib-title {
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	.lib-swatches {
+		display: flex;
+		gap: 3px;
+		flex-wrap: wrap;
+	}
+	.swatch-sm {
+		width: 16px;
+		height: 16px;
+		border-radius: 50%;
+		border: 1px solid var(--border);
+	}
+	.lib-actions {
+		display: flex;
+		gap: 0.3rem;
+		flex-wrap: wrap;
+		margin-top: auto;
+		padding-top: 0.3rem;
+	}
+	.lib-actions > * {
+		min-height: 40px;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+	}
+	.lib-actions .btn {
+		text-decoration: none;
+	}
+	.lib-actions .danger {
+		margin-left: auto;
+		color: var(--danger);
 	}
 </style>
