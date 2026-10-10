@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { mediaUrl } from '$lib/media';
+	import PdfViewer from '$lib/components/PdfViewer.svelte';
 	import { enhance } from '$app/forms';
 	import { withFeedback } from '$lib/feedback';
 	import { invalidateAll } from '$app/navigation';
@@ -246,12 +247,14 @@
 					<div class="file card">
 						<div class="file-head">
 							<strong>{f.filename}</strong>
-							<a href={`/media/${f.storedPath}`} target="_blank" rel="noopener">{t(locale, 'patterns.detail.open')}</a>
+							{#if !isPdf(f.mimeType)}
+								<a href={`/media/${f.storedPath}`} target="_blank" rel="noopener">{t(locale, 'patterns.detail.open')}</a>
+							{/if}
 						</div>
 						{#if isImage(f.mimeType)}
 							<img src={mediaUrl(f.storedPath, 800)} loading="lazy" alt={f.filename} />
 						{:else if isPdf(f.mimeType)}
-							<iframe src={`/media/${f.storedPath}`} title={f.filename}></iframe>
+							<PdfViewer src={`/media/${f.storedPath}`} title={f.filename} {locale} />
 						{/if}
 					</div>
 				{/each}
@@ -534,12 +537,6 @@
 	}
 	.file img {
 		max-width: 100%;
-		border-radius: var(--radius);
-	}
-	.file iframe {
-		width: 100%;
-		height: 70vh;
-		border: none;
 		border-radius: var(--radius);
 	}
 	@media (max-width: 720px) {
