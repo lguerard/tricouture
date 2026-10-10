@@ -574,6 +574,42 @@ export const storageBins = pgTable(
 	(t) => ({ ownerIdx: index('bins_owner_idx').on(t.ownerId) })
 );
 
+// Embroidered patches made in the Écussons tab: the source picture, a stitch
+// preview and the .pes file, plus the settings to reopen them in the editor.
+export type EmbroiderySettings = {
+	sizeMm: number;
+	colors: number;
+	removeBackground: boolean;
+	shape: 'none' | 'circle' | 'rounded';
+	borderThread: number;
+	backgroundThread: number;
+	density: 'light' | 'normal' | 'dense';
+	fabric: string;
+	swaps: Record<string, number>;
+};
+
+export const embroideryDesigns = pgTable(
+	'embroidery_designs',
+	{
+		id: uuid('id').primaryKey().defaultRandom(),
+		ownerId: uuid('owner_id')
+			.notNull()
+			.references(() => users.id, { onDelete: 'cascade' }),
+		title: varchar('title', { length: 200 }).notNull(),
+		imagePath: text('image_path').notNull(), // source picture (downscaled)
+		previewPath: text('preview_path').notNull(), // stitch preview (PNG/WebP)
+		pesPath: text('pes_path').notNull(),
+		settings: jsonb('settings').$type<EmbroiderySettings>().notNull(),
+		threads: jsonb('threads').$type<number[]>().notNull(), // PEC indices, sewing order
+		widthMm: real('width_mm').notNull(),
+		heightMm: real('height_mm').notNull(),
+		stitchCount: integer('stitch_count').notNull(),
+		createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+		updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow()
+	},
+	(t) => ({ ownerIdx: index('embroidery_designs_owner_idx').on(t.ownerId, t.updatedAt) })
+);
+
 /* ------------------------------------------------------------------ */
 /* Inferred types                                                     */
 /* ------------------------------------------------------------------ */
@@ -582,6 +618,7 @@ export type User = typeof users.$inferSelect;
 export type PasswordResetToken = typeof passwordResetTokens.$inferSelect;
 export type Pattern = typeof patterns.$inferSelect;
 export type PatternFile = typeof patternFiles.$inferSelect;
+export type EmbroideryDesign = typeof embroideryDesigns.$inferSelect;
 export type Yarn = typeof yarns.$inferSelect;
 export type Project = typeof projects.$inferSelect;
 export type ProjectYarn = typeof projectYarns.$inferSelect;
