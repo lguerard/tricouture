@@ -7,10 +7,17 @@ on:
         description: "Tricouture server URL (falls back to SERVER_URL repo variable)"
         required: false
         type: string
+      version:
+        description: "Version shown by Android (e.g. 0.18.1); defaults to a dev build number"
+        required: false
+        type: string
   # Allows other workflows (release) to reuse this build.
   workflow_call:
     inputs:
       server_url:
+        required: false
+        type: string
+      version:
         required: false
         type: string
     secrets:
@@ -71,6 +78,26 @@ jobs:
         env:
           CAP_SERVER_URL: ${{ steps.url.outputs.value }}
         run: npx cap add android
+
+      # Capacitor's template ships versionName "1.0" / versionCode 1 forever:
+      # Android then can't tell an APK from the previous one. Stamp the release
+      # version instead (versionCode must grow: 0.18.1 -> 18001).
+      - name: Set app version
+        working-directory: mobile
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          if echo "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            IFS=. read -r MAJ MIN PAT <<< "$VERSION"
+            CODE=$((MAJ * 1000000 + MIN * 1000 + PAT))
+            NAME="$VERSION"
+          else
+            CODE=${{ github.run_number }}
+            NAME="dev-${GITHUB_SHA::7}"
+          fi
+          GRADLE=android/app/build.gradle
+          sed -i -E "s/versionCode [0-9]+/versionCode $CODE/; s/versionName \"[^\"]*\"/versionName \"$NAME\"/" "$GRADLE"
+          grep -E "versionCode|versionName" "$GRADLE"
 
       - name: Inject runtime permissions (camera, mic, notifications, vibration)
         working-directory: mobile

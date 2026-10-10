@@ -1,6 +1,6 @@
 <script lang="ts">
 	import '../app.css';
-	import { page } from '$app/stores';
+	import { page, updated } from '$app/stores';
 	import { afterNavigate, beforeNavigate, invalidateAll } from '$app/navigation';
 	import { t, LOCALES, type Locale } from '$lib/i18n';
 	import { craftLabel, CRAFTS } from '$lib/labels';
@@ -9,10 +9,24 @@
 	import ThemeSwitch from '$lib/components/ThemeSwitch.svelte';
 	import SearchPalette from '$lib/components/SearchPalette.svelte';
 	import { flushPendingDeletes } from '$lib/undo';
+	import { toasts } from '$lib/toast.svelte';
 
 	let { data, children } = $props();
 
 	beforeNavigate(flushPendingDeletes);
+
+	// A new version of the site was deployed while this page was open (the
+	// Android app can stay open for days): offer a reload, and turn the next
+	// in-app navigation into a full page load so it runs the new code.
+	let updateOffered = false;
+	$effect(() => {
+		if (!$updated || updateOffered) return;
+		updateOffered = true;
+		toasts.push({ kind: 'info', key: 'app.updated', action: { key: 'app.reload', run: () => location.reload() } }, 24 * 3600_000);
+	});
+	beforeNavigate(({ willUnload, to }) => {
+		if ($updated && !willUnload && to?.url) location.href = to.url.href;
+	});
 
 	// Tab title: "<pattern/project> · <section> · Tricouture". Most specific
 	// prefix first; "/" only matches exactly.
