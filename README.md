@@ -211,8 +211,10 @@ Variables principales du fichier `.env` :
 | `ORIGIN` | URL publique réelle (doit correspondre au navigateur) |
 | `AUTH_SECRET` | secret de session (`openssl rand -hex 32`) |
 | `OLLAMA_URL` | URL du LLM (vide = IA désactivée proprement) |
-| `OLLAMA_CHAT_MODEL` / `OLLAMA_EMBED_MODEL` | modèles utilisés |
-| `WHISPER_URL` | sidecar IA voix |
+| `OLLAMA_CHAT_MODEL` / `OLLAMA_EMBED_MODEL` | modèles utilisés (chat multimodal : lit aussi les étiquettes) |
+| `OLLAMA_NUM_CTX` | contexte (tokens) de chaque requête, 8192 ; identique pour toutes les apps d'un même Ollama |
+| `COMPOSE_PROFILES` | `local-ollama` pour lancer l'Ollama de l'override GPU (vide si un Ollama existe déjà) |
+| `WHISPER_URL` / `WHISPER_MODEL` | sidecar IA voix et son modèle |
 | `CLOUDFLARE_TUNNEL_TOKEN` | exposition via Cloudflare (optionnel) |
 
 ---
