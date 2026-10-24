@@ -385,7 +385,7 @@ Chaque **push sur `main`** déclenche le workflow *Release* :
 - ✅ IA texte (traduction, copilote, génération)
 - ✅ IA vision/voix (lecture d'étiquette, compteur vocal)
 - ✅ App Android (Capacitor) + CI release
-- ✅ Aperçu coloris (Stable Diffusion)
+- ✅ Aperçu coloris (recoloration de la photo dans le navigateur)
 - ✅ Recherche sémantique (indexation + résultats « proches par le sens »)
 - ✅ Mood boards (palette de couleurs automatique), photos de projets, galerie
 - ✅ Écussons brodés : image → fichier .pes pour la Brother Skitch PP1 (Artspira), calculé dans le navigateur, avec bibliothèque de tous les écussons créés

@@ -1,4 +1,4 @@
-# Override to enable AI sidecars on GPU (phases 3-5).
+# Override to enable the AI services on GPU (LLM + voice).
 # Usage: docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d
 # Host prerequisite: NVIDIA driver + nvidia-container-toolkit.
 #
@@ -90,26 +90,8 @@ services:
               count: all
               capabilities: [gpu]
 
-  # Stable Diffusion service (colorway preview) — phase 5.
-  # Model configurable via SD_MODEL_ID (default SD 2.1-base ~4 GB VRAM).
-  # First start: downloads HuggingFace weights (~5-6 GB).
-  sd:
-    build: ./services/sd
-    restart: unless-stopped
-    environment:
-      SD_MODEL_ID: ${SD_MODEL_ID:-stabilityai/stable-diffusion-2-1-base}
-      HF_TOKEN: ${HF_TOKEN:-}
-    volumes:
-      - models:/models
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
-
 volumes:
+  # Ollama's model store (name kept from earlier versions so existing
+  # installs keep their downloaded models).
   models:
-  media:
   whisper-cache:

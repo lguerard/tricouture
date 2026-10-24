@@ -18,7 +18,6 @@ services:
       # Ollama reload the model on each switch.
       OLLAMA_NUM_CTX: ${OLLAMA_NUM_CTX:-8192}
       WHISPER_URL: ${WHISPER_URL:-}
-      SD_URL: ${SD_URL:-}
       # Monthly model-watch cron job (scripts/model-watch/) — empty disables
       # the /api/cron/model-watch endpoint entirely (503).
       MODEL_WATCH_TOKEN: ${MODEL_WATCH_TOKEN:-}

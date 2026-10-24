@@ -7,6 +7,7 @@
 	import { YARN_WEIGHTS, MOTIF_VALUES, motifLabel, COLOR_NAMES, toolTypeOptions, toolTypeLabel } from '$lib/labels';
 	import { isCapacitor, scanBarcode } from '$lib/capacitor';
 	import { t } from '$lib/i18n';
+	import { recolorImage } from '$lib/recolor';
 	let { data, form } = $props();
 	const locale = $derived(data.locale);
 
@@ -57,33 +58,40 @@
 		form?.error ? t(locale, ADD_ERRORS[form.error as string] ?? 'stash.errGeneric') : ''
 	);
 
-	// SD colorway preview
+	// Colorway preview: recolours the yarn's own photo toward a colour picked
+	// in the card, in the browser (lib/recolor.ts) -- instant, no AI service.
 	let previewYarnId = $state<string | null>(null);
 	let previewBusy = $state(false);
 	let previewSrc = $state<string | null>(null);
 	let previewError = $state('');
+	let previewColor = $state('#888888');
 
-	async function generatePreview(yarnId: string, colorHex: string, label: string) {
-		previewYarnId = yarnId;
-		previewBusy = true;
-		previewSrc = null;
-		previewError = '';
-		try {
-			const res = await fetch('/api/ai/preview-colorway', {
-				method: 'POST',
-				headers: { 'content-type': 'application/json' },
-				body: JSON.stringify({ prompt: `pelote de laine ${label}, texturée`, colorHex })
-			});
-			const d = await res.json();
-			if (!res.ok) {
-				previewError = d.message ?? t(locale, 'stash.previewUnavailable');
-			} else {
-				previewSrc = `data:image/png;base64,${d.image_base64}`;
-			}
-		} catch {
-			previewError = t(locale, 'stash.networkError');
+	function togglePreview(yarnId: string, photoPath: string | null, colorHex: string | null) {
+		if (previewYarnId === yarnId) {
+			previewYarnId = null;
+			previewSrc = null;
+			previewError = '';
+			return;
 		}
-		previewBusy = false;
+		previewYarnId = yarnId;
+		previewSrc = null;
+		previewError = photoPath ? '' : t(locale, 'stash.yarn.previewNoPhoto');
+		previewColor = colorHex ?? '#888888';
+		if (photoPath) void renderPreview(photoPath);
+	}
+
+	// Latest request wins: dragging the colour picker fires many inputs.
+	let previewSeq = 0;
+	async function renderPreview(photoPath: string) {
+		const seq = ++previewSeq;
+		previewBusy = true;
+		try {
+			const src = await recolorImage(mediaUrl(photoPath, 800), previewColor);
+			if (seq === previewSeq) previewSrc = src;
+		} catch {
+			if (seq === previewSeq) previewError = t(locale, 'stash.previewUnavailable');
+		}
+		if (seq === previewSeq) previewBusy = false;
 	}
 
 	// Fields pre-fill: shared by label OCR, barcode lookup, and URL import — across all 4 tabs.
@@ -533,12 +541,22 @@
 					{#if previewYarnId === y.id && previewError}
 						<span class="muted small">{previewError}</span>
 					{/if}
+					{#if previewYarnId === y.id && y.photoPath}
+						<label class="preview-color small">
+							{t(locale, 'stash.yarn.previewColor')}
+							<input
+								type="color"
+								bind:value={previewColor}
+								oninput={() => y.photoPath && renderPreview(y.photoPath)}
+							/>
+						</label>
+					{/if}
 					<div class="card-actions">
 						<button
 							type="button"
 							class="btn-ghost small"
-							disabled={previewBusy && previewYarnId === y.id}
-							onclick={() => generatePreview(y.id, y.colorHex ?? '#888', [y.brand, y.name, y.colorway].filter(Boolean).join(' '))}
+							aria-pressed={previewYarnId === y.id}
+							onclick={() => togglePreview(y.id, y.photoPath, y.colorHex)}
 						>
 							{previewBusy && previewYarnId === y.id ? `⏳ ${t(locale, 'stash.yarn.generating')}` : `🎨 ${t(locale, 'stash.yarn.previewBtn')}`}
 						</button>
@@ -741,6 +759,18 @@
 	.btn-ghost.small {
 		font-size: 0.82rem;
 		padding: 0.3rem 0.6rem;
+	}
+	.preview-color {
+		display: flex;
+		align-items: center;
+		gap: 0.4rem;
+	}
+	.preview-color input {
+		width: 2.4rem;
+		height: 1.6rem;
+		padding: 0;
+		border: none;
+		background: none;
 	}
 	.preview-img {
 		width: 100%;
