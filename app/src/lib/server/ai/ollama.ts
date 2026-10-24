@@ -143,16 +143,25 @@ export async function generate(
 // Embedding vector (768 dims with nomic-embed-text → vector(768) column).
 // Bounded: it runs inline when a pattern or yarn is saved, and a hung Ollama
 // must not hang the save with it (callers treat a failure as "no vector").
+// Uses /api/embed (`input`, batched response); falls back to the deprecated
+// /api/embeddings only when the server is too old to know /api/embed (404).
 export async function embed(text: string): Promise<number[]> {
-	const data = (await call(
-		'/api/embeddings',
-		{
-			model: EMBED_MODEL(),
-			prompt: text
-		},
-		EMBED_TIMEOUT_MS
-	)) as { embedding?: number[] };
-	if (!data.embedding) throw new Error('Empty embedding');
+	try {
+		const data = (await call('/api/embed', { model: EMBED_MODEL(), input: text }, EMBED_TIMEOUT_MS)) as {
+			embeddings?: number[][];
+		};
+		const vec = data.embeddings?.[0];
+		if (!vec?.length) throw new Error('Empty embedding');
+		return vec;
+	} catch (e) {
+		if (!(e instanceof OllamaHttpError && e.status === 404)) throw e;
+		// A 404 can also mean "model not found": the legacy endpoint then
+		// fails the same way, so the error surfaced stays meaningful.
+	}
+	const data = (await call('/api/embeddings', { model: EMBED_MODEL(), prompt: text }, EMBED_TIMEOUT_MS)) as {
+		embedding?: number[];
+	};
+	if (!data.embedding?.length) throw new Error('Empty embedding');
 	return data.embedding;
 }
 

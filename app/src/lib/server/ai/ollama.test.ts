@@ -90,3 +90,28 @@ describe('generate request shape', () => {
 		expect(fetchMock).not.toHaveBeenCalled();
 	});
 });
+
+describe('embed', () => {
+	it('uses /api/embed with `input` and reads embeddings[0]', async () => {
+		const { embed } = await import('./ollama');
+		fetchMock.mockResolvedValue(reply({ embeddings: [[0.1, 0.2, 0.3]] }));
+		await expect(embed('pull chaud')).resolves.toEqual([0.1, 0.2, 0.3]);
+		expect(fetchMock.mock.calls[0][0]).toBe('http://ollama:11434/api/embed');
+		expect(sentBody()).toEqual({ model: 'nomic-embed-text', input: 'pull chaud' });
+	});
+
+	it('falls back to the legacy /api/embeddings on a 404', async () => {
+		const { embed } = await import('./ollama');
+		fetchMock.mockResolvedValueOnce(reply({ error: 'not found' }, 404)).mockResolvedValueOnce(reply({ embedding: [1, 2] }));
+		await expect(embed('x')).resolves.toEqual([1, 2]);
+		expect(fetchMock.mock.calls[1][0]).toBe('http://ollama:11434/api/embeddings');
+		expect(sentBody(1)).toEqual({ model: 'nomic-embed-text', prompt: 'x' });
+	});
+
+	it('does not retry on other errors', async () => {
+		const { embed } = await import('./ollama');
+		fetchMock.mockResolvedValue(reply({ error: 'boom' }, 500));
+		await expect(embed('x')).rejects.toThrow('Ollama 500');
+		expect(fetchMock).toHaveBeenCalledTimes(1);
+	});
+});
