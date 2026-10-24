@@ -101,7 +101,8 @@ besoin :
 
 - **Traduction** de patrons EN/JP/DE → FR (glossaire tricot/crochet).
 - **Copilote** et **génération de patron**.
-- **OCR** d'étiquettes, **transcription vocale** (compteur mains-libres).
+- **Lecture d'étiquettes** de pelotes (photo → marque, composition, métrage…),
+  **transcription vocale** (compteur mains-libres).
 - **Recherche par le sens** (Ctrl K) : « pull chaud pour l'hiver » retrouve un
   patron intitulé « Aran ». La page *Mon compte* indexe les patrons et laines
   créés pendant que l'IA était indisponible.
@@ -152,12 +153,12 @@ besoin :
         │  UI + API + auth   │   │     pgvector)    │
         └─────────┬──────────┘   └──────────────────┘
                   │ (optionnel, GPU)
-     ┌────────────┼─────────────┐
-     ▼            ▼             ▼
- ┌────────┐  ┌─────────┐   ┌──────────┐
- │ ollama │  │ vision  │   │ whisper  │
- │ (LLM)  │  │ (OCR)   │   │ (STT)    │
- └────────┘  └─────────┘   └──────────┘
+          ┌───────┴───────┐
+          ▼               ▼
+ ┌─────────────────┐  ┌──────────┐
+ │ ollama          │  │ whisper  │
+ │ (LLM + images)  │  │ (STT)    │
+ └─────────────────┘  └──────────┘
 ```
 
 - **Frontend + backend** : SvelteKit (adapter-node), une seule base de code,
@@ -211,7 +212,7 @@ Variables principales du fichier `.env` :
 | `AUTH_SECRET` | secret de session (`openssl rand -hex 32`) |
 | `OLLAMA_URL` | URL du LLM (vide = IA désactivée proprement) |
 | `OLLAMA_CHAT_MODEL` / `OLLAMA_EMBED_MODEL` | modèles utilisés |
-| `VISION_URL` / `WHISPER_URL` | sidecars IA vision/voix |
+| `WHISPER_URL` | sidecar IA voix |
 | `CLOUDFLARE_TUNNEL_TOKEN` | exposition via Cloudflare (optionnel) |
 
 ---
@@ -225,7 +226,7 @@ docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d --build
 ```
 
 Cela ajoute `ollama` (LLM, profil `local-ollama` — ou un Ollama déjà présent
-via `OLLAMA_URL`), `vision` (OCR) et `whisper` (voix). Les modèles
+via `OLLAMA_URL` ; il lit aussi les photos d'étiquettes) et `whisper` (voix). Les modèles
 sont téléchargés au premier démarrage. Détails (toolkit NVIDIA, VRAM, modèles)
 dans le [guide d'auto-hébergement](docs/SELF-HOSTING.md#6-activer-lia-locale-gpu--optionnel).
 
@@ -382,7 +383,7 @@ Chaque **push sur `main`** déclenche le workflow *Release* :
 - ✅ Socle (patrons, stock, projets, Kanban)
 - ✅ Motivation (stats, objectifs, succès, calendrier)
 - ✅ IA texte (traduction, copilote, génération)
-- ✅ IA vision/voix (OCR étiquette, compteur vocal)
+- ✅ IA vision/voix (lecture d'étiquette, compteur vocal)
 - ✅ App Android (Capacitor) + CI release
 - ✅ Aperçu coloris (Stable Diffusion)
 - ✅ Recherche sémantique (indexation + résultats « proches par le sens »)

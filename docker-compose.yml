@@ -17,7 +17,6 @@ services:
       # what every other app on the same Ollama uses: a different value makes
       # Ollama reload the model on each switch.
       OLLAMA_NUM_CTX: ${OLLAMA_NUM_CTX:-8192}
-      VISION_URL: ${VISION_URL:-}
       WHISPER_URL: ${WHISPER_URL:-}
       SD_URL: ${SD_URL:-}
       # Monthly model-watch cron job (scripts/model-watch/) — empty disables

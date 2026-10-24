@@ -1,7 +1,16 @@
 import { env } from '$env/dynamic/private';
 
-export const visionUrl = () => env.VISION_URL?.replace(/\/$/, '') || '';
 export const whisperUrl = () => env.WHISPER_URL?.replace(/\/$/, '') || '';
+
+// VISION_URL pointed at the former EasyOCR/CLIP sidecar; label scanning and
+// photo analysis now go through Ollama (ai/vision.ts) and the palette code.
+// A leftover value is harmless -- ignored, said once in the logs.
+let visionUrlWarned = false;
+export function warnIfVisionUrlSet(): void {
+	if (visionUrlWarned || !env.VISION_URL) return;
+	visionUrlWarned = true;
+	console.warn('VISION_URL is set but no longer used (label scan now uses OLLAMA_CHAT_MODEL) — ignoring it.');
+}
 
 // Proxies a file (image/audio) to a FastAPI sidecar and returns its JSON response.
 export async function proxyFile(

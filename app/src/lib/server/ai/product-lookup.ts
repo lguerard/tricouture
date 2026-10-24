@@ -55,7 +55,7 @@ export interface ScrapedProduct {
 
 const WEIGHTS = ['lace', 'fingering', 'sport', 'dk', 'worsted', 'aran', 'bulky', 'super bulky'];
 
-// Same heuristics as services/vision (OCR label parsing), applied to product text instead.
+// Regex heuristics over scraped product text (brand/fiber/weight/yardage).
 export function guessYarnFields(text: string): GuessedYarnFields {
 	const low = text.toLowerCase();
 	const fields: GuessedYarnFields = {};

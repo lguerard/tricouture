@@ -111,24 +111,26 @@
 		for (const [key, id] of Object.entries(FIELD_IDS[tab])) set(id, f[key]);
 	}
 
-	// Photo analysis: guesses colorHex (dominant color) + motif (zero-shot CLIP, if the
-	// vision service has it installed) from an actual photo of the item. Only fills fields
-	// that are still empty/default so it never overwrites an explicit choice or a value
-	// already guessed from product page text.
+	// Photo analysis: guesses colorHex (dominant color, computed by the server
+	// without AI) + motif (local vision model, when the AI is on) from an actual
+	// photo of the item. Only fills fields that are still empty/default so it
+	// never overwrites an explicit choice or a value already guessed from
+	// product page text. `withMotif: false` for a label photo: its "motif" says
+	// nothing about the yarn, and skipping it saves a model call.
 	let analyzing = $state(false);
-	async function analyzePhoto(file: Blob) {
+	async function analyzePhoto(file: Blob, { withMotif = true } = {}) {
 		const ids = COLOR_MOTIF_IDS[tab];
 		if (!ids) return;
 		const colorEl = document.getElementById(ids.color) as HTMLInputElement | null;
 		const motifEl = document.getElementById(ids.motif) as HTMLSelectElement | null;
 		const needsColor = !!colorEl && (!colorEl.value || colorEl.value.toLowerCase() === '#cccccc');
-		const needsMotif = !!motifEl && !motifEl.value;
+		const needsMotif = withMotif && !!motifEl && !motifEl.value;
 		if (!needsColor && !needsMotif) return;
 		analyzing = true;
 		try {
 			const fd = new FormData();
 			fd.append('file', file, 'photo.jpg');
-			const res = await fetch('/api/ai/analyze-photo', { method: 'POST', body: fd });
+			const res = await fetch(`/api/ai/analyze-photo${needsMotif ? '' : '?motif=0'}`, { method: 'POST', body: fd });
 			if (res.ok) {
 				const d = await res.json();
 				if (needsColor && d.colorHex && colorEl) colorEl.value = d.colorHex;
@@ -136,7 +138,7 @@
 				if (d.colorHex || d.motif) scanMsg = t(locale, 'stash.fieldsPrefilled');
 			}
 		} catch {
-			// vision service unavailable — leave fields as-is
+			// analysis unavailable — leave fields as-is
 		}
 		analyzing = false;
 	}
@@ -197,8 +199,8 @@
 		barcodeBusy = false;
 	}
 
-	// Label scan: sends the photo to the vision service, pre-fills the form.
-	// The vision service guesses yarn-shaped fields; for fabric, "fiber" reads as composition.
+	// Label scan: the local vision model reads the label photo, pre-fills the form.
+	// It returns yarn-shaped fields; for fabric, "fiber" reads as composition.
 	let scanBusy = $state(false);
 	async function scanLabel(e: Event) {
 		const input = e.target as HTMLInputElement;
@@ -216,7 +218,7 @@
 			} else {
 				const raw = data.fields ?? {};
 				applyFields(tab === 'fabric' ? { name: raw.name, composition: raw.fiber } : raw);
-				await analyzePhoto(file);
+				await analyzePhoto(file, { withMotif: false });
 				scanMsg = t(locale, 'stash.fieldsPrefilled');
 			}
 		} catch {

@@ -52,3 +52,30 @@ const MIN_DISTANCE = 48;
 // A colour covering less than this share of the picture is noise (a stray
 // highlight, an edge), not part of its palette.
 const MIN_SHARE = 0.02;
+
+// The single dominant colour of a stash photo (yarn ball, fabric swatch), as
+// "#rrggbb", or null for an unreadable image. Only the centre of the picture
+// counts (20 %-80 % on each axis): product photos put the item in the middle
+// on a white/neutral background that would otherwise win. Deterministic --
+// same photo, same colour -- and runs in-process, no GPU sidecar.
+export async function dominantColor(input: Buffer): Promise<string | null> {
+	try {
+		const { data, info } = await sharp(input)
+			.rotate()
+			.resize(256, 256, { fit: 'inside' })
+			.toBuffer({ resolveWithObject: true });
+		const left = Math.floor(info.width * 0.2);
+		const top = Math.floor(info.height * 0.2);
+		const centre = await sharp(data)
+			.extract({
+				left,
+				top,
+				width: Math.max(1, Math.round(info.width * 0.6)),
+				height: Math.max(1, Math.round(info.height * 0.6))
+			})
+			.toBuffer();
+		return (await extractPalette(centre, 1))[0] ?? null;
+	} catch {
+		return null;
+	}
+}

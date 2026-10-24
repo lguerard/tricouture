@@ -65,20 +65,6 @@ services:
         ollama pull ${OLLAMA_EMBED_MODEL:-nomic-embed-text}
     restart: "no"
 
-  # Vision service (label OCR, gauge sample, image embeddings) — phase 4.
-  vision:
-    build: ./services/vision
-    restart: unless-stopped
-    volumes:
-      - media:/data/media:ro
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
-
   # Whisper service (hands-free voice transcription) — phase 5.
   whisper:
     build: ./services/whisper

@@ -254,11 +254,15 @@ Ensuite :
   font alors sur **cet** Ollama, pas ici.
 
 Dans les deux modes, l'override ajoute aussi :
-- **vision** — OCR d'étiquettes de pelote (EasyOCR) ;
 - **whisper** — transcription vocale (compteur de rangs mains-libres).
 
+Le scan d'étiquette de pelote et le motif d'une photo passent par le modèle de chat
+(`OLLAMA_CHAT_MODEL`, qui doit accepter les images — c'est le cas de `gemma4:12b`) ; la
+couleur dominante d'une photo est calculée par l'app elle-même, sans GPU. L'ancien service
+`vision` (EasyOCR) n'existe plus : `VISION_URL` peut être retiré du `.env` (ignoré sinon).
+
 > Premier démarrage long : téléchargement des modèles (plusieurs Go) et build des images
-> PyTorch. Surveille avec `docker compose logs -f ollama-pull vision whisper`.
+> PyTorch. Surveille avec `docker compose logs -f ollama-pull whisper`.
 
 ### 6.3 Notes VRAM (RTX 3080 = 10 Go)
 
@@ -266,7 +270,7 @@ Dans les deux modes, l'override ajoute aussi :
   C'est le plus gros poste : sur une carte de 10 Go partagée avec d'autres services, il
   ne reste pas de place pour un second LLM chargé en même temps.
 - Ollama décharge les modèles inactifs automatiquement.
-- vision et whisper chargent leurs modèles à la première requête. Si tu veux limiter la
+- whisper charge son modèle à la première requête. Si tu veux limiter la
   pression mémoire, utilise les services un par un (ils ne tournent à fond que pendant l'usage).
 - Pour changer de modèle : `OLLAMA_CHAT_MODEL=qwen3:8b` (par exemple) dans `.env`, puis relance.
 
@@ -462,5 +466,6 @@ Actions (aucun environnement Android à installer en local).
 | Page blanche après login distant | `ORIGIN` ≠ URL réelle | corriger `ORIGIN`, `up -d` |
 | Boutons IA → « service indisponible » | GPU non lancé / `OLLAMA_URL` vide | lancer l'override `gpu`, vérifier `nvidia-smi` |
 | `nvidia-smi` KO dans un conteneur | toolkit non installé | refaire §6.1 |
-| Scan/voix sans effet | services `vision`/`whisper` non prêts | `docker compose logs -f vision whisper` |
+| Scan d'étiquette en échec | `OLLAMA_CHAT_MODEL` sans entrée image, ou Ollama non prêt | utiliser un modèle multimodal (`gemma4:12b`), `docker compose logs -f ollama` |
+| Voix sans effet | service `whisper` non prêt | `docker compose logs -f whisper` |
 | APK ne se connecte pas | mauvaise URL / HTTP bloqué | vérifier `SERVER_URL`, préférer HTTPS |
