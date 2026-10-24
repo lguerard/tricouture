@@ -1,8 +1,7 @@
 // Parsing for the pattern-pieces extraction response. Lives here (not inline
-// in the API route) so the monthly model-watch evaluation
-// ($lib/server/ai/model-watch/) can run the exact same parsing the real
-// pattern-pieces endpoint uses, rather than a re-implementation that could
-// silently drift out of sync.
+// in the API route) so the model evaluation ($lib/server/ai/model-eval/) can
+// run the exact same parsing the real pattern-pieces endpoint uses, rather
+// than a re-implementation that could silently drift out of sync.
 
 import { parseJsonReply, stripReasoning } from './output';
 
@@ -37,7 +36,7 @@ export const PIECES_SCHEMA = {
 } as const;
 
 // The generate() options every pieces extraction uses (the API route and the
-// model-watch evaluation alike): schema-constrained JSON, deterministic.
+// model evaluation alike): schema-constrained JSON, deterministic.
 export const PIECES_GENERATE_OPTIONS = { schema: PIECES_SCHEMA, temperature: 0, think: false };
 
 const MAX_PIECES = 30;

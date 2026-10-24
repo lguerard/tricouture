@@ -284,15 +284,36 @@ couleur dominante d'une photo est calculée par l'app elle-même, sans GPU. L'an
 > Si `OLLAMA_URL` est vide dans `.env`, les boutons d'IA affichent un message clair au lieu
 > de planter : le socle reste pleinement utilisable.
 
-### 6.4 Surveillance mensuelle des modèles (optionnel)
+### 6.4 Évaluer un modèle (optionnel)
 
-Un job cron optionnel vérifie une fois par mois si un nouveau modèle Ollama
-ferait mieux que `OLLAMA_CHAT_MODEL` tout en tenant dans la VRAM du GPU, et
-te l'envoie en rapport (rien n'est changé, sauf `MODEL_WATCH_AUTO_SWITCH=true`).
-Règle `MODEL_WATCH_VRAM_BUDGET_GB` sur la VRAM réellement libre pour le modèle
-si le GPU est partagé. Voir
-[`scripts/model-watch/README.md`](../scripts/model-watch/README.md) pour
-l'installation.
+Tricouture sait noter un modèle Ollama sur **ses propres tâches IA**, avec ses
+prompts, ses requêtes (`think: false`, même `num_ctx`, schéma JSON,
+température 0) et ses analyseurs de production :
+
+| Tâche | Cas tirés de la base | Note |
+|---|---|---|
+| `label` | laines avec une photo et au moins 3 champs d'étiquette remplis | marque, nom, coloris, composition, grosseur, métrage, poids |
+| `pieces` | patrons avec texte extrait et pièces enregistrées | pièces retrouvées, rangs et quantités |
+| `pattern_info` | patrons avec texte extrait et au moins 3 infos remplies | type, créateur·rice, langue, difficulté, tailles, jauge, métrage |
+| `translation` | extraits de patrons en anglais | nombres et termes de tricot conservés, sortie en français |
+
+Les fiches modifiées après leur création passent en premier, puis les plus
+récentes, 12 par tâche au plus. Une tâche avec moins de 3 cas en base est
+complétée par des cas fournis (`app/src/lib/server/ai/model-eval/cases.ts`).
+
+Le point d'accès, protégé par `MODEL_WATCH_TOKEN` (vide = désactivé) :
+
+```bash
+docker compose exec app sh -c 'wget -qO- --header "Authorization: Bearer $MODEL_WATCH_TOKEN" \
+  --header "Content-Type: application/json" --post-data "{\"model\":\"gemma4:12b\",\"dry\":true}" \
+  http://localhost:3000/api/cron/model-eval'
+```
+
+`dry: true` compte les cas sans appeler le modèle ; sans lui, la réponse
+(quelques minutes) donne une note sur 100 par tâche et la vitesse mesurée.
+Le modèle doit déjà être dans Ollama : c'est la **veille des modèles** du
+dépôt `server_setup` (service `model-watch`) qui découvre, télécharge et
+compare les modèles chaque mois, pour Popote, Paperless et Tricouture à la fois.
 
 ---
 

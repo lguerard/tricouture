@@ -5,7 +5,7 @@
 // raw OCR text.
 
 import sharp from 'sharp';
-import { generate } from './ollama';
+import { generate, type GenerateOptions } from './ollama';
 import { MOTIF_VALUES, YARN_WEIGHTS } from '$lib/labels';
 import { parseJsonReply } from './output';
 
@@ -110,17 +110,25 @@ export function parseLabelFields(raw: string): LabelFields {
 	return Object.fromEntries(Object.entries(fields).filter(([, v]) => v !== undefined)) as LabelFields;
 }
 
-// Reads a yarn label photo. Lets AiUnavailable and Ollama errors propagate
-// (e.g. a text-only OLLAMA_CHAT_MODEL rejecting the image).
-export async function scanYarnLabel(image: Buffer): Promise<LabelFields> {
-	const raw = await generate("Lis cette étiquette de pelote et remplis l'objet JSON.", LABEL_SYSTEM, undefined, {
-		images: [await imageForModel(image)],
+export const LABEL_PROMPT = "Lis cette étiquette de pelote et remplis l'objet JSON.";
+
+// The generate() options of a label scan, shared with the model evaluation
+// ($lib/server/ai/model-eval) so it sends exactly the production request.
+export function labelGenerateOptions(imageB64: string): GenerateOptions {
+	return {
+		images: [imageB64],
 		schema: LABEL_SCHEMA,
 		temperature: 0,
 		think: false,
 		maxTokens: 400,
 		timeoutMs: LABEL_TIMEOUT_MS
-	});
+	};
+}
+
+// Reads a yarn label photo. Lets AiUnavailable and Ollama errors propagate
+// (e.g. a text-only OLLAMA_CHAT_MODEL rejecting the image).
+export async function scanYarnLabel(image: Buffer): Promise<LabelFields> {
+	const raw = await generate(LABEL_PROMPT, LABEL_SYSTEM, undefined, labelGenerateOptions(await imageForModel(image)));
 	return parseLabelFields(raw);
 }
 
