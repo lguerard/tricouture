@@ -105,6 +105,10 @@ export const PATTERN_INFO_SCHEMA = {
 	}
 } as const;
 
+// The generate() options of a suggestion, shared with the model evaluation
+// ($lib/server/ai/model-eval) so it sends exactly the production request.
+export const PATTERN_INFO_GENERATE_OPTIONS = { schema: PATTERN_INFO_SCHEMA, temperature: 0, think: false };
+
 // Parses the model's response, tolerating the usual local-model quirks
 // (reasoning block, markdown fences, prose around the JSON, a non-JSON
 // reply) via output.ts, the same way pieces.ts does. Never throws -- a
@@ -140,11 +144,18 @@ export async function suggestPatternInfo(
 	vocabulary?: PatternVocabulary,
 	hints?: PatternInfoHints
 ): Promise<SuggestedPatternInfo> {
-	const raw = await generate(patternInfoPrompt(context, vocabulary, hints), patternInfoSystem(language), undefined, {
-		schema: PATTERN_INFO_SCHEMA,
-		temperature: 0,
-		think: false
-	});
+	const raw = await generate(
+		patternInfoPrompt(context, vocabulary, hints),
+		patternInfoSystem(language),
+		undefined,
+		PATTERN_INFO_GENERATE_OPTIONS
+	);
+	return readPatternInfoReply(raw, context, hints);
+}
+
+// The model's raw reply -> the suggestion production keeps: parsed, then
+// tags the pattern text does not back up dropped (tagGrounding.ts).
+export function readPatternInfoReply(raw: string, context: string, hints?: PatternInfoHints): SuggestedPatternInfo {
 	const info = parsePatternInfo(raw);
 	info.tags = groundTags(info.tags, { text: context, garmentType: hints?.garmentType || info.garmentType });
 	return info;

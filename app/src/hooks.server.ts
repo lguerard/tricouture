@@ -9,10 +9,10 @@ const PUBLIC_PREFIXES = [
 	'/forgot-password',
 	'/reset-password',
 	'/api/locale',
-	// Machine-to-machine: the monthly model-watch cron job has no session
-	// cookie to send. Not actually open — the route itself requires a
-	// MODEL_WATCH_TOKEN bearer token, checked in its own handler.
-	'/api/cron/model-watch'
+	// Machine-to-machine: the server's model watch (server_setup/model-watch)
+	// has no session cookie to send. Not actually open — the route itself
+	// requires a MODEL_WATCH_TOKEN bearer token, checked in its own handler.
+	'/api/cron/model-eval'
 ];
 
 // Public routes that make no sense once signed in, so signed-in visitors are

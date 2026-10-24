@@ -36,12 +36,6 @@ export function aiConfigured(): boolean {
 	return OLLAMA_URL().length > 0;
 }
 
-// The chat model actually in use — read here rather than duplicated so the
-// model-watch evaluation always compares against the real current setting.
-export function currentChatModel(): string {
-	return CHAT_MODEL();
-}
-
 export class AiUnavailable extends Error {
 	constructor(msg = 'AI service unavailable (OLLAMA_URL not configured or offline).') {
 		super(msg);
@@ -100,7 +94,13 @@ export type GenerateOptions = {
 	maxTokens?: number;
 	// Base64-encoded images (no data: prefix) for a vision-capable model.
 	images?: string[];
+	// Called with Ollama's own timing of the answer (tokens generated and
+	// generation time) -- the model evaluation ($lib/server/ai/model-eval)
+	// measures speed with it. Not part of the request body.
+	onStats?: (stats: GenerateStats) => void;
 };
+
+export type GenerateStats = { evalCount: number; evalDurationNs: number };
 
 // The exact JSON body sent to /api/generate — exported for the tests, which
 // pin down the request shape (think, num_ctx, format...).
@@ -122,7 +122,7 @@ export function buildGenerateBody(prompt: string, system: string | undefined, mo
 }
 
 // Text generation (non-streaming for simplicity). `model` defaults to the
-// configured chat model; the model-watch evaluation passes a candidate's tag
+// configured chat model; the model evaluation passes the model under test
 // instead, so it runs the exact same call production uses. A leading
 // <think>…</think> block (models that reason inline even with think:false)
 // is stripped from the returned text.
@@ -136,7 +136,8 @@ export async function generate(
 		'/api/generate',
 		buildGenerateBody(prompt, system, model || CHAT_MODEL(), opts),
 		opts.timeoutMs ?? GENERATE_TIMEOUT_MS
-	)) as { response?: string };
+	)) as { response?: string; eval_count?: number; eval_duration?: number };
+	opts.onStats?.({ evalCount: data.eval_count ?? 0, evalDurationNs: data.eval_duration ?? 0 });
 	return stripReasoning(data.response ?? '').trim();
 }
 
@@ -186,42 +187,4 @@ export async function embed(raw: string, task: EmbedTask = 'document'): Promise<
 	};
 	if (!data.embedding?.length) throw new Error('Empty embedding');
 	return data.embedding;
-}
-
-// Names of the models already in Ollama's local store. Lets the model-watch
-// run tell apart a candidate it downloaded itself (safe to delete afterwards)
-// from one that was already there -- possibly used by another app sharing
-// the same Ollama.
-export async function listLocalModels(): Promise<string[]> {
-	if (!aiConfigured()) throw new AiUnavailable();
-	const res = await fetch(`${OLLAMA_URL()}/api/tags`, { signal: AbortSignal.timeout(15_000) }).catch(() => {
-		throw new AiUnavailable();
-	});
-	if (!res.ok) throw new OllamaHttpError(res.status, await res.text().catch(() => ''));
-	const data = (await res.json()) as { models?: { name?: string; model?: string }[] };
-	return (data.models ?? []).map((m) => m.name ?? m.model ?? '').filter(Boolean);
-}
-
-// Downloads a model into Ollama's local store if not already present
-// (no-op otherwise). Pulls can take minutes for a multi-GB model, hence the
-// generous timeout — used only by the monthly model-watch evaluation, never
-// on a user-facing request path.
-export async function pullModel(model: string): Promise<void> {
-	await call('/api/pull', { name: model, stream: false }, 60 * 60 * 1000);
-}
-
-// Removes a model from Ollama's local store. Best-effort: failures are not
-// fatal (the caller just ends up keeping a model on disk it meant to drop).
-export async function deleteModel(model: string): Promise<void> {
-	if (!aiConfigured()) return;
-	try {
-		await fetch(`${OLLAMA_URL()}/api/delete`, {
-			method: 'DELETE',
-			headers: { 'content-type': 'application/json' },
-			body: JSON.stringify({ model }),
-			signal: AbortSignal.timeout(30_000)
-		});
-	} catch {
-		/* non-fatal — see comment above */
-	}
 }

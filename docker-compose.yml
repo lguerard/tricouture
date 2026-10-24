@@ -18,11 +18,10 @@ services:
       # Ollama reload the model on each switch.
       OLLAMA_NUM_CTX: ${OLLAMA_NUM_CTX:-8192}
       WHISPER_URL: ${WHISPER_URL:-}
-      # Monthly model-watch cron job (scripts/model-watch/) — empty disables
-      # the /api/cron/model-watch endpoint entirely (503).
+      # Token of POST /api/cron/model-eval, which the server's model watch
+      # (server_setup/model-watch) calls from inside this container to score
+      # a model on Tricouture's AI tasks. Empty disables the endpoint (503).
       MODEL_WATCH_TOKEN: ${MODEL_WATCH_TOKEN:-}
-      MODEL_WATCH_MAX_CANDIDATES: ${MODEL_WATCH_MAX_CANDIDATES:-3}
-      MODEL_WATCH_MIN_IMPROVEMENT: ${MODEL_WATCH_MIN_IMPROVEMENT:-5.0}
       # adapter-node plafonne les corps de requête à 512 Ko par défaut : un seul
       # PDF de patron un peu lourd suffit à déclencher un 413, et un import en
       # lot le dépasse à coup sûr. 100 Mo par défaut, ajustable dans le .env.
