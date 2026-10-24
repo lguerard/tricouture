@@ -141,7 +141,7 @@ export const patterns = pgTable(
 		isShared: boolean('is_shared').notNull().default(false),
 		coverPath: text('cover_path'), // cover image (relative to MEDIA_DIR)
 		extractedText: text('extracted_text'), // PDF text for FTS
-		embedding: vector('embedding', { dimensions: 768 }), // semantic search (phase 3)
+		embedding: vector('embedding', { dimensions: 768 }), // semantic search (text embedding, see embeddings.ts)
 		createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 		updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow()
 	},
@@ -242,7 +242,9 @@ export const yarns = pgTable(
 		photoPath: text('photo_path'),
 		binId: uuid('bin_id'),
 		notes: text('notes'),
-		embedding: vector('embedding', { dimensions: 768 }), // color/texture search (phase 4)
+		// Text embedding of brand/name/colorway/fiber/weight (embeddings.ts) for
+		// semantic search -- not an image/colour embedding.
+		embedding: vector('embedding', { dimensions: 768 }),
 		createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
 	},
 	(t) => ({ ownerIdx: index('yarns_owner_idx').on(t.ownerId) })
@@ -609,6 +611,19 @@ export const embroideryDesigns = pgTable(
 	},
 	(t) => ({ ownerIdx: index('embroidery_designs_owner_idx').on(t.ownerId, t.updatedAt) })
 );
+
+/* ------------------------------------------------------------------ */
+/* App settings                                                       */
+/* ------------------------------------------------------------------ */
+
+// Instance-wide key/value state the app itself maintains (not user
+// preferences). E.g. "embedding_scheme": which embedding model + text
+// prefixes produced the stored vectors (see $lib/server/embeddings.ts).
+export const appSettings = pgTable('app_settings', {
+	key: varchar('key', { length: 80 }).primaryKey(),
+	value: text('value').notNull(),
+	updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow()
+});
 
 /* ------------------------------------------------------------------ */
 /* Inferred types                                                     */

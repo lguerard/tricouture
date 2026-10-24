@@ -140,12 +140,35 @@ export async function generate(
 	return stripReasoning(data.response ?? '').trim();
 }
 
+// nomic-embed-text is trained with task prefixes: a query and the documents
+// it should find are embedded differently ("search_query: " vs
+// "search_document: "); without them its retrieval quality drops. Other
+// embedding models get the raw text. Part of the stored-vector scheme
+// (embeddingScheme below): changing this logic must change the scheme.
+export type EmbedTask = 'query' | 'document';
+const NOMIC_PREFIXES: Record<EmbedTask, string> = { query: 'search_query: ', document: 'search_document: ' };
+const usesNomicPrefixes = () => /nomic-embed/i.test(EMBED_MODEL());
+
+export function embedInput(text: string, task: EmbedTask): string {
+	return usesNomicPrefixes() ? `${NOMIC_PREFIXES[task]}${text}` : text;
+}
+
+// Identifies what produced a stored vector: embedding model + prefix scheme.
+// Vectors from different schemes are not comparable, so when this changes
+// every stored embedding is reset and re-computed (embeddings.ts).
+export function embeddingScheme(): string {
+	return `${EMBED_MODEL()}|${usesNomicPrefixes() ? 'nomic-task-prefix-v1' : 'raw'}`;
+}
+
 // Embedding vector (768 dims with nomic-embed-text → vector(768) column).
-// Bounded: it runs inline when a pattern or yarn is saved, and a hung Ollama
-// must not hang the save with it (callers treat a failure as "no vector").
-// Uses /api/embed (`input`, batched response); falls back to the deprecated
-// /api/embeddings only when the server is too old to know /api/embed (404).
-export async function embed(text: string): Promise<number[]> {
+// `task`: "document" for what gets stored (patterns, yarns), "query" for a
+// search string. Bounded: it runs inline when a pattern or yarn is saved,
+// and a hung Ollama must not hang the save with it (callers treat a failure
+// as "no vector"). Uses /api/embed (`input`, batched response); falls back to
+// the deprecated /api/embeddings only when the server is too old to know
+// /api/embed (404).
+export async function embed(raw: string, task: EmbedTask = 'document'): Promise<number[]> {
+	const text = embedInput(raw, task);
 	try {
 		const data = (await call('/api/embed', { model: EMBED_MODEL(), input: text }, EMBED_TIMEOUT_MS)) as {
 			embeddings?: number[][];

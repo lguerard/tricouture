@@ -3,6 +3,7 @@ import { and, eq, isNotNull, or, sql } from 'drizzle-orm';
 import { db } from '$lib/server/db';
 import { patterns, yarns } from '$lib/server/db/schema';
 import { embed, aiConfigured, AiUnavailable } from '$lib/server/ai/ollama';
+import { ensureEmbeddingScheme } from '$lib/server/embeddings';
 import type { SearchHit } from '../../search/+server';
 import type { RequestHandler } from './$types';
 
@@ -24,7 +25,8 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 
 	let vec: number[];
 	try {
-		vec = await embed(query);
+		await ensureEmbeddingScheme();
+		vec = await embed(query, 'query');
 	} catch (e) {
 		if (e instanceof AiUnavailable) return json({ hits: [] }, { status: 503 });
 		throw e;

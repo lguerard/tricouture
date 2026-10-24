@@ -95,9 +95,18 @@ describe('embed', () => {
 	it('uses /api/embed with `input` and reads embeddings[0]', async () => {
 		const { embed } = await import('./ollama');
 		fetchMock.mockResolvedValue(reply({ embeddings: [[0.1, 0.2, 0.3]] }));
-		await expect(embed('pull chaud')).resolves.toEqual([0.1, 0.2, 0.3]);
+		await expect(embed('pull chaud', 'query')).resolves.toEqual([0.1, 0.2, 0.3]);
 		expect(fetchMock.mock.calls[0][0]).toBe('http://ollama:11434/api/embed');
-		expect(sentBody()).toEqual({ model: 'nomic-embed-text', input: 'pull chaud' });
+		expect(sentBody()).toEqual({ model: 'nomic-embed-text', input: 'search_query: pull chaud' });
+	});
+
+	it('prefixes nomic documents/queries, not other models, and tags the scheme', async () => {
+		const { embedInput, embeddingScheme } = await import('./ollama');
+		expect(embedInput('Aran', 'document')).toBe('search_document: Aran');
+		expect(embeddingScheme()).toBe('nomic-embed-text|nomic-task-prefix-v1');
+		env.OLLAMA_EMBED_MODEL = 'bge-m3';
+		expect(embedInput('Aran', 'query')).toBe('Aran');
+		expect(embeddingScheme()).toBe('bge-m3|raw');
 	});
 
 	it('falls back to the legacy /api/embeddings on a 404', async () => {
@@ -105,7 +114,7 @@ describe('embed', () => {
 		fetchMock.mockResolvedValueOnce(reply({ error: 'not found' }, 404)).mockResolvedValueOnce(reply({ embedding: [1, 2] }));
 		await expect(embed('x')).resolves.toEqual([1, 2]);
 		expect(fetchMock.mock.calls[1][0]).toBe('http://ollama:11434/api/embeddings');
-		expect(sentBody(1)).toEqual({ model: 'nomic-embed-text', prompt: 'x' });
+		expect(sentBody(1)).toEqual({ model: 'nomic-embed-text', prompt: 'search_document: x' });
 	});
 
 	it('does not retry on other errors', async () => {

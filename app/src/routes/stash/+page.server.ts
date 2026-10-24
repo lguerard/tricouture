@@ -3,8 +3,8 @@ import { and, eq, desc } from 'drizzle-orm';
 import { db } from '$lib/server/db';
 import { yarns, fabrics, notions, tools } from '$lib/server/db/schema';
 import { saveImageUpload, saveDataUrl, deleteStored, UnsupportedImageError } from '$lib/server/storage';
-import { embed, aiConfigured } from '$lib/server/ai/ollama';
-import { yarnEmbeddingText } from '$lib/server/embeddings';
+import { aiConfigured } from '$lib/server/ai/ollama';
+import { yarnEmbeddingText, embedDocument } from '$lib/server/embeddings';
 import type { Actions, PageServerLoad } from './$types';
 import type { toolType } from '$lib/server/db/schema';
 
@@ -87,7 +87,7 @@ export const actions: Actions = {
 					weightCategory: str(form.get('weightCategory'))
 				});
 				if (parts) {
-					const vec = await embed(parts);
+					const vec = await embedDocument(parts);
 					await db.update(yarns).set({ embedding: vec }).where(eq(yarns.id, inserted.id));
 				}
 			} catch { /* Ollama absent */ }

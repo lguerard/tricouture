@@ -276,6 +276,10 @@ couleur dominante d'une photo est calculée par l'app elle-même, sans GPU. L'an
   `WHISPER_IDLE_UNLOAD_SECONDS` (300 s par défaut) sans requête ; la 1re commande vocale après
   une pause attend donc quelques secondes le rechargement.
 - Pour changer de modèle : `OLLAMA_CHAT_MODEL=qwen3:8b` (par exemple) dans `.env`, puis relance.
+- Recherche par le sens : l'app note quel modèle d'embedding (`OLLAMA_EMBED_MODEL`) et quels
+  préfixes ont produit les vecteurs stockés. Si ça change (autre modèle, ou mise à jour de
+  l'app), les anciens vecteurs sont effacés au premier usage et la page *Mon compte* propose
+  de réindexer (bouton existant) ; chaque patron/laine modifié est aussi réindexé.
 
 > Si `OLLAMA_URL` est vide dans `.env`, les boutons d'IA affichent un message clair au lieu
 > de planter : le socle reste pleinement utilisable.

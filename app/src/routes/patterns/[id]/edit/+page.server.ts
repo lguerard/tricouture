@@ -4,8 +4,8 @@ import { db } from '$lib/server/db';
 import { patterns, patternFiles } from '$lib/server/db/schema';
 import { saveUpload } from '$lib/server/storage';
 import { extractPdfText } from '$lib/server/pdf';
-import { embed, aiConfigured } from '$lib/server/ai/ollama';
-import { patternEmbeddingText } from '$lib/server/embeddings';
+import { aiConfigured } from '$lib/server/ai/ollama';
+import { patternEmbeddingText, embedDocument } from '$lib/server/embeddings';
 import { t } from '$lib/i18n';
 import type { Actions, PageServerLoad } from './$types';
 import type { Craft } from '$lib/server/db/schema';
@@ -100,7 +100,7 @@ export const actions: Actions = {
 
 		if (aiConfigured()) {
 			try {
-				updates.embedding = await embed(
+				updates.embedding = await embedDocument(
 					patternEmbeddingText({
 						title,
 						craft,
