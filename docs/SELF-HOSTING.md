@@ -254,7 +254,9 @@ Ensuite :
   font alors sur **cet** Ollama, pas ici.
 
 Dans les deux modes, l'override ajoute aussi :
-- **whisper** — transcription vocale (compteur de rangs mains-libres).
+- **whisper** — transcription vocale (compteur de rangs mains-libres), modèle
+  `WHISPER_MODEL` (`large-v3-turbo` par défaut), téléchargé à la 1re requête dans le volume
+  `whisper-cache`.
 
 Le scan d'étiquette de pelote et le motif d'une photo passent par le modèle de chat
 (`OLLAMA_CHAT_MODEL`, qui doit accepter les images — c'est le cas de `gemma4:12b`) ; la
@@ -270,8 +272,9 @@ couleur dominante d'une photo est calculée par l'app elle-même, sans GPU. L'an
   C'est le plus gros poste : sur une carte de 10 Go partagée avec d'autres services, il
   ne reste pas de place pour un second LLM chargé en même temps.
 - Ollama décharge les modèles inactifs automatiquement.
-- whisper charge son modèle à la première requête. Si tu veux limiter la
-  pression mémoire, utilise les services un par un (ils ne tournent à fond que pendant l'usage).
+- whisper charge son modèle (~1-1,5 Go) à la première requête et le libère après
+  `WHISPER_IDLE_UNLOAD_SECONDS` (300 s par défaut) sans requête ; la 1re commande vocale après
+  une pause attend donc quelques secondes le rechargement.
 - Pour changer de modèle : `OLLAMA_CHAT_MODEL=qwen3:8b` (par exemple) dans `.env`, puis relance.
 
 > Si `OLLAMA_URL` est vide dans `.env`, les boutons d'IA affichent un message clair au lieu

@@ -66,9 +66,22 @@ services:
     restart: "no"
 
   # Whisper service (hands-free voice transcription) — phase 5.
+  # Loads its model on the first request and unloads it after
+  # WHISPER_IDLE_UNLOAD_SECONDS idle, so it only holds VRAM (~1-1.5 GB for
+  # large-v3-turbo in int8_float16) while the voice counter is in use.
+  # First request downloads the model (~1.6 GB) into the whisper-cache volume.
   whisper:
     build: ./services/whisper
     restart: unless-stopped
+    environment:
+      WHISPER_MODEL: ${WHISPER_MODEL:-large-v3-turbo}
+      WHISPER_COMPUTE_TYPE: ${WHISPER_COMPUTE_TYPE:-}
+      WHISPER_IDLE_UNLOAD_SECONDS: ${WHISPER_IDLE_UNLOAD_SECONDS:-300}
+      # Return freed CUDA memory to the driver instead of CTranslate2's
+      # caching allocator keeping it, so an unload really frees the VRAM.
+      CT2_CUDA_ALLOCATOR: cuda_malloc_async
+    volumes:
+      - whisper-cache:/root/.cache/huggingface
     deploy:
       resources:
         reservations:
@@ -99,3 +112,4 @@ services:
 volumes:
   models:
   media:
+  whisper-cache:
