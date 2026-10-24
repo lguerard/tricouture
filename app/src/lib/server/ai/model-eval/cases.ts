@@ -20,7 +20,7 @@
 
 import { createHash } from 'node:crypto';
 import { ALPACA_LABEL, COTON_LABEL, MERINOS_LABEL } from './labelImages';
-import type { PatternVocabulary } from '$lib/server/patternVocabulary';
+import { buildVocabulary, type PatternVocabulary } from '$lib/server/vocabularyRanking';
 import { groundTags } from '../tagGrounding';
 import { fold, type LabelExpected, type PatternInfoExpected, type PieceExpected } from './scoring';
 
@@ -313,23 +313,9 @@ export function piecesCase(p: PatternRow, pieces: PieceRow[]): PiecesCase | null
 	};
 }
 
-const MAX_VOCAB_ITEMS = 40;   // as getPatternVocabulary()
-
+// Same ranking as getPatternVocabulary(), over the person's OTHER patterns.
 export function vocabularyFor(p: PatternRow, rows: PatternRow[]): PatternVocabulary {
-	const tags = new Set<string>();
-	const garmentTypes = new Set<string>();
-	const designers = new Set<string>();
-	for (const r of rows) {
-		if (r.id === p.id || (p.ownerId && r.ownerId !== p.ownerId)) continue;
-		for (const t of r.tags ?? []) tags.add(t);
-		if (r.garmentType) garmentTypes.add(r.garmentType);
-		if (r.designer) designers.add(r.designer);
-	}
-	return {
-		tags: [...tags].slice(0, MAX_VOCAB_ITEMS),
-		garmentTypes: [...garmentTypes].slice(0, MAX_VOCAB_ITEMS),
-		designers: [...designers].slice(0, MAX_VOCAB_ITEMS)
-	};
+	return buildVocabulary(rows.filter((r) => r.id !== p.id && (!p.ownerId || r.ownerId === p.ownerId)));
 }
 
 const LEVEL_WORDS = /\b(niveau|difficulte|debutant|intermediaire|avance|facile|skill|level|beginner|intermediate|advanced|easy)\b/;

@@ -1,7 +1,7 @@
 import { generate } from './ollama';
 import { parseJsonReply } from './output';
 import { patternInfoSystem, patternInfoPrompt, type PatternInfoHints } from './prompts';
-import { groundTags } from './tagGrounding';
+import { groundTags, tagIdentity } from './tagGrounding';
 import type { PatternVocabulary } from '$lib/server/patternVocabulary';
 
 const MAX_TAGS = 6;
@@ -176,14 +176,17 @@ function canonicalize(value: string, pool: string[]): string {
 // (case-insensitive), keeping the casing and order of what was already
 // there. A suggested tag matching the library-wide vocabulary is re-cased to
 // match it (see canonicalize above); one with no match keeps its own casing.
+// Same tag = same tagIdentity(): case, accents, "d'", plurals and the
+// French/English synonyms of tagGrounding.ts ("Torsades" is "torsade" is
+// "cable"). A suggestion takes the library's existing spelling.
 export function mergeTags(existing: string[], suggested: string[], vocabulary: string[] = []): string[] {
-	const seen = new Set(existing.map((t) => t.trim().toLowerCase()));
+	const seen = new Set(existing.map(tagIdentity));
 	const merged = [...existing];
 	for (const tag of suggested) {
-		const key = tag.trim().toLowerCase();
-		if (key && !seen.has(key)) {
-			seen.add(key);
-			merged.push(canonicalize(tag, vocabulary));
+		const id = tagIdentity(tag);
+		if (id && !seen.has(id)) {
+			seen.add(id);
+			merged.push(vocabulary.find((v) => tagIdentity(v) === id) ?? tag);
 		}
 	}
 	return merged;
