@@ -20,7 +20,9 @@
 
 import { createHash } from 'node:crypto';
 import { ALPACA_LABEL, COTON_LABEL, MERINOS_LABEL } from './labelImages';
-import type { LabelExpected, PatternInfoExpected, PieceExpected } from './scoring';
+import type { PatternVocabulary } from '$lib/server/patternVocabulary';
+import { groundTags } from '../tagGrounding';
+import { fold, type LabelExpected, type PatternInfoExpected, type PieceExpected } from './scoring';
 
 export const TASKS = ['label', 'pieces', 'pattern_info', 'translation'] as const;
 export type Task = (typeof TASKS)[number];
@@ -34,7 +36,10 @@ type Base = { id: string; source: 'db' | 'bundled' };
 // it with imageForModel, exactly like a production scan.
 export type LabelCase = Base & { image: string; expected: LabelExpected };
 export type PiecesCase = Base & { context: string; craft: string; expected: PieceExpected[] };
-export type PatternInfoCase = Base & { context: string; craft: string; expected: PatternInfoExpected };
+// `vocabulary`: what production passes too (the person's existing tags,
+// garment types and designers), built from their OTHER patterns only, as
+// when a new pattern is created -- so it never contains this one's answers.
+export type PatternInfoCase = Base & { context: string; craft: string; expected: PatternInfoExpected; vocabulary?: PatternVocabulary };
 export type TranslationCase = Base & { text: string };
 export type EvalCases = {
 	label: LabelCase[];
@@ -242,6 +247,7 @@ export type YarnRow = {
 
 export type PatternRow = {
 	id: string;
+	ownerId?: string;
 	title: string;
 	craft: string;
 	notes: string | null;
@@ -307,13 +313,62 @@ export function piecesCase(p: PatternRow, pieces: PieceRow[]): PiecesCase | null
 	};
 }
 
-export function patternInfoCase(p: PatternRow): PatternInfoCase | null {
+const MAX_VOCAB_ITEMS = 40;   // as getPatternVocabulary()
+
+export function vocabularyFor(p: PatternRow, rows: PatternRow[]): PatternVocabulary {
+	const tags = new Set<string>();
+	const garmentTypes = new Set<string>();
+	const designers = new Set<string>();
+	for (const r of rows) {
+		if (r.id === p.id || (p.ownerId && r.ownerId !== p.ownerId)) continue;
+		for (const t of r.tags ?? []) tags.add(t);
+		if (r.garmentType) garmentTypes.add(r.garmentType);
+		if (r.designer) designers.add(r.designer);
+	}
+	return {
+		tags: [...tags].slice(0, MAX_VOCAB_ITEMS),
+		garmentTypes: [...garmentTypes].slice(0, MAX_VOCAB_ITEMS),
+		designers: [...designers].slice(0, MAX_VOCAB_ITEMS)
+	};
+}
+
+const LEVEL_WORDS = /\b(niveau|difficulte|debutant|intermediaire|avance|facile|skill|level|beginner|intermediate|advanced|easy)\b/;
+const SIZE_TOKENS = /\b(xxs|xs|s|m|l|xl|xxl|[2-6]xl|\d{1,3})\b/g;
+
+// A field the person typed in but the text never states (designer, their
+// own difficulty rating, sizes or gauge from elsewhere) cannot be found by
+// any model: scoring it only adds the same noise to every candidate.
+export function groundedInText(key: keyof PatternInfoExpected, value: unknown, context: string): boolean {
+	const text = ` ${fold(context)} `;
+	switch (key) {
+		case 'designer':
+			return fold(value).length > 1 && text.includes(` ${fold(value)} `);
+		case 'difficulty':
+			return LEVEL_WORDS.test(text);
+		case 'sizes':
+			return (fold(value).match(SIZE_TOKENS) ?? []).some((t) => text.includes(` ${t} `));
+		case 'gaugeStitches':
+		case 'gaugeRows':
+		case 'yardageRequired':
+			return text.includes(` ${String(value)} `);
+		default:
+			return true;
+	}
+}
+
+export function patternInfoCase(p: PatternRow, rows: PatternRow[] = []): PatternInfoCase | null {
 	if (!p.extractedText?.trim()) return null;
+	const context = patternContext(p);
 	const expected: PatternInfoExpected = {};
-	for (const k of INFO_FIELDS) if (filled(p[k])) (expected as Record<string, unknown>)[k] = p[k];
+	for (const k of INFO_FIELDS) {
+		if (filled(p[k]) && groundedInText(k, p[k], context)) (expected as Record<string, unknown>)[k] = p[k];
+	}
 	if (Object.keys(expected).length < 3) return null;
-	if (p.tags?.length) expected.tags = p.tags;
-	return { id: `info-${shortId(p.id)}`, source: 'db', craft: p.craft, context: patternContext(p), expected };
+	// Production drops suggested tags the text doesn't back up (tagGrounding.ts);
+	// the same rule decides which of the person's tags a model could find.
+	const tags = groundTags(p.tags ?? [], { text: context, garmentType: p.garmentType });
+	if (tags.length) expected.tags = tags;
+	return { id: `info-${shortId(p.id)}`, source: 'db', craft: p.craft, context, expected, vocabulary: vocabularyFor(p, rows) };
 }
 
 export function translationExcerpt(text: string, max = TRANSLATION_EXCERPT_CHARS): string {

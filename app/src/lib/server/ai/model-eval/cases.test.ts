@@ -7,7 +7,9 @@ import {
 	labelExpected,
 	orderPatterns,
 	orderYarns,
+	groundedInText,
 	patternInfoCase,
+	vocabularyFor,
 	piecesCase,
 	translationCase,
 	translationExcerpt,
@@ -88,9 +90,32 @@ describe('harvest', () => {
 		expect(piecesCase(p, [])).toBeNull();
 	});
 
-	it('needs three info fields for a pattern_info case', () => {
-		expect(patternInfoCase(pattern(1))?.expected).toEqual({ garmentType: 'Pull', designer: 'Laine & Lune', language: 'fr', gaugeStitches: 22 });
-		expect(patternInfoCase(pattern(1, { designer: null, language: null }))).toBeNull();
+	it('needs three info fields stated in the text for a pattern_info case', () => {
+		const text = 'Pull Brume par Laine & Lune. Échantillon : 22 mailles = 10 cm. ' + 'DOS : monter 90 mailles. '.repeat(10);
+		expect(patternInfoCase(pattern(1, { extractedText: text }))?.expected).toEqual({ garmentType: 'Pull', designer: 'Laine & Lune', language: 'fr', gaugeStitches: 22 });
+		expect(patternInfoCase(pattern(1, { extractedText: text, designer: null, language: null }))).toBeNull();
+	});
+
+	it('does not score what the text never states', () => {
+		// Designer and gauge typed in by hand, absent from the text: no model can find them.
+		const c = patternInfoCase(pattern(1, { sizes: 'S-L', difficulty: 3, extractedText: 'Tailles : S (M, L). ' + 'DOS : monter 90 mailles. '.repeat(10) }));
+		expect(c?.expected).toEqual({ garmentType: 'Pull', language: 'fr', sizes: 'S-L' });
+		expect(groundedInText('difficulty', 3, 'Niveau : facile')).toBe(true);
+		expect(groundedInText('yardageRequired', 875, 'soit 875 m')).toBe(true);
+		expect(groundedInText('yardageRequired', 875, 'soit 8750 m')).toBe(false);
+	});
+
+	it('gives the vocabulary of the person\'s OTHER patterns, like production', () => {
+		const text = 'Pull par Laine & Lune, échantillon 22 mailles. ' + 'DOS : monter 90 mailles. '.repeat(10);
+		const rows = [
+			pattern(1, { ownerId: 'u1', extractedText: text, tags: ['raglan'], garmentType: 'Pull' }),
+			pattern(2, { ownerId: 'u1', tags: ['hiver'], garmentType: 'Bonnet', designer: 'Autre' }),
+			pattern(3, { ownerId: 'u2', tags: ['secret'], garmentType: 'Châle' })
+		];
+		const v = patternInfoCase(rows[0], rows)!.vocabulary!;
+		expect(v.tags).toEqual(['hiver']);
+		expect(v.garmentTypes).toEqual(['Bonnet']);
+		expect(vocabularyFor(rows[0], rows).designers).toEqual(['Autre']);
 	});
 
 	it('translates only English patterns, as a bounded excerpt', () => {

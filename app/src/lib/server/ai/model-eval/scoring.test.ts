@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { scoreLabel, scorePatternInfo, scorePieces, scoreTranslation, similarity } from './scoring';
+import { nameValue, scoreLabel, scorePatternInfo, scorePieces, scoreTranslation, similarity, sizeSet } from './scoring';
 
 describe('similarity', () => {
 	it('ignores case, accents and punctuation', () => {
@@ -73,3 +73,22 @@ describe('scoreTranslation', () => {
 		expect(scoreTranslation(source, '  ').score).toBe(0);
 	});
 });
+
+describe('pattern info matching', () => {
+	it('accepts a more or less specific name', () => {
+		expect(nameValue('Pull raglan', 'Pull')).toBe(1);
+		expect(nameValue('Laine et Lune', 'Laine & Lune')).toBe(1);
+		expect(nameValue('Chaussettes', 'Pull')).toBe(0);
+	});
+
+	it('reads size lists as sets', () => {
+		expect([...sizeSet('XS-XL')]).toEqual(expect.arrayContaining(['xs', 's', 'm', 'l', 'xl']));
+		expect(sizeSet('XS (S, M, L, XL)')).toEqual(sizeSet('XS-XL'));
+	});
+
+	it('compares languages by code', () => {
+		const got = { tags: [], language: 'Français' } as never;
+		expect(scorePatternInfo(got, { language: 'fr' }).score).toBe(100);
+	});
+});
+
