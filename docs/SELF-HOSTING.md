@@ -194,7 +194,7 @@ docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d --build
 
 Cela ajoute :
 - **ollama** — modèles de texte (traduction, copilote, génération de patron) ;
-- **ollama-pull** — télécharge les modèles au 1er démarrage (`qwen2.5:7b` + `nomic-embed-text`),
+- **ollama-pull** — télécharge les modèles au 1er démarrage (`gemma4:12b` + `nomic-embed-text`),
   puis s'arrête ;
 - **vision** — OCR d'étiquettes de pelote (EasyOCR) ;
 - **whisper** — transcription vocale (compteur de rangs mains-libres).
@@ -204,11 +204,13 @@ Cela ajoute :
 
 ### 6.3 Notes VRAM (RTX 3080 = 10 Go)
 
-- `qwen2.5:7b` quantifié ≈ 5–6 Go ; `nomic-embed-text` ≈ 0,3 Go.
+- `gemma4:12b` (Gemma 4 12B, texte + image) ≈ 8 Go de poids ; `nomic-embed-text` ≈ 0,3 Go.
+  C'est le plus gros poste : sur une carte de 10 Go partagée avec d'autres services, il
+  ne reste pas de place pour un second LLM chargé en même temps.
 - Ollama décharge les modèles inactifs automatiquement.
 - vision et whisper chargent leurs modèles à la première requête. Si tu veux limiter la
   pression mémoire, utilise les services un par un (ils ne tournent à fond que pendant l'usage).
-- Pour changer de modèle : `OLLAMA_CHAT_MODEL=llama3.1:8b` dans `.env`, puis relance.
+- Pour changer de modèle : `OLLAMA_CHAT_MODEL=qwen3:8b` (par exemple) dans `.env`, puis relance.
 
 > Si `OLLAMA_URL` est vide dans `.env`, les boutons d'IA affichent un message clair au lieu
 > de planter : le socle reste pleinement utilisable.

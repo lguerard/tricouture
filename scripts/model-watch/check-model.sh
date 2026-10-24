@@ -34,7 +34,7 @@ fi
 
 APP_URL="${MODEL_WATCH_APP_URL:-http://localhost:3000}"
 HEADROOM="${MODEL_WATCH_VRAM_HEADROOM_GB:-1.0}"
-OLD_MODEL="${OLLAMA_CHAT_MODEL:-qwen2.5:7b}"
+OLD_MODEL="${OLLAMA_CHAT_MODEL:-gemma4:12b}"
 echo "model-watch: modèle actuel = $OLD_MODEL"
 
 VRAM_TOTAL_MIB="$(nvidia-smi --query-gpu=memory.total --format=csv,noheader,nounits | head -1)"

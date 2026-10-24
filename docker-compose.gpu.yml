@@ -28,7 +28,7 @@ services:
       - -c
       - >
         sleep 6;
-        ollama pull ${OLLAMA_CHAT_MODEL:-qwen2.5:7b} &&
+        ollama pull ${OLLAMA_CHAT_MODEL:-gemma4:12b} &&
         ollama pull ${OLLAMA_EMBED_MODEL:-nomic-embed-text}
     restart: "no"
 

@@ -1,8 +1,9 @@
 import { env } from '$env/dynamic/private';
 
 const OLLAMA_URL = () => env.OLLAMA_URL?.replace(/\/$/, '') || '';
-// Default models (overridable via env). Chosen to fit within ~10 GB VRAM.
-const CHAT_MODEL = () => env.OLLAMA_CHAT_MODEL || 'qwen2.5:7b';
+// Default models (overridable via env). gemma4:12b (~8 GB) is the largest
+// model that still fits a 10 GB card, and it also accepts image input.
+const CHAT_MODEL = () => env.OLLAMA_CHAT_MODEL || 'gemma4:12b';
 const EMBED_MODEL = () => env.OLLAMA_EMBED_MODEL || 'nomic-embed-text';
 // Generous enough for the embedding model's cold start on a busy GPU.
 const EMBED_TIMEOUT_MS = 30_000;
