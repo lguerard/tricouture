@@ -1,4 +1,5 @@
 import { generate } from './ollama';
+import { parseJsonReply } from './output';
 import { patternInfoSystem, patternInfoPrompt, type PatternInfoHints } from './prompts';
 import { groundTags } from './tagGrounding';
 import type { PatternVocabulary } from '$lib/server/patternVocabulary';
@@ -85,18 +86,33 @@ function cleanNumber(v: unknown, min: number, max: number, decimals: number): nu
 	return Math.round(n * factor) / factor;
 }
 
-// Parses the model's response, tolerating the usual local-model quirks
-// (markdown fences, a non-JSON reply) the same way pieces.ts does. Never
-// throws -- a response we can't parse just means nothing to suggest.
-function parsePatternInfo(raw: string): SuggestedPatternInfo {
-	let text = raw.trim();
-	const fence = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
-	if (fence) text = fence[1].trim();
+// Structured-output schema for the suggestion (Ollama `format`). Every field
+// is optional: the prompt asks the model to omit what the text does not say,
+// and the schema must not force it to invent a value.
+export const PATTERN_INFO_SCHEMA = {
+	type: 'object',
+	properties: {
+		title: { type: 'string' },
+		tags: { type: 'array', items: { type: 'string' } },
+		garmentType: { type: 'string' },
+		designer: { type: 'string' },
+		language: { type: 'string' },
+		difficulty: { type: 'integer' },
+		sizes: { type: 'string' },
+		gaugeStitches: { type: 'number' },
+		gaugeRows: { type: 'number' },
+		yardageRequired: { type: 'number' }
+	}
+} as const;
 
-	try {
-		const data = JSON.parse(text);
-		if (data && typeof data === 'object' && !Array.isArray(data)) {
-			return {
+// Parses the model's response, tolerating the usual local-model quirks
+// (reasoning block, markdown fences, prose around the JSON, a non-JSON
+// reply) via output.ts, the same way pieces.ts does. Never throws -- a
+// response we can't parse just means nothing to suggest.
+function parsePatternInfo(raw: string): SuggestedPatternInfo {
+	const data = parseJsonReply(raw) as Record<string, unknown> | undefined;
+	if (data && typeof data === 'object' && !Array.isArray(data)) {
+		return {
 				title: cleanText(data.title, 255),
 				tags: cleanTags(data.tags),
 				garmentType: cleanText(data.garmentType, 120),
@@ -107,11 +123,9 @@ function parsePatternInfo(raw: string): SuggestedPatternInfo {
 				gaugeStitches: cleanNumber(data.gaugeStitches, 1, 200, 1),
 				gaugeRows: cleanNumber(data.gaugeRows, 1, 200, 1),
 				yardageRequired: cleanNumber(data.yardageRequired, 1, 100_000, 0)
-			};
-		}
-	} catch {
-		/* not valid JSON — no structured info to salvage */
+		};
 	}
+	// Not valid JSON — no structured info to salvage.
 	return { tags: [] };
 }
 
@@ -127,8 +141,9 @@ export async function suggestPatternInfo(
 	hints?: PatternInfoHints
 ): Promise<SuggestedPatternInfo> {
 	const raw = await generate(patternInfoPrompt(context, vocabulary, hints), patternInfoSystem(language), undefined, {
+		schema: PATTERN_INFO_SCHEMA,
 		temperature: 0,
-		json: true
+		think: false
 	});
 	const info = parsePatternInfo(raw);
 	info.tags = groundTags(info.tags, { text: context, garmentType: hints?.garmentType || info.garmentType });

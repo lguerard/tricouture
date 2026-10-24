@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import sharp from 'sharp';
-import { extractPalette } from './palette';
+import { dominantColor, extractPalette } from './palette';
 
 // An image made of horizontal bands, `weights` giving each band's height.
 async function bands(colors: [number, number, number][], weights: number[]): Promise<Buffer> {
@@ -51,5 +51,24 @@ describe('extractPalette', () => {
 			[10, 10, 10, 10]
 		);
 		expect(await extractPalette(img, 2)).toHaveLength(2);
+	});
+});
+
+describe('dominantColor', () => {
+	it('ignores the background around the centred item', async () => {
+		// White top/bottom margins (40 % of the picture) around a red band.
+		const img = await bands(
+			[
+				[255, 255, 255],
+				[200, 30, 60],
+				[255, 255, 255]
+			],
+			[20, 60, 20]
+		);
+		expect(await dominantColor(img)).toBe('#c81e3c');
+	});
+
+	it('returns null for something that is not an image', async () => {
+		expect(await dominantColor(Buffer.from('nope'))).toBeNull();
 	});
 });

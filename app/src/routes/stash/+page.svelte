@@ -7,6 +7,7 @@
 	import { YARN_WEIGHTS, MOTIF_VALUES, motifLabel, COLOR_NAMES, toolTypeOptions, toolTypeLabel } from '$lib/labels';
 	import { isCapacitor, scanBarcode } from '$lib/capacitor';
 	import { t } from '$lib/i18n';
+	import { recolorImage } from '$lib/recolor';
 	let { data, form } = $props();
 	const locale = $derived(data.locale);
 
@@ -57,33 +58,40 @@
 		form?.error ? t(locale, ADD_ERRORS[form.error as string] ?? 'stash.errGeneric') : ''
 	);
 
-	// SD colorway preview
+	// Colorway preview: recolours the yarn's own photo toward a colour picked
+	// in the card, in the browser (lib/recolor.ts) -- instant, no AI service.
 	let previewYarnId = $state<string | null>(null);
 	let previewBusy = $state(false);
 	let previewSrc = $state<string | null>(null);
 	let previewError = $state('');
+	let previewColor = $state('#888888');
 
-	async function generatePreview(yarnId: string, colorHex: string, label: string) {
-		previewYarnId = yarnId;
-		previewBusy = true;
-		previewSrc = null;
-		previewError = '';
-		try {
-			const res = await fetch('/api/ai/preview-colorway', {
-				method: 'POST',
-				headers: { 'content-type': 'application/json' },
-				body: JSON.stringify({ prompt: `pelote de laine ${label}, texturée`, colorHex })
-			});
-			const d = await res.json();
-			if (!res.ok) {
-				previewError = d.message ?? t(locale, 'stash.previewUnavailable');
-			} else {
-				previewSrc = `data:image/png;base64,${d.image_base64}`;
-			}
-		} catch {
-			previewError = t(locale, 'stash.networkError');
+	function togglePreview(yarnId: string, photoPath: string | null, colorHex: string | null) {
+		if (previewYarnId === yarnId) {
+			previewYarnId = null;
+			previewSrc = null;
+			previewError = '';
+			return;
 		}
-		previewBusy = false;
+		previewYarnId = yarnId;
+		previewSrc = null;
+		previewError = photoPath ? '' : t(locale, 'stash.yarn.previewNoPhoto');
+		previewColor = colorHex ?? '#888888';
+		if (photoPath) void renderPreview(photoPath);
+	}
+
+	// Latest request wins: dragging the colour picker fires many inputs.
+	let previewSeq = 0;
+	async function renderPreview(photoPath: string) {
+		const seq = ++previewSeq;
+		previewBusy = true;
+		try {
+			const src = await recolorImage(mediaUrl(photoPath, 800), previewColor);
+			if (seq === previewSeq) previewSrc = src;
+		} catch {
+			if (seq === previewSeq) previewError = t(locale, 'stash.previewUnavailable');
+		}
+		if (seq === previewSeq) previewBusy = false;
 	}
 
 	// Fields pre-fill: shared by label OCR, barcode lookup, and URL import — across all 4 tabs.
@@ -111,24 +119,26 @@
 		for (const [key, id] of Object.entries(FIELD_IDS[tab])) set(id, f[key]);
 	}
 
-	// Photo analysis: guesses colorHex (dominant color) + motif (zero-shot CLIP, if the
-	// vision service has it installed) from an actual photo of the item. Only fills fields
-	// that are still empty/default so it never overwrites an explicit choice or a value
-	// already guessed from product page text.
+	// Photo analysis: guesses colorHex (dominant color, computed by the server
+	// without AI) + motif (local vision model, when the AI is on) from an actual
+	// photo of the item. Only fills fields that are still empty/default so it
+	// never overwrites an explicit choice or a value already guessed from
+	// product page text. `withMotif: false` for a label photo: its "motif" says
+	// nothing about the yarn, and skipping it saves a model call.
 	let analyzing = $state(false);
-	async function analyzePhoto(file: Blob) {
+	async function analyzePhoto(file: Blob, { withMotif = true } = {}) {
 		const ids = COLOR_MOTIF_IDS[tab];
 		if (!ids) return;
 		const colorEl = document.getElementById(ids.color) as HTMLInputElement | null;
 		const motifEl = document.getElementById(ids.motif) as HTMLSelectElement | null;
 		const needsColor = !!colorEl && (!colorEl.value || colorEl.value.toLowerCase() === '#cccccc');
-		const needsMotif = !!motifEl && !motifEl.value;
+		const needsMotif = withMotif && !!motifEl && !motifEl.value;
 		if (!needsColor && !needsMotif) return;
 		analyzing = true;
 		try {
 			const fd = new FormData();
 			fd.append('file', file, 'photo.jpg');
-			const res = await fetch('/api/ai/analyze-photo', { method: 'POST', body: fd });
+			const res = await fetch(`/api/ai/analyze-photo${needsMotif ? '' : '?motif=0'}`, { method: 'POST', body: fd });
 			if (res.ok) {
 				const d = await res.json();
 				if (needsColor && d.colorHex && colorEl) colorEl.value = d.colorHex;
@@ -136,7 +146,7 @@
 				if (d.colorHex || d.motif) scanMsg = t(locale, 'stash.fieldsPrefilled');
 			}
 		} catch {
-			// vision service unavailable — leave fields as-is
+			// analysis unavailable — leave fields as-is
 		}
 		analyzing = false;
 	}
@@ -197,8 +207,8 @@
 		barcodeBusy = false;
 	}
 
-	// Label scan: sends the photo to the vision service, pre-fills the form.
-	// The vision service guesses yarn-shaped fields; for fabric, "fiber" reads as composition.
+	// Label scan: the local vision model reads the label photo, pre-fills the form.
+	// It returns yarn-shaped fields; for fabric, "fiber" reads as composition.
 	let scanBusy = $state(false);
 	async function scanLabel(e: Event) {
 		const input = e.target as HTMLInputElement;
@@ -216,7 +226,7 @@
 			} else {
 				const raw = data.fields ?? {};
 				applyFields(tab === 'fabric' ? { name: raw.name, composition: raw.fiber } : raw);
-				await analyzePhoto(file);
+				await analyzePhoto(file, { withMotif: false });
 				scanMsg = t(locale, 'stash.fieldsPrefilled');
 			}
 		} catch {
@@ -531,12 +541,22 @@
 					{#if previewYarnId === y.id && previewError}
 						<span class="muted small">{previewError}</span>
 					{/if}
+					{#if previewYarnId === y.id && y.photoPath}
+						<label class="preview-color small">
+							{t(locale, 'stash.yarn.previewColor')}
+							<input
+								type="color"
+								bind:value={previewColor}
+								oninput={() => y.photoPath && renderPreview(y.photoPath)}
+							/>
+						</label>
+					{/if}
 					<div class="card-actions">
 						<button
 							type="button"
 							class="btn-ghost small"
-							disabled={previewBusy && previewYarnId === y.id}
-							onclick={() => generatePreview(y.id, y.colorHex ?? '#888', [y.brand, y.name, y.colorway].filter(Boolean).join(' '))}
+							aria-pressed={previewYarnId === y.id}
+							onclick={() => togglePreview(y.id, y.photoPath, y.colorHex)}
 						>
 							{previewBusy && previewYarnId === y.id ? `⏳ ${t(locale, 'stash.yarn.generating')}` : `🎨 ${t(locale, 'stash.yarn.previewBtn')}`}
 						</button>
@@ -739,6 +759,18 @@
 	.btn-ghost.small {
 		font-size: 0.82rem;
 		padding: 0.3rem 0.6rem;
+	}
+	.preview-color {
+		display: flex;
+		align-items: center;
+		gap: 0.4rem;
+	}
+	.preview-color input {
+		width: 2.4rem;
+		height: 1.6rem;
+		padding: 0;
+		border: none;
+		background: none;
 	}
 	.preview-img {
 		width: 100%;

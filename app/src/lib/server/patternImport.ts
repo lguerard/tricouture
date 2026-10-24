@@ -4,8 +4,8 @@ import { patterns, patternFiles } from '$lib/server/db/schema';
 import { saveUpload, saveDataUrl } from '$lib/server/storage';
 import { autoFindCover, isStorableImage } from '$lib/server/cover-search';
 import { extractPdfText } from '$lib/server/pdf';
-import { embed, aiConfigured } from '$lib/server/ai/ollama';
-import { patternEmbeddingText } from '$lib/server/embeddings';
+import { aiConfigured } from '$lib/server/ai/ollama';
+import { patternEmbeddingText, embedDocument } from '$lib/server/embeddings';
 import { suggestPatternInfo, mergePatternInfo, DEFAULT_INFO_LANGUAGE, type InfoLanguage } from '$lib/server/ai/patternInfo';
 import { getPatternVocabulary } from '$lib/server/patternVocabulary';
 import type { Craft } from '$lib/server/db/schema';
@@ -132,7 +132,7 @@ export async function importOnePattern(opts: {
 	// Semantic search is a bonus: an embedding failing must not abort the import.
 	if (aiConfigured()) {
 		try {
-			updates.embedding = await embed(
+			updates.embedding = await embedDocument(
 				patternEmbeddingText({
 					title,
 					craft,

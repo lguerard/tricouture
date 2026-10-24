@@ -81,6 +81,7 @@
 				<textarea
 					id="src"
 					rows="14"
+					maxlength="8000"
 					bind:value={source}
 					placeholder={t(locale, 'assistant.sourcePlaceholder')}
 				></textarea>

@@ -11,11 +11,13 @@ services:
       AUTH_SECRET: ${AUTH_SECRET}
       MEDIA_DIR: ${MEDIA_DIR:-/data/media}
       OLLAMA_URL: ${OLLAMA_URL:-}
-      OLLAMA_CHAT_MODEL: ${OLLAMA_CHAT_MODEL:-qwen2.5:7b}
+      OLLAMA_CHAT_MODEL: ${OLLAMA_CHAT_MODEL:-gemma4:12b}
       OLLAMA_EMBED_MODEL: ${OLLAMA_EMBED_MODEL:-nomic-embed-text}
-      VISION_URL: ${VISION_URL:-}
+      # Context window (tokens) sent with every generation. Keep it equal to
+      # what every other app on the same Ollama uses: a different value makes
+      # Ollama reload the model on each switch.
+      OLLAMA_NUM_CTX: ${OLLAMA_NUM_CTX:-8192}
       WHISPER_URL: ${WHISPER_URL:-}
-      SD_URL: ${SD_URL:-}
       # Monthly model-watch cron job (scripts/model-watch/) — empty disables
       # the /api/cron/model-watch endpoint entirely (503).
       MODEL_WATCH_TOKEN: ${MODEL_WATCH_TOKEN:-}

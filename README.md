@@ -101,7 +101,8 @@ besoin :
 
 - **Traduction** de patrons EN/JP/DE → FR (glossaire tricot/crochet).
 - **Copilote** et **génération de patron**.
-- **OCR** d'étiquettes, **transcription vocale** (compteur mains-libres).
+- **Lecture d'étiquettes** de pelotes (photo → marque, composition, métrage…),
+  **transcription vocale** (compteur mains-libres).
 - **Recherche par le sens** (Ctrl K) : « pull chaud pour l'hiver » retrouve un
   patron intitulé « Aran ». La page *Mon compte* indexe les patrons et laines
   créés pendant que l'IA était indisponible.
@@ -152,12 +153,12 @@ besoin :
         │  UI + API + auth   │   │     pgvector)    │
         └─────────┬──────────┘   └──────────────────┘
                   │ (optionnel, GPU)
-     ┌────────────┼─────────────┐
-     ▼            ▼             ▼
- ┌────────┐  ┌─────────┐   ┌──────────┐
- │ ollama │  │ vision  │   │ whisper  │
- │ (LLM)  │  │ (OCR)   │   │ (STT)    │
- └────────┘  └─────────┘   └──────────┘
+          ┌───────┴───────┐
+          ▼               ▼
+ ┌─────────────────┐  ┌──────────┐
+ │ ollama          │  │ whisper  │
+ │ (LLM + images)  │  │ (STT)    │
+ └─────────────────┘  └──────────┘
 ```
 
 - **Frontend + backend** : SvelteKit (adapter-node), une seule base de code,
@@ -210,8 +211,10 @@ Variables principales du fichier `.env` :
 | `ORIGIN` | URL publique réelle (doit correspondre au navigateur) |
 | `AUTH_SECRET` | secret de session (`openssl rand -hex 32`) |
 | `OLLAMA_URL` | URL du LLM (vide = IA désactivée proprement) |
-| `OLLAMA_CHAT_MODEL` / `OLLAMA_EMBED_MODEL` | modèles utilisés |
-| `VISION_URL` / `WHISPER_URL` | sidecars IA vision/voix |
+| `OLLAMA_CHAT_MODEL` / `OLLAMA_EMBED_MODEL` | modèles utilisés (chat multimodal : lit aussi les étiquettes) |
+| `OLLAMA_NUM_CTX` | contexte (tokens) de chaque requête, 8192 ; identique pour toutes les apps d'un même Ollama |
+| `COMPOSE_PROFILES` | `local-ollama` pour lancer l'Ollama de l'override GPU (vide si un Ollama existe déjà) |
+| `WHISPER_URL` / `WHISPER_MODEL` | sidecar IA voix et son modèle |
 | `CLOUDFLARE_TUNNEL_TOKEN` | exposition via Cloudflare (optionnel) |
 
 ---
@@ -224,7 +227,8 @@ Lance l'application avec les services IA :
 docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d --build
 ```
 
-Cela ajoute `ollama` (LLM), `vision` (OCR) et `whisper` (voix). Les modèles
+Cela ajoute `ollama` (LLM, profil `local-ollama` — ou un Ollama déjà présent
+via `OLLAMA_URL` ; il lit aussi les photos d'étiquettes) et `whisper` (voix). Les modèles
 sont téléchargés au premier démarrage. Détails (toolkit NVIDIA, VRAM, modèles)
 dans le [guide d'auto-hébergement](docs/SELF-HOSTING.md#6-activer-lia-locale-gpu--optionnel).
 
@@ -381,9 +385,9 @@ Chaque **push sur `main`** déclenche le workflow *Release* :
 - ✅ Socle (patrons, stock, projets, Kanban)
 - ✅ Motivation (stats, objectifs, succès, calendrier)
 - ✅ IA texte (traduction, copilote, génération)
-- ✅ IA vision/voix (OCR étiquette, compteur vocal)
+- ✅ IA vision/voix (lecture d'étiquette, compteur vocal)
 - ✅ App Android (Capacitor) + CI release
-- ✅ Aperçu coloris (Stable Diffusion)
+- ✅ Aperçu coloris (recoloration de la photo dans le navigateur)
 - ✅ Recherche sémantique (indexation + résultats « proches par le sens »)
 - ✅ Mood boards (palette de couleurs automatique), photos de projets, galerie
 - ✅ Écussons brodés : image → fichier .pes pour la Brother Skitch PP1 (Artspira), calculé dans le navigateur, avec bibliothèque de tous les écussons créés

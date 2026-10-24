@@ -5,8 +5,8 @@ import { patterns, patternFiles } from '$lib/server/db/schema';
 import { saveUpload, saveDataUrl } from '$lib/server/storage';
 import { autoFindCover, isStorableImage, resolveImageFromUrl } from '$lib/server/cover-search';
 import { extractPdfText } from '$lib/server/pdf';
-import { embed, aiConfigured } from '$lib/server/ai/ollama';
-import { patternEmbeddingText } from '$lib/server/embeddings';
+import { aiConfigured } from '$lib/server/ai/ollama';
+import { patternEmbeddingText, embedDocument } from '$lib/server/embeddings';
 import { suggestPatternInfo, mergePatternInfo, normalizeInfoLanguage } from '$lib/server/ai/patternInfo';
 import { getPatternVocabulary } from '$lib/server/patternVocabulary';
 import { t } from '$lib/i18n';
@@ -136,7 +136,7 @@ export const actions: Actions = {
 
 		if (aiConfigured()) {
 			try {
-				updates.embedding = await embed(
+				updates.embedding = await embedDocument(
 					patternEmbeddingText({
 						title,
 						craft,

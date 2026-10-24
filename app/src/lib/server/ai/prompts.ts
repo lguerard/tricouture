@@ -2,6 +2,21 @@
 
 import type { PatternVocabulary } from '$lib/server/patternVocabulary';
 
+// How much pattern text goes into one prompt. Every generation runs with an
+// 8192-token context (ollama.ts numCtx(), shared with other apps on the same
+// Ollama), which must hold the system prompt, the pattern excerpt AND the
+// answer. Budget, worst case: extracted PDF text full of numbers and
+// abbreviations tokenizes at ~2.5 chars/token, so 10 000 chars is ≤ 4 000
+// tokens (≈ 2 500-3 000 for ordinary prose); the longest system prompt
+// (patternInfoSystem) is ~1 300 tokens, the vocabulary block ≤ ~600, which
+// leaves ≥ 2 000 tokens for the answer -- plenty for JSON extraction and a
+// copilot reply.
+export const PATTERN_CONTEXT_CHARS = 10_000;
+// Translation sends the text itself AND gets it back, roughly the same size:
+// 8 000 chars ≈ ≤ 3 200 tokens each way even worst case, plus the ~400-token
+// system prompt and glossary, fits 8192.
+export const MAX_TRANSLATE_CHARS = 8_000;
+
 export const KNITTING_GLOSSARY = `
 Glossaire de référence (anglais → français) à respecter strictement :
 - k = maille endroit (m. end.) ; p = maille envers (m. env.)
@@ -59,7 +74,7 @@ export function piecesPrompt(context: string, craft?: string): string {
 			: craft === 'tricot' || craft === 'crochet'
 				? ' Patron de tricot/crochet : cherche le nombre de rangs total par pièce ("rows").'
 				: '';
-	return `PATRON:\n${context.slice(0, 12000)}\n\nListe les pièces à réaliser pour ce patron, avec leurs rangs/quantités si précisés, au format JSON demandé.${hint}`;
+	return `PATRON:\n${context.slice(0, PATTERN_CONTEXT_CHARS)}\n\nListe les pièces à réaliser pour ce patron, avec leurs rangs/quantités si précisés, au format JSON demandé.${hint}`;
 }
 
 // Output language for the free-text fields a suggestion generates (tags,
@@ -151,11 +166,11 @@ function hintsBlock(hints?: PatternInfoHints): string {
 }
 
 export function patternInfoPrompt(context: string, vocabulary?: PatternVocabulary, hints?: PatternInfoHints): string {
-	return `${hintsBlock(hints)}PATRON:\n${context.slice(0, 12000)}${vocabularyBlock(vocabulary)}\n\nExtrais les informations pour ce patron, au format JSON demandé.`;
+	return `${hintsBlock(hints)}PATRON:\n${context.slice(0, PATTERN_CONTEXT_CHARS)}${vocabularyBlock(vocabulary)}\n\nExtrais les informations pour ce patron, au format JSON demandé.`;
 }
 
 export function copilotPrompt(context: string, question: string): string {
-	const ctx = context.slice(0, 12000);
+	const ctx = context.slice(0, PATTERN_CONTEXT_CHARS);
 	return `CONTEXTE DU PATRON:\n${ctx}\n\nQUESTION: ${question}`;
 }
 

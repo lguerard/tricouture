@@ -5,6 +5,10 @@
 # A lancer via cron depuis le HOST (a besoin de nvidia-smi pour mesurer la
 # VRAM, et de docker compose pour redemarrer l'app si le modele change).
 # Idempotent et sans argument.
+#
+# Par defaut : RAPPORT SEULEMENT, rien n'est modifie. Le changement
+# automatique de OLLAMA_CHAT_MODEL dans .env (+ redemarrage de l'app) n'a
+# lieu qu'avec MODEL_WATCH_AUTO_SWITCH=true dans .env.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -34,12 +38,20 @@ fi
 
 APP_URL="${MODEL_WATCH_APP_URL:-http://localhost:3000}"
 HEADROOM="${MODEL_WATCH_VRAM_HEADROOM_GB:-1.0}"
-OLD_MODEL="${OLLAMA_CHAT_MODEL:-qwen2.5:7b}"
+AUTO_SWITCH="${MODEL_WATCH_AUTO_SWITCH:-false}"
+OLD_MODEL="${OLLAMA_CHAT_MODEL:-gemma4:12b}"
 echo "model-watch: modèle actuel = $OLD_MODEL"
 
 VRAM_TOTAL_MIB="$(nvidia-smi --query-gpu=memory.total --format=csv,noheader,nounits | head -1)"
 VRAM_TOTAL_GB="$(awk -v m="$VRAM_TOTAL_MIB" 'BEGIN{printf "%.2f", m/1024}')"
-VRAM_BUDGET_GB="$(awk -v t="$VRAM_TOTAL_GB" -v h="$HEADROOM" 'BEGIN{printf "%.2f", t-h}')"
+# MODEL_WATCH_VRAM_BUDGET_GB : la VRAM vraiment disponible pour le modele de
+# chat (GPU partage avec d'autres services = bien moins que la VRAM totale).
+# A defaut : VRAM totale moins MODEL_WATCH_VRAM_HEADROOM_GB.
+if [ -n "${MODEL_WATCH_VRAM_BUDGET_GB:-}" ]; then
+  VRAM_BUDGET_GB="$(awk -v b="$MODEL_WATCH_VRAM_BUDGET_GB" 'BEGIN{printf "%.2f", b}')"
+else
+  VRAM_BUDGET_GB="$(awk -v t="$VRAM_TOTAL_GB" -v h="$HEADROOM" 'BEGIN{printf "%.2f", t-h}')"
+fi
 echo "model-watch: VRAM totale ${VRAM_TOTAL_GB} Go -- budget candidats ${VRAM_BUDGET_GB} Go"
 
 echo "model-watch: démarrage de l'évaluation…"
@@ -74,20 +86,27 @@ fi
 WINNER="$(echo "$RESULT" | jq -r '.winner // empty')"
 NEW_MODEL="$OLD_MODEL"
 
+RECOMMENDED=""
+
 if [ -n "$WINNER" ] && [ "$WINNER" != "$OLD_MODEL" ]; then
-  echo "model-watch: nouveau modèle retenu : $WINNER (ancien : $OLD_MODEL)"
-  if grep -q '^OLLAMA_CHAT_MODEL=' .env; then
-    sed -i.bak "s|^OLLAMA_CHAT_MODEL=.*|OLLAMA_CHAT_MODEL=${WINNER}|" .env && rm -f .env.bak
+  if [ "$AUTO_SWITCH" = "true" ]; then
+    echo "model-watch: nouveau modèle retenu : $WINNER (ancien : $OLD_MODEL)"
+    if grep -q '^OLLAMA_CHAT_MODEL=' .env; then
+      sed -i.bak "s|^OLLAMA_CHAT_MODEL=.*|OLLAMA_CHAT_MODEL=${WINNER}|" .env && rm -f .env.bak
+    else
+      echo "OLLAMA_CHAT_MODEL=${WINNER}" >> .env
+    fi
+    docker compose up -d --no-deps app
+    sleep 5
+    DOCKER_STATUS="$(docker compose ps app --format '{{.Status}}' 2>/dev/null || echo inconnu)"
+    echo "model-watch: app redémarrée avec $WINNER -- statut : $DOCKER_STATUS"
+    NEW_MODEL="$WINNER"
   else
-    echo "OLLAMA_CHAT_MODEL=${WINNER}" >> .env
+    echo "model-watch: $WINNER fait mieux que $OLD_MODEL -- RECOMMANDÉ, non appliqué (MODEL_WATCH_AUTO_SWITCH≠true)."
+    RECOMMENDED="$WINNER"
   fi
-  docker compose up -d --no-deps app
-  sleep 5
-  DOCKER_STATUS="$(docker compose ps app --format '{{.Status}}' 2>/dev/null || echo inconnu)"
-  echo "model-watch: app redémarrée avec $WINNER -- statut : $DOCKER_STATUS"
-  NEW_MODEL="$WINNER"
 else
   echo "model-watch: aucun candidat n'a fait significativement mieux -- pas de changement."
 fi
 
-echo "$RESULT" | node "$SCRIPT_DIR/send-report.mjs" --old-model "$OLD_MODEL" --new-model "$NEW_MODEL"
+echo "$RESULT" | node "$SCRIPT_DIR/send-report.mjs" --old-model "$OLD_MODEL" --new-model "$NEW_MODEL" ${RECOMMENDED:+--recommended "$RECOMMENDED"}
