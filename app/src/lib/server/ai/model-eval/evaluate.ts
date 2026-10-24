@@ -61,10 +61,10 @@ async function runCase(task: Task, c: EvalCases[Task][number], model: string, on
 	if (task === 'pattern_info') {
 		const ic = c as EvalCases['pattern_info'][number];
 		// Only the craft is passed as a hint (the garment type is one of the
-		// fields being checked), and no vocabulary: the person's own one
-		// would contain this very pattern's answers.
+		// fields being checked). The vocabulary is the one production sends,
+		// built from the person's other patterns (cases.ts vocabularyFor).
 		const hints = { craft: ic.craft };
-		const raw = await generate(patternInfoPrompt(ic.context, undefined, hints), patternInfoSystem('fr'), model, {
+		const raw = await generate(patternInfoPrompt(ic.context, ic.vocabulary, hints), patternInfoSystem('fr'), model, {
 			...PATTERN_INFO_GENERATE_OPTIONS,
 			...run
 		});

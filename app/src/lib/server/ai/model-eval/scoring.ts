@@ -70,6 +70,42 @@ function weighted(criteria: Criterion[]): Scored {
 }
 
 const textValue = (got: unknown, want: unknown) => ramp(1 - similarity(got, want), 0.1, 0.5);
+
+// A name or a type: « Pull » for « Pull raglan », « Laine & Lune » for
+// « Laine et Lune » are right, just more or less specific.
+export function nameValue(got: unknown, want: unknown): number {
+	const g = fold(got).replace(/\bet\b/g, ' ').replace(/\s+/g, ' ').trim();
+	const w = fold(want).replace(/\bet\b/g, ' ').replace(/\s+/g, ' ').trim();
+	if (!g || !w) return 0;
+	if (g === w || ` ${g} `.includes(` ${w} `) || ` ${w} `.includes(` ${g} `)) return 1;
+	return textValue(g, w);
+}
+
+const LETTER_SIZES = ['xxs', 'xs', 's', 'm', 'l', 'xl', 'xxl', '3xl', '4xl', '5xl', '6xl'];
+
+// Size list as a set: « XS-XL » = « XS (S, M, L, XL) » = « XS, S, M, L, XL ».
+export function sizeSet(text: unknown): Set<string> {
+	const t = fold(String(text ?? '').replace(/2xl/gi, 'xxl'));
+	const out = new Set<string>();
+	const range = t.match(/\b(xxs|xs|s|m|l|xl|xxl|[3-6]xl)\s+(?:a|to)?\s*(xxs|xs|s|m|l|xl|xxl|[3-6]xl)\b/);
+	if (range && /[-–àa]|to/.test(String(text))) {
+		const [i, j] = [LETTER_SIZES.indexOf(range[1]), LETTER_SIZES.indexOf(range[2])];
+		if (i >= 0 && j > i) LETTER_SIZES.slice(i, j + 1).forEach((s) => out.add(s));
+	}
+	for (const tok of t.match(/\b(xxs|xs|s|m|l|xl|xxl|[3-6]xl|\d{1,3})\b/g) ?? []) out.add(tok);
+	return out;
+}
+
+const sizesValue = (got: unknown, want: unknown) => {
+	const g = sizeSet(got);
+	const w = sizeSet(want);
+	if (!w.size) return textValue(got, want);
+	const inter = [...w].filter((x) => g.has(x)).length;
+	return inter / new Set([...g, ...w]).size;
+};
+
+const LANGUAGES: Record<string, string> = { francais: 'fr', french: 'fr', anglais: 'en', english: 'en', allemand: 'de', german: 'de', deutsch: 'de', espagnol: 'es', spanish: 'es', italien: 'it', italian: 'it', neerlandais: 'nl', dutch: 'nl' };
+const langCode = (v: unknown) => LANGUAGES[fold(v)] ?? fold(v).slice(0, 2);
 const relative = (got: number | null | undefined, want: number, full: number, zero: number) =>
 	got == null ? 0 : ramp(Math.abs(got - want) / Math.max(Math.abs(want), 1), full, zero);
 
@@ -158,18 +194,19 @@ export type PatternInfoExpected = {
 export function scorePatternInfo(got: SuggestedPatternInfo, expected: PatternInfoExpected, validJson = true): Scored {
 	if (!validJson) return { score: 0, notes: ['JSON illisible'] };
 	const c: Criterion[] = [[10, 1, 'JSON valide']];
-	const text = (key: 'garmentType' | 'designer' | 'sizes', w: number) => {
-		if (expected[key]) c.push([w, textValue(got[key], expected[key]), `${key} « ${got[key] ?? '—'} », attendu « ${expected[key]} »`]);
+	const text = (key: 'garmentType' | 'designer' | 'sizes', w: number, value: (g: unknown, e: unknown) => number) => {
+		if (expected[key]) c.push([w, value(got[key], expected[key]), `${key} « ${got[key] ?? '—'} », attendu « ${expected[key]} »`]);
 	};
-	text('garmentType', 15);
-	text('designer', 10);
-	text('sizes', 10);
+	text('garmentType', 15, nameValue);
+	text('designer', 10, nameValue);
+	text('sizes', 10, sizesValue);
 	if (expected.language) {
-		c.push([10, Number(fold(got.language) === fold(expected.language)), `langue ${got.language ?? '—'}, attendu ${expected.language}`]);
+		c.push([10, Number(langCode(got.language) === langCode(expected.language)), `langue ${got.language ?? '—'}, attendu ${expected.language}`]);
 	}
 	if (expected.difficulty) {
+		// A rating the person chose: one level off is a matter of taste.
 		const d = got.difficulty == null ? 9 : Math.abs(got.difficulty - expected.difficulty);
-		c.push([10, d === 0 ? 1 : d === 1 ? 0.5 : 0, `difficulté ${got.difficulty ?? '—'}, attendu ${expected.difficulty}`]);
+		c.push([5, d === 0 ? 1 : d === 1 ? 0.75 : 0, `difficulté ${got.difficulty ?? '—'}, attendu ${expected.difficulty}`]);
 	}
 	for (const key of ['gaugeStitches', 'gaugeRows'] as const) {
 		const want = expected[key];

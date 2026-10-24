@@ -60,6 +60,7 @@ async function patternRows(): Promise<PatternRow[]> {
 	return db
 		.select({
 			id: patterns.id,
+			ownerId: patterns.ownerId,
 			title: patterns.title,
 			craft: patterns.craft,
 			notes: patterns.notes,
@@ -121,7 +122,7 @@ export async function harvestCases(maxCases: number): Promise<{ cases: EvalCases
 		cases: {
 			label: withFallback(label, BUNDLED.label, maxCases),
 			pieces: withFallback(take(rows, (p) => piecesCase(p, pieces), maxCases), BUNDLED.pieces, maxCases),
-			pattern_info: withFallback(take(rows, patternInfoCase, maxCases), BUNDLED.pattern_info, maxCases),
+			pattern_info: withFallback(take(rows, (p) => patternInfoCase(p, rows), maxCases), BUNDLED.pattern_info, maxCases),
 			translation: withFallback(take(rows, translationCase, maxCases), BUNDLED.translation, maxCases)
 		}
 	};
