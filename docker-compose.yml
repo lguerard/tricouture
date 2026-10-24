@@ -13,6 +13,10 @@ services:
       OLLAMA_URL: ${OLLAMA_URL:-}
       OLLAMA_CHAT_MODEL: ${OLLAMA_CHAT_MODEL:-gemma4:12b}
       OLLAMA_EMBED_MODEL: ${OLLAMA_EMBED_MODEL:-nomic-embed-text}
+      # Context window (tokens) sent with every generation. Keep it equal to
+      # what every other app on the same Ollama uses: a different value makes
+      # Ollama reload the model on each switch.
+      OLLAMA_NUM_CTX: ${OLLAMA_NUM_CTX:-8192}
       VISION_URL: ${VISION_URL:-}
       WHISPER_URL: ${WHISPER_URL:-}
       SD_URL: ${SD_URL:-}

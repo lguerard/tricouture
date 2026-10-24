@@ -4,7 +4,7 @@ import { db } from '$lib/server/db';
 import { patterns, patternPieces } from '$lib/server/db/schema';
 import { generate, AiUnavailable } from '$lib/server/ai/ollama';
 import { PIECES_SYSTEM, piecesPrompt } from '$lib/server/ai/prompts';
-import { parsePieces, type ParsedPiece } from '$lib/server/ai/pieces';
+import { parsePiecesResult, PIECES_GENERATE_OPTIONS, type PiecesParseResult } from '$lib/server/ai/pieces';
 import type { RequestHandler } from './$types';
 
 export const POST: RequestHandler = async ({ request, locals }) => {
@@ -22,19 +22,27 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 	if (!pat) return json({ error: 'Pattern not found' }, { status: 404 });
 	if (!pat.extractedText) return json({ error: 'no-text' }, { status: 422 });
 
-	let parsed: ParsedPiece[];
+	let result: PiecesParseResult;
 	try {
 		const context = [pat.title, pat.notes, pat.extractedText].filter(Boolean).join('\n\n');
-		parsed = parsePieces(await generate(piecesPrompt(context, pat.craft), PIECES_SYSTEM));
+		result = parsePiecesResult(
+			await generate(piecesPrompt(context, pat.craft), PIECES_SYSTEM, undefined, PIECES_GENERATE_OPTIONS)
+		);
 	} catch (e) {
 		if (e instanceof AiUnavailable) return json({ error: e.message }, { status: 503 });
 		return json({ error: 'Analysis failed' }, { status: 500 });
 	}
-	if (!parsed.length) return json({ error: 'empty' }, { status: 422 });
+	// Nothing usable (reasoning, prose, truncated JSON): leave the stored
+	// pieces untouched rather than "merging" them with an empty list.
+	const parsed = result.pieces;
+	if (result.source === 'none' || !parsed.length) return json({ error: 'empty' }, { status: 422 });
 
 	// Merge with what is already stored: keep (and reposition) pieces whose
 	// name still matches so a project's per-piece progress on them survives
 	// re-analysis; drop the ones no longer detected; insert the new ones.
+	// Dropping only happens for a structured (JSON) reply: a list salvaged
+	// from plain text is too unreliable to delete anything on its strength
+	// (and a project's per-piece progress would go with it).
 	// A newly detected rows/quantity always wins; when this pass doesn't spot
 	// one (a smaller local model can miss it), the previously stored value is
 	// kept rather than wiped, so re-analysis only ever adds information.
@@ -71,8 +79,20 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		}
 	}
 
-	for (const stale of existing.filter((p) => !keepIds.has(p.id))) {
-		await db.delete(patternPieces).where(eq(patternPieces.id, stale.id));
+	if (result.source === 'json') {
+		for (const stale of existing.filter((p) => !keepIds.has(p.id))) {
+			await db.delete(patternPieces).where(eq(patternPieces.id, stale.id));
+		}
+	} else {
+		// Kept pieces go after the newly listed ones, in their former order.
+		const kept = existing.filter((p) => !keepIds.has(p.id)).sort((a, b) => a.position - b.position);
+		for (const p of kept) {
+			const position = finalRows.length;
+			if (p.position !== position) {
+				await db.update(patternPieces).set({ position }).where(eq(patternPieces.id, p.id));
+			}
+			finalRows.push({ id: p.id, name: p.name, position, defaultTotalRows: p.defaultTotalRows, quantity: p.quantity });
+		}
 	}
 
 	return json({ pieces: finalRows.sort((a, b) => a.position - b.position) });

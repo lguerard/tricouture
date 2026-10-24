@@ -92,6 +92,15 @@ describe('suggestPatternInfo', () => {
 		await expect(suggestPatternInfo('texte')).resolves.toEqual({ tags: [] });
 	});
 
+	it('asks for schema-constrained, deterministic output and reads past a <think> block', async () => {
+		generate.mockResolvedValue('<think>Le titre est Lina.</think>\nVoici : {"garmentType": "Pull"}');
+		const info = await suggestPatternInfo('Pull Lina');
+		expect(info.garmentType).toBe('Pull');
+		const opts = generate.mock.calls[0][3] as Record<string, unknown>;
+		expect(opts).toMatchObject({ temperature: 0, think: false });
+		expect(opts.schema).toMatchObject({ type: 'object' });
+	});
+
 	it('drops season/audience tags the text does not support', async () => {
 		generate.mockResolvedValue(JSON.stringify({ tags: ['hiver', 'homme', 'dentelle'], garmentType: 'débardeur' }));
 		const info = await suggestPatternInfo('Débardeur Lina en dentelle');

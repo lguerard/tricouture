@@ -1,4 +1,5 @@
 import { env } from '$env/dynamic/private';
+import { stripReasoning } from './output';
 
 const OLLAMA_URL = () => env.OLLAMA_URL?.replace(/\/$/, '') || '';
 // Default models (overridable via env). gemma4:12b (~8 GB) is the largest
@@ -7,6 +8,29 @@ const CHAT_MODEL = () => env.OLLAMA_CHAT_MODEL || 'gemma4:12b';
 const EMBED_MODEL = () => env.OLLAMA_EMBED_MODEL || 'nomic-embed-text';
 // Generous enough for the embedding model's cold start on a busy GPU.
 const EMBED_TIMEOUT_MS = 30_000;
+// Default bound on one generation: a cold load of an ~8 GB model on a shared
+// GPU plus a few thousand output tokens fits comfortably; a hung Ollama no
+// longer hangs the request forever. Long-form callers (pattern generation)
+// pass a larger timeoutMs.
+export const GENERATE_TIMEOUT_MS = 180_000;
+export const LONG_GENERATE_TIMEOUT_MS = 420_000;
+// Context window sent with EVERY generation (options.num_ctx). It must be the
+// same for every call AND for every other app sharing the same Ollama: Ollama
+// reloads the model whenever num_ctx changes between requests, so a mismatch
+// with a neighbour (another stack's apps typically run at 8192) means a full
+// ~8 GB reload on each switch. Ollama's own default (2048-4096 depending on
+// version) would silently truncate the pattern prompts, hence an explicit
+// value. The prompt builders (prompts.ts) size their pattern excerpts so the
+// whole prompt plus the answer fits in 8192 tokens. VRAM cost: the KV cache
+// grows linearly with it -- 8192 is roughly 0.5-1 GB on a 12B model with
+// OLLAMA_KV_CACHE_TYPE=q8_0 (about twice that in f16). Raise OLLAMA_NUM_CTX
+// only if every app on that Ollama is raised with it.
+const DEFAULT_NUM_CTX = 8192;
+
+export function numCtx(): number {
+	const n = parseInt(env.OLLAMA_NUM_CTX ?? '', 10);
+	return Number.isFinite(n) && n >= 1024 ? n : DEFAULT_NUM_CTX;
+}
 
 export function aiConfigured(): boolean {
 	return OLLAMA_URL().length > 0;
@@ -24,6 +48,15 @@ export class AiUnavailable extends Error {
 	}
 }
 
+class OllamaHttpError extends Error {
+	constructor(
+		readonly status: number,
+		detail: string
+	) {
+		super(`Ollama ${status}: ${detail}`);
+	}
+}
+
 async function call(path: string, body: unknown, timeoutMs?: number): Promise<unknown> {
 	if (!aiConfigured()) throw new AiUnavailable();
 	let res: Response;
@@ -34,33 +67,77 @@ async function call(path: string, body: unknown, timeoutMs?: number): Promise<un
 			body: JSON.stringify(body),
 			signal: timeoutMs ? AbortSignal.timeout(timeoutMs) : undefined
 		});
-	} catch {
+	} catch (e) {
+		if ((e as Error)?.name === 'TimeoutError') {
+			throw new AiUnavailable(`AI service timed out after ${Math.round((timeoutMs ?? 0) / 1000)} s.`);
+		}
 		throw new AiUnavailable();
 	}
-	if (!res.ok) throw new Error(`Ollama ${res.status}: ${await res.text().catch(() => '')}`);
+	if (!res.ok) throw new OllamaHttpError(res.status, await res.text().catch(() => ''));
 	return res.json();
+}
+
+// A JSON schema handed to Ollama's structured outputs (`format`): decoding is
+// constrained to it, so the reply is valid JSON of that shape.
+export type JsonSchema = Record<string, unknown>;
+
+export type GenerateOptions = {
+	// Overrides the model default (~0.8) — extraction wants 0: same text,
+	// same answer.
+	temperature?: number;
+	// Plain JSON mode (`format: "json"`): valid JSON, any shape.
+	json?: boolean;
+	// Structured output: a JSON schema the reply must follow. Wins over `json`.
+	schema?: JsonSchema;
+	// Reasoning ("thinking") is OFF unless a caller opts in explicitly: none of
+	// today's tasks benefit enough to pay for the extra latency/tokens, and a
+	// reasoning trace leaking into `response` breaks the parsers. Ollama
+	// returns the trace in a separate `thinking` field when it is on, which is
+	// dropped here.
+	think?: boolean;
+	timeoutMs?: number;
+	// Upper bound on generated tokens (options.num_predict); unset = model default.
+	maxTokens?: number;
+	// Base64-encoded images (no data: prefix) for a vision-capable model.
+	images?: string[];
+};
+
+// The exact JSON body sent to /api/generate — exported for the tests, which
+// pin down the request shape (think, num_ctx, format...).
+export function buildGenerateBody(prompt: string, system: string | undefined, model: string, opts: GenerateOptions) {
+	const options: Record<string, number> = { num_ctx: numCtx() };
+	if (opts.temperature != null) options.temperature = opts.temperature;
+	if (opts.maxTokens != null) options.num_predict = opts.maxTokens;
+	const format = opts.schema ?? (opts.json ? 'json' : undefined);
+	return {
+		model,
+		prompt,
+		...(system ? { system } : {}),
+		stream: false,
+		think: opts.think ?? false,
+		...(format ? { format } : {}),
+		...(opts.images?.length ? { images: opts.images } : {}),
+		options
+	};
 }
 
 // Text generation (non-streaming for simplicity). `model` defaults to the
 // configured chat model; the model-watch evaluation passes a candidate's tag
-// instead, so it runs the exact same call production uses.
-// `opts.json` turns on Ollama's JSON mode and `opts.temperature` overrides the
-// model default (~0.8) — extraction wants 0: same text, same answer.
+// instead, so it runs the exact same call production uses. A leading
+// <think>…</think> block (models that reason inline even with think:false)
+// is stripped from the returned text.
 export async function generate(
 	prompt: string,
 	system?: string,
 	model?: string,
-	opts: { temperature?: number; json?: boolean } = {}
+	opts: GenerateOptions = {}
 ): Promise<string> {
-	const data = (await call('/api/generate', {
-		model: model || CHAT_MODEL(),
-		prompt,
-		system,
-		stream: false,
-		...(opts.json ? { format: 'json' } : {}),
-		...(opts.temperature != null ? { options: { temperature: opts.temperature } } : {})
-	})) as { response?: string };
-	return (data.response ?? '').trim();
+	const data = (await call(
+		'/api/generate',
+		buildGenerateBody(prompt, system, model || CHAT_MODEL(), opts),
+		opts.timeoutMs ?? GENERATE_TIMEOUT_MS
+	)) as { response?: string };
+	return stripReasoning(data.response ?? '').trim();
 }
 
 // Embedding vector (768 dims with nomic-embed-text → vector(768) column).
