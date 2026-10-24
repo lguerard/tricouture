@@ -25,6 +25,7 @@ const LIBRARY_URL = 'https://ollama.com/library';
 export const CURATED_FAMILIES = [
 	'qwen2.5',
 	'qwen3',
+	'qwen3.5',
 	'llama3.1',
 	'llama3.2',
 	'llama3.3',
@@ -32,6 +33,7 @@ export const CURATED_FAMILIES = [
 	'mistral-nemo',
 	'gemma2',
 	'gemma3',
+	'gemma4',
 	'phi3.5',
 	'phi4',
 	'deepseek-r1',
@@ -40,8 +42,22 @@ export const CURATED_FAMILIES = [
 
 // Tags to try per family, smallest to largest: stop at the first that exists
 // for each size listed here rather than trying every quantization variant
-// Ollama lists for a given size.
-export const CANDIDATE_SIZE_TAGS = ['7b', '8b', '9b', '13b', '14b', '27b', '32b'];
+// Ollama lists for a given size. "e4b" is Gemma's "effective 4B" naming; the
+// real footprint always comes from the manifest, not from the tag.
+export const CANDIDATE_SIZE_TAGS = ['e4b', '4b', '7b', '8b', '9b', '12b', '13b', '14b', '27b', '32b'];
+
+// VRAM a model needs once loaded, from its on-disk (manifest) size: the
+// weights themselves (loaded as-is, quantization included), plus the KV
+// cache for the context window the app requests -- roughly 6% of the weights
+// per 8192 tokens with the q8_0 KV cache the GPU overlay configures -- plus
+// ~0.3 GB of CUDA context/compute buffers. An ~8 GB model at 8192 tokens
+// comes to ~8.8 GB: it fits a 10 GB card when the budget is set to the VRAM
+// actually free for it, which is the point (the old "x1.15 + 0.5 GB"
+// estimate rejected it outright).
+export function estimateVramGb(diskSizeGb: number, numCtx = 8192): number {
+	const kvCacheGb = diskSizeGb * 0.06 * (numCtx / 8192);
+	return diskSizeGb + kvCacheGb + 0.3;
+}
 
 export type Candidate = { model: string; diskSizeGb: number };
 
@@ -97,7 +113,8 @@ async function manifestSizeBytes(name: string, tag: string): Promise<number | nu
 // The largest known tag of `name` that fits the VRAM budget, or null.
 export async function findBestFittingTag(
 	name: string,
-	vramBudgetGb: number
+	vramBudgetGb: number,
+	numCtx?: number
 ): Promise<Candidate | null> {
 	let best: Candidate | null = null;
 	for (const sizeTag of CANDIDATE_SIZE_TAGS) {
@@ -105,9 +122,7 @@ export async function findBestFittingTag(
 			const sizeBytes = await manifestSizeBytes(name, tag);
 			if (sizeBytes == null) continue;
 			const sizeGb = sizeBytes / 1024 ** 3;
-			// Real-world VRAM use runs a bit above on-disk size (KV cache,
-			// activation buffers): 15% margin + 0.5 GB.
-			const estimatedVramGb = sizeGb * 1.15 + 0.5;
+			const estimatedVramGb = estimateVramGb(sizeGb, numCtx);
 			if (estimatedVramGb <= vramBudgetGb && (!best || sizeGb > best.diskSizeGb)) {
 				best = { model: `${name}:${tag}`, diskSizeGb: Math.round(sizeGb * 100) / 100 };
 			}
@@ -121,11 +136,12 @@ export async function findBestFittingTag(
 export async function buildCandidateList(
 	vramBudgetGb: number,
 	maxCandidates: number,
-	warnings: string[] = []
+	warnings: string[] = [],
+	numCtx?: number
 ): Promise<Candidate[]> {
 	const candidates: Candidate[] = [];
 	for (const name of await discoverCandidateNames(15, warnings)) {
-		const result = await findBestFittingTag(name, vramBudgetGb);
+		const result = await findBestFittingTag(name, vramBudgetGb, numCtx);
 		if (result) candidates.push(result);
 	}
 	candidates.sort((a, b) => b.diskSizeGb - a.diskSizeGb);

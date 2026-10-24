@@ -9,7 +9,7 @@
  * section) since check-model.sh sources .env before calling this.
  *
  * Usage:
- *   node send-report.mjs --old-model X --new-model Y [--error "message"]
+ *   node send-report.mjs --old-model X --new-model Y [--recommended Z] [--error "message"]
  *   (the model-watch JSON result is read from stdin unless --error is set)
  */
 
@@ -32,7 +32,7 @@ function fmtScore(n) {
 	return n.toFixed(1).padStart(5);
 }
 
-function buildBody({ oldModel, newModel, result, error }) {
+function buildBody({ oldModel, newModel, recommended, result, error }) {
 	const stamp = new Date().toISOString().replace('T', ' ').slice(0, 16);
 	const lines = [`Vérification mensuelle des modèles Ollama — ${stamp} UTC`, ''];
 
@@ -50,6 +50,17 @@ function buildBody({ oldModel, newModel, result, error }) {
 			'  2. docker compose up -d --no-deps app',
 			''
 		);
+	} else if (recommended) {
+		lines.push(
+			`CANDIDAT RECOMMANDÉ (non appliqué) : ${recommended}  — modèle actuel conservé : ${oldModel}`,
+			'',
+			'Pour l\'adopter :',
+			`  1. Dans .env, mettre OLLAMA_CHAT_MODEL=${recommended}`,
+			'  2. docker compose up -d --no-deps app',
+			'(Il reste téléchargé dans Ollama ; sinon : ollama rm ' + recommended + '.)',
+			'Pour que la surveillance applique elle-même ce changement : MODEL_WATCH_AUTO_SWITCH=true.',
+			''
+		);
 	} else {
 		lines.push(`Aucun changement — modèle actuel conservé : ${oldModel}`, '');
 	}
@@ -59,7 +70,8 @@ function buildBody({ oldModel, newModel, result, error }) {
 	const b = result.baseline;
 	lines.push(`${pad(`Modèle actuel  ${b.model}`, 46)}score ${fmtScore(b.avgScore)}/100   latence moy. ${b.avgLatencyS}s`);
 	for (const c of result.candidates) {
-		const marker = c.model === newModel && oldModel !== newModel ? ' <-- retenu' : '';
+		const marker =
+			c.model === newModel && oldModel !== newModel ? ' <-- retenu' : c.model === recommended ? ' <-- recommandé' : '';
 		lines.push(
 			`${pad(`Candidat       ${c.model}`, 46)}score ${fmtScore(c.avgScore)}/100   ` +
 				`latence moy. ${c.avgLatencyS}s   ~${c.diskSizeGb} Go${marker}`
@@ -71,7 +83,8 @@ function buildBody({ oldModel, newModel, result, error }) {
 		for (const w of result.warnings) lines.push(`  - ${w}`);
 	}
 
-	const detail = newModel === b.model ? b : (result.candidates.find((c) => c.model === newModel) ?? b);
+	const shown = recommended || newModel;
+	const detail = shown === b.model ? b : (result.candidates.find((c) => c.model === shown) ?? b);
 	lines.push('', `Détail par cas de test (${detail.model}) :`);
 	for (const c of detail.cases) {
 		lines.push(`  [${c.case}] ${c.score}/100 (${c.latencyS}s)`);
@@ -207,10 +220,11 @@ function parseArgs(argv) {
 	for (let i = 0; i < argv.length; i++) {
 		if (argv[i] === '--old-model') out.oldModel = argv[++i];
 		else if (argv[i] === '--new-model') out.newModel = argv[++i];
+		else if (argv[i] === '--recommended') out.recommended = argv[++i];
 		else if (argv[i] === '--error') out.error = argv[++i];
 	}
 	if (!out.oldModel || !out.newModel) {
-		console.error('Usage: send-report.mjs --old-model X --new-model Y [--error "message"]');
+		console.error('Usage: send-report.mjs --old-model X --new-model Y [--recommended Z] [--error "message"]');
 		process.exit(2);
 	}
 	return out;
@@ -231,7 +245,7 @@ function saveLocalCopy(subject, body) {
 }
 
 async function main() {
-	const { oldModel, newModel, error } = parseArgs(process.argv.slice(2));
+	const { oldModel, newModel, recommended, error } = parseArgs(process.argv.slice(2));
 
 	let result = null;
 	if (!error) {
@@ -239,12 +253,14 @@ async function main() {
 		result = raw.trim() ? JSON.parse(raw) : null;
 	}
 
-	const body = buildBody({ oldModel, newModel, result, error });
+	const body = buildBody({ oldModel, newModel, recommended, result, error });
 	const subject = error
 		? '[Tricouture] Échec de la vérification mensuelle des modèles'
 		: oldModel !== newModel
 			? `[Tricouture] Modèle changé : ${oldModel} → ${newModel}`
-			: '[Tricouture] Vérification mensuelle des modèles — rien de nouveau';
+			: recommended
+				? `[Tricouture] Meilleur modèle disponible : ${recommended} (non appliqué)`
+				: '[Tricouture] Vérification mensuelle des modèles — rien de nouveau';
 
 	const sent = await sendEmailIfConfigured(subject, body);
 	const localPath = saveLocalCopy(subject, body);

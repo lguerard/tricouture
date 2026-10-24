@@ -4,5 +4,8 @@
 # Le job peut prendre longtemps (telechargement de plusieurs modeles) : le
 # laisser tourner de nuit evite de charger le GPU/reseau pendant une
 # utilisation normale de l'app.
+#
+# Par defaut le job ne fait que RAPPORTER (aucun changement de .env) ; voir
+# MODEL_WATCH_AUTO_SWITCH et MODEL_WATCH_VRAM_BUDGET_GB dans .env.example.
 
 0 4 1 * * /home/pi/tricouture/scripts/model-watch/check-model.sh >> /home/pi/tricouture/scripts/model-watch/run.log 2>&1

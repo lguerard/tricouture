@@ -2,15 +2,21 @@
 
 Vérifie une fois par mois si un nouveau modèle Ollama ferait mieux que celui
 utilisé pour l'analyse des pièces de patron (`OLLAMA_CHAT_MODEL`), tout en
-tenant dans la VRAM du GPU. Si oui, bascule dessus automatiquement et
-t'envoie un rapport (email si configuré, sinon fichier local) ; sinon,
-t'envoie un rapport "rien de nouveau".
+tenant dans la VRAM du GPU, et t'envoie un rapport (email si configuré, sinon
+fichier local) : "candidat recommandé" ou "rien de nouveau".
+
+**Par défaut, rien n'est modifié** : le rapport recommande, tu décides. Le
+changement automatique (modifier `OLLAMA_CHAT_MODEL` dans `.env` et recréer
+l'app) n'a lieu que si `MODEL_WATCH_AUTO_SWITCH=true` est dans `.env`.
 
 ## Comment ça marche
 
 1. `check-model.sh` (ce dossier, lancé sur le HOST via cron) :
-   - mesure la VRAM totale du GPU en direct (`nvidia-smi`), moins une marge
-     de sécurité (`MODEL_WATCH_VRAM_HEADROOM_GB`) ;
+   - fixe le budget VRAM des candidats : `MODEL_WATCH_VRAM_BUDGET_GB` s'il
+     est défini — **règle-le sur la VRAM réellement libre pour ce modèle**
+     (GPU partagé avec d'autres services : bien moins que la VRAM totale) —,
+     sinon la VRAM totale mesurée (`nvidia-smi`) moins une marge
+     (`MODEL_WATCH_VRAM_HEADROOM_GB`, 1 Go par défaut) ;
    - démarre l'évaluation via l'app elle-même : `POST /api/cron/model-watch`
      (authentifié par `MODEL_WATCH_TOKEN`, pas par une session — ce point
      n'a aucun sens depuis un navigateur, seulement depuis ce script) ;
@@ -30,8 +36,10 @@ t'envoie un rapport "rien de nouveau".
      dans le budget VRAM, d'après la taille **réelle** du manifest Ollama
      (pas une estimation à partir du nombre de paramètres) ;
    - télécharge (`ollama pull`) le modèle actuel et chaque candidat, puis
-     fait tourner **le même prompt système et le même parsing JSON que la
-     vraie app** (`PIECES_SYSTEM` / `piecesPrompt` / `parsePieces`) sur 3
+     fait tourner **le même prompt système, les mêmes options (schéma JSON,
+     température 0, réflexion désactivée) et le même parsing JSON que la
+     vraie app** (`PIECES_SYSTEM` / `piecesPrompt` / `PIECES_GENERATE_OPTIONS`
+     / `parsePieces`) — donc un résultat déterministe — sur 3
      patrons de test (`cases.ts` : un tricot propre, une couture façon PDF
      scrapé avec en-têtes/pieds de page, un crochet façon transcription
      orale) ;
@@ -43,10 +51,14 @@ t'envoie un rapport "rien de nouveau".
      `MODEL_WATCH_MIN_IMPROVEMENT` points (5 par défaut, pour éviter de
      changer de modèle sur du bruit de mesure) ;
    - supprime (`ollama rm`) les candidats testés qui n'ont pas gagné, pour ne
-     pas accumuler des dizaines de Go de modèles inutilisés. **Le modèle
-     précédent n'est PAS supprimé** en cas de changement, pour que revenir
-     en arrière soit instantané (pas besoin de re-télécharger).
-3. `check-model.sh` lit le résultat final. S'il y a un gagnant :
+     pas accumuler des dizaines de Go de modèles inutilisés — **seulement
+     ceux que ce run a lui-même téléchargés** : un modèle déjà présent avant
+     le run (peut-être utilisé par une autre app qui partage le même Ollama)
+     n'est jamais supprimé. **Le modèle précédent n'est PAS supprimé** non
+     plus, pour que revenir en arrière soit instantané.
+3. `check-model.sh` lit le résultat final. S'il y a un gagnant, sans
+   `MODEL_WATCH_AUTO_SWITCH=true` : le rapport le recommande, avec la marche
+   à suivre (le modèle reste téléchargé). Avec `MODEL_WATCH_AUTO_SWITCH=true` :
    - modifie `OLLAMA_CHAT_MODEL=` dans `.env` ;
    - `docker compose up -d --no-deps app` (recrée le conteneur avec la
      nouvelle variable d'env — un simple `restart` ne suffit pas, Compose ne
@@ -104,11 +116,14 @@ changement), donc ce redémarrage est immédiat.
 - Chaque run peut télécharger plusieurs Go par candidat testé — surveiller
   `MODEL_WATCH_MAX_CANDIDATES` si la bande passante ou le disque sont
   limités.
-- L'estimation VRAM (taille du manifest × 1.15 + 0.5 Go) est une marge
-  raisonnable mais pas une garantie absolue ; `MODEL_WATCH_VRAM_HEADROOM_GB`
-  existe pour ajuster la prudence. Elle ne tient pas compte de vision/
-  whisper/sd s'ils tournent en même temps sur le même GPU — lance plutôt le
-  check quand ils sont inactifs (cron de nuit, par défaut).
+- L'estimation VRAM (taille du manifest + cache KV ≈ 6 % des poids par
+  tranche de 8192 tokens de contexte + 0,3 Go) est réaliste mais pas une
+  garantie absolue : un modèle de ~8 Go est estimé à ~8,8 Go et tient donc
+  dans un budget de 9-10 Go. Elle ne tient pas compte des autres services
+  du GPU (whisper, autres stacks, transcodage…) : c'est le rôle de
+  `MODEL_WATCH_VRAM_BUDGET_GB`, à régler sur ce qui reste vraiment libre
+  pour le modèle de chat ; lance le check quand le GPU est calme (cron de
+  nuit, par défaut).
 - `/api/cron/model-watch` n'exécute qu'un run à la fois (un deuxième
   `POST` pendant qu'un run est en cours répond `alreadyRunning: true` sans
   rien démarrer de plus) ; le résultat d'un run vit en mémoire dans le

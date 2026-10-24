@@ -165,6 +165,20 @@ export async function embed(text: string): Promise<number[]> {
 	return data.embedding;
 }
 
+// Names of the models already in Ollama's local store. Lets the model-watch
+// run tell apart a candidate it downloaded itself (safe to delete afterwards)
+// from one that was already there -- possibly used by another app sharing
+// the same Ollama.
+export async function listLocalModels(): Promise<string[]> {
+	if (!aiConfigured()) throw new AiUnavailable();
+	const res = await fetch(`${OLLAMA_URL()}/api/tags`, { signal: AbortSignal.timeout(15_000) }).catch(() => {
+		throw new AiUnavailable();
+	});
+	if (!res.ok) throw new OllamaHttpError(res.status, await res.text().catch(() => ''));
+	const data = (await res.json()) as { models?: { name?: string; model?: string }[] };
+	return (data.models ?? []).map((m) => m.name ?? m.model ?? '').filter(Boolean);
+}
+
 // Downloads a model into Ollama's local store if not already present
 // (no-op otherwise). Pulls can take minutes for a multi-GB model, hence the
 // generous timeout — used only by the monthly model-watch evaluation, never
