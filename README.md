@@ -224,7 +224,8 @@ Lance l'application avec les services IA :
 docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d --build
 ```
 
-Cela ajoute `ollama` (LLM), `vision` (OCR) et `whisper` (voix). Les modèles
+Cela ajoute `ollama` (LLM, profil `local-ollama` — ou un Ollama déjà présent
+via `OLLAMA_URL`), `vision` (OCR) et `whisper` (voix). Les modèles
 sont téléchargés au premier démarrage. Détails (toolkit NVIDIA, VRAM, modèles)
 dans le [guide d'auto-hébergement](docs/SELF-HOSTING.md#6-activer-lia-locale-gpu--optionnel).
 

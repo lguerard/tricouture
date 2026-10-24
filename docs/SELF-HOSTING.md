@@ -188,14 +188,72 @@ Test : `docker run --rm --gpus all nvidia/cuda:12.1.0-base-ubuntu22.04 nvidia-sm
 
 ### 6.2 Lancer avec les services IA
 
+L'override `docker-compose.gpu.yml` ajoute les sidecars GPU. Pour le LLM (Ollama), deux modes
+au choix — **un seul Ollama par GPU** : deux instances gardent chacune leur propre copie du
+modèle (~8 Go) en VRAM, ce qu'une carte de 10 Go ne supporte pas.
+
+#### Mode A — Ollama fourni par cet override (profil `local-ollama`)
+
+Si aucun autre Ollama ne tourne sur la machine :
+
 ```bash
+# dans .env
+COMPOSE_PROFILES=local-ollama
+OLLAMA_URL=http://ollama:11434
+
 docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d --build
 ```
 
-Cela ajoute :
-- **ollama** — modèles de texte (traduction, copilote, génération de patron) ;
+Le profil active :
+- **ollama** — modèles de texte et d'image (traduction, copilote, génération de patron,
+  scan d'étiquette), image épinglée sur une version précise (voir le commentaire dans
+  `docker-compose.gpu.yml` pour la mettre à jour) et réglée pour économiser la VRAM
+  (`OLLAMA_FLASH_ATTENTION=1`, `OLLAMA_KV_CACHE_TYPE=q8_0`, `OLLAMA_MAX_LOADED_MODELS=2`
+  pour garder le petit modèle d'embedding à côté du modèle de chat,
+  `OLLAMA_KEEP_ALIVE=5m`, `OLLAMA_CONTEXT_LENGTH` = `OLLAMA_NUM_CTX`) ;
 - **ollama-pull** — télécharge les modèles au 1er démarrage (`gemma4:12b` + `nomic-embed-text`),
-  puis s'arrête ;
+  puis s'arrête.
+
+#### Mode B — réutiliser un Ollama existant (recommandé si le GPU en a déjà un)
+
+Si un autre stack fait déjà tourner Ollama sur ce GPU (par ex. celui d'une autre app),
+laisse le profil `local-ollama` **désactivé** (pas de `COMPOSE_PROFILES`, ou sans
+`local-ollama`) et pointe `OLLAMA_URL` vers cet Ollama. Rien dans l'override ne dépend du
+service `ollama`, l'app démarre donc sans lui.
+
+- Ollama publié sur le host (port 11434) :
+  ```
+  OLLAMA_URL=http://host.docker.internal:11434
+  ```
+  avec, dans un `docker-compose.override.yml` :
+  ```yaml
+  services:
+    app:
+      extra_hosts:
+        - "host.docker.internal:host-gateway"
+  ```
+- Ollama sur le réseau Docker d'un autre stack (sans port publié) : rattache l'app à ce
+  réseau dans `docker-compose.override.yml` (nom du réseau : `docker network ls`) :
+  ```yaml
+  services:
+    app:
+      networks: [default, autre_stack]
+  networks:
+    autre_stack:
+      external: true
+      name: autrestack_default   # nom réel du réseau
+  ```
+  puis `OLLAMA_URL=http://ollama:11434` (nom du service/conteneur Ollama sur ce réseau).
+
+Ensuite :
+- télécharge les modèles sur cet Ollama : `docker exec <conteneur-ollama> ollama pull gemma4:12b`
+  puis `... ollama pull nomic-embed-text` ;
+- garde **le même `OLLAMA_NUM_CTX`** (8192 par défaut) que les autres apps qui l'utilisent :
+  Ollama recharge le modèle à chaque changement de taille de contexte entre deux requêtes ;
+- les réglages VRAM (flash attention, cache KV, keep-alive, nombre de modèles chargés) se
+  font alors sur **cet** Ollama, pas ici.
+
+Dans les deux modes, l'override ajoute aussi :
 - **vision** — OCR d'étiquettes de pelote (EasyOCR) ;
 - **whisper** — transcription vocale (compteur de rangs mains-libres).
 

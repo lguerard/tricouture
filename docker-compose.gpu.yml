@@ -1,10 +1,41 @@
 # Override to enable AI sidecars on GPU (phases 3-5).
 # Usage: docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d
 # Host prerequisite: NVIDIA driver + nvidia-container-toolkit.
+#
+# Two ways to get an LLM (see docs/SELF-HOSTING.md §6.2):
+#   - bundled: enable the "local-ollama" profile (COMPOSE_PROFILES=local-ollama
+#     in .env, or --profile local-ollama) to run this overlay's own Ollama;
+#   - external: leave the profile off and point OLLAMA_URL at an Ollama that
+#     already runs on the host/another stack. Recommended when the GPU already
+#     hosts one: two Ollama instances on one card each keep their own model
+#     copy in VRAM. Nothing here depends_on "ollama", so either mode works.
 services:
   ollama:
-    image: ollama/ollama:latest
+    # Pinned (not :latest) so an image update never changes behaviour under
+    # our feet. 0.40.10 = newest stable tag on Docker Hub when pinned, with
+    # Gemma 4 support (text + image, structured outputs, `think`). To bump:
+    # pick the newest non-rc tag from
+    #   https://hub.docker.com/r/ollama/ollama/tags
+    # update both images below, then `docker compose ... pull ollama`.
+    image: ollama/ollama:0.40.10
+    profiles: ["local-ollama"]
     restart: unless-stopped
+    environment:
+      # Same context length the app requests (OLLAMA_NUM_CTX): a mismatch
+      # between callers makes Ollama reload the model.
+      OLLAMA_CONTEXT_LENGTH: ${OLLAMA_NUM_CTX:-8192}
+      # Flash attention + 8-bit KV cache: roughly halves the KV cache VRAM
+      # for a negligible quality cost.
+      OLLAMA_FLASH_ATTENTION: "1"
+      OLLAMA_KV_CACHE_TYPE: q8_0
+      # Never keep two chat models resident on a 10 GB card. 2 (not 1) so
+      # the small embedding model (~0.3 GB) can stay loaded next to the chat
+      # model: with 1, every semantic search or save would evict the chat
+      # model and the next AI request would reload ~8 GB.
+      OLLAMA_MAX_LOADED_MODELS: "2"
+      # Unload an idle model after 5 min to give the VRAM back to the other
+      # GPU users (whisper, other stacks).
+      OLLAMA_KEEP_ALIVE: 5m
     volumes:
       - models:/root/.ollama
     deploy:
@@ -16,9 +47,11 @@ services:
               capabilities: [gpu]
     # No port exposed: consumed by "app" via the compose network.
 
-  # Downloads models on first start then exits.
+  # Downloads models on first start then exits (bundled Ollama only; with an
+  # external Ollama, pull the models there yourself, see the docs).
   ollama-pull:
-    image: ollama/ollama:latest
+    image: ollama/ollama:0.40.10
+    profiles: ["local-ollama"]
     depends_on:
       - ollama
     environment:
