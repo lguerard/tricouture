@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { openAssistant } from '$lib/assistant/store.svelte';
 	import { enhance } from '$app/forms';
 	import { withFeedback } from '$lib/feedback';
 	import { undoableDelete } from '$lib/undo';
@@ -85,6 +86,11 @@
 
 	<header class="head">
 		<h1>{p.title}</h1>
+		{#if data.ai}
+			<button type="button" class="ask-assistant" onclick={() => openAssistant({ kind: 'project', id: p.id, title: p.title, row: p.currentRow })}>
+				🤖 {t(locale, 'chat.ask')}
+			</button>
+		{/if}
 		{#if isOwner}
 			<form
 				method="POST"
@@ -507,6 +513,9 @@
 </div>
 
 <style>
+	.ask-assistant {
+		margin-left: auto;
+	}
 	.photo-grid {
 		list-style: none;
 		padding: 0;
@@ -553,6 +562,8 @@
 		display: flex;
 		justify-content: space-between;
 		align-items: center;
+		flex-wrap: wrap;
+		gap: 0.5rem;
 	}
 	.cols {
 		display: grid;
