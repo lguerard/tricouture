@@ -77,7 +77,9 @@
 		assistantUi.draft = '';
 	}
 
+	let stoppedAt = 0;
 	function stop() {
+		if (controller) stoppedAt = Date.now();
 		controller?.abort();
 	}
 
@@ -114,12 +116,20 @@
 
 		controller = new AbortController();
 		try {
-			const res = await fetch('/api/ai/assistant', {
-				method: 'POST',
-				headers: { 'content-type': 'application/json' },
-				body: JSON.stringify({ messages: [...history, { role: 'user', content: question }], context }),
-				signal: controller.signal
-			});
+			const request = () =>
+				fetch('/api/ai/assistant', {
+					method: 'POST',
+					headers: { 'content-type': 'application/json' },
+					body: JSON.stringify({ messages: [...history, { role: 'user', content: question }], context }),
+					signal: controller!.signal
+				});
+			let res = await request();
+			// Asked again right after "stop": the server may not have noticed the
+			// previous answer is gone yet. One short wait, then retry.
+			if (res.status === 429 && Date.now() - stoppedAt < 3000) {
+				await new Promise((r) => setTimeout(r, 800));
+				res = await request();
+			}
 			if (!res.ok || !res.body) {
 				answer.error = ERROR_BY_STATUS[res.status] ?? 'chat.error.failed';
 				return;
