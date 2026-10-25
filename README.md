@@ -39,7 +39,7 @@ besoin :
 - un **suivi de projets** (Kanban, compteur de rangs, prédiction d'échéance) ;
 - une **couche de motivation** (statistiques annuelles, objectifs, succès) ;
 - un **atelier d'écussons brodés** : n'importe quelle image devient un fichier `.pes` pour la Brother Skitch PP1 (via l'appli Artspira), et chaque écusson est rangé dans une bibliothèque ;
-- un **assistant IA** local (traduction de patrons, copilote, génération).
+- un **assistant IA** local : une conversation qui connaît tes patrons, ton stock et tes projets, plus la traduction et la génération de patrons.
 
 ---
 
@@ -54,7 +54,7 @@ besoin :
   **modifiables à tout moment** après la création du patron.
 - **Pièces détectées par IA** à partir du contenu du patron (Dos, Devant,
   Manche...), éditables à la main — servent de checklist par projet.
-- **Copilote IA** par patron (questions, recalculs de taille).
+- **Assistant IA** sur chaque patron (questions, recalculs de taille, laine du stock adaptée).
 - **Partage** entre comptes (voir [section dédiée](#multi-utilisateur-et-partage)).
 
 ### Stock
@@ -100,7 +100,12 @@ besoin :
 ### IA locale (sur GPU)
 
 - **Traduction** de patrons EN/JP/DE → FR (glossaire tricot/crochet).
-- **Copilote** et **génération de patron**.
+- **Assistant** (bouton 💬 sur toutes les pages, en français) : il cherche et lit
+  tes patrons, ton stock de laines et tes projets (compteurs de rangs compris),
+  fait les calculs de jauge et de métrage, et peut ajouter une note à un projet
+  quand tu le demandes. Réponse en direct, même modèle Ollama que le reste ; voir
+  [docs/SELF-HOSTING.md §6.4](docs/SELF-HOSTING.md#64-lassistant-chat).
+- **Génération de patron**.
 - **Lecture d'étiquettes** de pelotes (photo → marque, composition, métrage…),
   **transcription vocale** (compteur mains-libres).
 - **Recherche par le sens** (Ctrl K) : « pull chaud pour l'hiver » retrouve un
@@ -384,7 +389,7 @@ Chaque **push sur `main`** déclenche le workflow *Release* :
 
 - ✅ Socle (patrons, stock, projets, Kanban)
 - ✅ Motivation (stats, objectifs, succès, calendrier)
-- ✅ IA texte (traduction, copilote, génération)
+- ✅ IA texte (traduction, assistant avec outils, génération)
 - ✅ IA vision/voix (lecture d'étiquette, compteur vocal)
 - ✅ App Android (Capacitor) + CI release
 - ✅ Aperçu coloris (recoloration de la photo dans le navigateur)

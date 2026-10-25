@@ -20,7 +20,7 @@ Sur la machine serveur (ton i9-9900K + RTX 3080 convient parfaitement) :
 | (GPU/IA) **nvidia-container-toolkit** | donne le GPU aux conteneurs | voir §6 |
 
 > Le **socle** (patrons, stock, projets, Kanban, motivation) fonctionne **sans GPU**.
-> Le GPU n'est nécessaire que pour les fonctions d'IA (traduction, copilote, scan, voix).
+> Le GPU n'est nécessaire que pour les fonctions d'IA (traduction, assistant, scan, voix).
 
 ### Installer Docker (Ubuntu / Debian)
 
@@ -205,7 +205,7 @@ docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d --build
 ```
 
 Le profil active :
-- **ollama** — modèles de texte et d'image (traduction, copilote, génération de patron,
+- **ollama** — modèles de texte et d'image (traduction, assistant, génération de patron,
   scan d'étiquette), image épinglée sur une version précise (voir le commentaire dans
   `docker-compose.gpu.yml` pour la mettre à jour) et réglée pour économiser la VRAM
   (`OLLAMA_FLASH_ATTENTION=1`, `OLLAMA_KV_CACHE_TYPE=q8_0`, `OLLAMA_MAX_LOADED_MODELS=2`
@@ -284,7 +284,47 @@ couleur dominante d'une photo est calculée par l'app elle-même, sans GPU. L'an
 > Si `OLLAMA_URL` est vide dans `.env`, les boutons d'IA affichent un message clair au lieu
 > de planter : le socle reste pleinement utilisable.
 
-### 6.4 Évaluer un modèle (optionnel)
+### 6.4 L'assistant (chat)
+
+Le bouton 💬, présent sur toutes les pages (et « Demander à l'assistant » sur un
+patron, un projet ou une laine du stock), ouvre une conversation en français avec
+un assistant de tricot, crochet et couture qui **connaît la bibliothèque du
+compte** et agit par des outils :
+
+| Outil | Rôle |
+|---|---|
+| `chercher_patrons` | recherche par le sens (mêmes vecteurs que Ctrl K) + par mots |
+| `lire_patron` | infos, pièces, notes et un extrait du texte autour d'une section demandée |
+| `chercher_laines` | stock de laines (texte, poids, couleur, fibre), avec le métrage total |
+| `projets_en_cours`, `lire_projet` | projets en cours, compteurs de rangs, pièces, laines utilisées |
+| `calculer_jauge`, `estimer_metrage` | calculs exacts (mailles ↔ cm, conversion entre deux jauges, métrage d'après un échantillon) |
+| `ajouter_note_projet` | **seule écriture** : ajoute une note datée à un projet, seulement sur demande explicite ; rien n'est jamais effacé |
+
+- **Même Ollama, même modèle** que le reste de l'IA (`OLLAMA_CHAT_MODEL`,
+  `gemma4:12b` par défaut, qui sait appeler des outils), même `OLLAMA_NUM_CTX`
+  (8192) : **aucune variable à ajouter**. Un modèle sans appel d'outils
+  fonctionne quand même, sans accès à la bibliothèque.
+- **Droits** : les outils ne voient que ce que le compte voit dans l'app (ses
+  patrons, ceux partagés avec lui et les patrons publics ; ses projets et ceux
+  partagés ; son propre stock). Une note ne s'ajoute qu'à un projet modifiable.
+- **Latence** : la réponse s'affiche au fil de l'eau, mais chaque appel d'outil
+  coûte un aller-retour au modèle (5 au maximum par question). Les requêtes
+  Ollama passent les unes après les autres : si une autre tâche IA occupe le GPU
+  (import, analyse de patron, autre app), la question attend son tour. Comptez
+  quelques secondes avec un modèle déjà chargé, davantage après un chargement à
+  froid. Au-delà de 3 minutes, la réponse s'arrête avec un message d'erreur.
+- **Une question à la fois par compte** (un 2e onglet reçoit « réponse déjà en
+  cours »), et une question de plus de 4 000 caractères est refusée : l'assistant
+  lit lui-même le texte des patrons enregistrés.
+- **Contexte de 8192 tokens** : les anciens messages sont retirés au fur et à
+  mesure, et les résultats d'outils sont plafonnés.
+- **Historique** : la conversation est gardée **dans le navigateur** (par compte,
+  effacée à la déconnexion), pas sur le serveur.
+- **Derrière un proxy** : la réponse est un flux SSE (`text/event-stream`) avec
+  un signal de vie toutes les 15 s, que Cloudflare Tunnel, Caddy et nginx
+  transmettent sans le mettre en tampon.
+
+### 6.5 Évaluer un modèle (optionnel)
 
 Tricouture sait noter un modèle Ollama sur **ses propres tâches IA**, avec ses
 prompts, ses requêtes (`think: false`, même `num_ctx`, schéma JSON,
@@ -496,4 +536,6 @@ Actions (aucun environnement Android à installer en local).
 | `nvidia-smi` KO dans un conteneur | toolkit non installé | refaire §6.1 |
 | Scan d'étiquette en échec | `OLLAMA_CHAT_MODEL` sans entrée image, ou Ollama non prêt | utiliser un modèle multimodal (`gemma4:12b`), `docker compose logs -f ollama` |
 | Voix sans effet | service `whisper` non prêt | `docker compose logs -f whisper` |
+| L'assistant répond sans connaître la bibliothèque | modèle sans appel d'outils | revenir à `gemma4:12b` (ou un autre modèle « tools ») |
+| L'assistant « n'a pas répondu à temps » | GPU occupé par une autre tâche, modèle chargé à froid | réessayer ; `docker compose logs -f ollama` |
 | APK ne se connecte pas | mauvaise URL / HTTP bloqué | vérifier `SERVER_URL`, préférer HTTPS |
