@@ -124,3 +124,37 @@ describe('embed', () => {
 		expect(fetchMock).toHaveBeenCalledTimes(1);
 	});
 });
+
+describe('chat (streaming, tools)', () => {
+	const stream = (lines: unknown[]) =>
+		new Response(lines.map((l) => (typeof l === 'string' ? l : JSON.stringify(l))).join('\n'), { status: 200 });
+
+	it('sends the same think/num_ctx rules to /api/chat and streams the text', async () => {
+		const { chat } = await import('./ollama');
+		fetchMock.mockResolvedValue(
+			stream([{ message: { content: 'Bon' } }, { message: { content: 'jour' } }, { message: { content: '' }, done: true, done_reason: 'stop' }])
+		);
+		const pieces: string[] = [];
+		const tools = [{ type: 'function' as const, function: { name: 'f', description: 'd', parameters: { type: 'object' } } }];
+		const r = await chat([{ role: 'user', content: 'salut' }], { tools, temperature: 0.4, onDelta: (t) => pieces.push(t) });
+		expect(fetchMock.mock.calls[0][0]).toBe('http://ollama:11434/api/chat');
+		expect(sentBody()).toEqual({
+			model: 'gemma4:12b',
+			messages: [{ role: 'user', content: 'salut' }],
+			tools,
+			stream: true,
+			think: false,
+			options: { num_ctx: 8192, temperature: 0.4 }
+		});
+		expect(pieces).toEqual(['Bon', 'jour']);
+		expect(r).toEqual({ content: 'Bonjour', toolCalls: [], doneReason: 'stop' });
+	});
+
+	it('collects tool calls and surfaces an error line', async () => {
+		const { chat } = await import('./ollama');
+		fetchMock.mockResolvedValueOnce(stream([{ message: { content: '', tool_calls: [{ function: { name: 'f', arguments: { a: 1 } } }] } }, { done: true }]));
+		expect((await chat([{ role: 'user', content: 'x' }])).toolCalls).toEqual([{ function: { name: 'f', arguments: { a: 1 } } }]);
+		fetchMock.mockResolvedValueOnce(stream([{ message: { content: 'a' } }, { error: 'model crashed' }]));
+		await expect(chat([{ role: 'user', content: 'x' }])).rejects.toThrow('model crashed');
+	});
+});

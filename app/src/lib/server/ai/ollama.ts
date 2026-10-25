@@ -42,7 +42,15 @@ export class AiUnavailable extends Error {
 	}
 }
 
-class OllamaHttpError extends Error {
+// The AI service did not answer in time (a busy shared GPU, a cold model
+// load): still "unavailable", but worth telling apart for the person.
+export class AiTimeout extends AiUnavailable {
+	constructor(timeoutMs: number) {
+		super(`AI service timed out after ${Math.round(timeoutMs / 1000)} s.`);
+	}
+}
+
+export class OllamaHttpError extends Error {
 	constructor(
 		readonly status: number,
 		detail: string
@@ -63,7 +71,7 @@ async function call(path: string, body: unknown, timeoutMs?: number): Promise<un
 		});
 	} catch (e) {
 		if ((e as Error)?.name === 'TimeoutError') {
-			throw new AiUnavailable(`AI service timed out after ${Math.round((timeoutMs ?? 0) / 1000)} s.`);
+			throw new AiTimeout(timeoutMs ?? 0);
 		}
 		throw new AiUnavailable();
 	}
@@ -187,4 +195,151 @@ export async function embed(raw: string, task: EmbedTask = 'document'): Promise<
 	};
 	if (!data.embedding?.length) throw new Error('Empty embedding');
 	return data.embedding;
+}
+
+// --- Chat with tools (/api/chat) ---------------------------------------------
+//
+// The in-app assistant ($lib/server/assistant) talks to the same model through
+// Ollama's chat endpoint: a message list instead of a single prompt, and
+// function calling ("tools"). Same rules as generate(): thinking off, the
+// shared num_ctx, a bounded wait. The answer is STREAMED (NDJSON from
+// Ollama, one JSON object per line) so the first words reach the person while
+// the rest is still being generated -- on a shared GPU the full answer can take
+// a while.
+
+export type ChatRole = 'system' | 'user' | 'assistant' | 'tool';
+export type ChatToolCall = { function: { name: string; arguments: Record<string, unknown> | string } };
+export type ChatMessage = {
+	role: ChatRole;
+	content: string;
+	images?: string[];
+	tool_calls?: ChatToolCall[];
+	// Which tool a role:"tool" message answers.
+	tool_name?: string;
+};
+export type ChatTool = {
+	type: 'function';
+	function: { name: string; description: string; parameters: JsonSchema };
+};
+
+export type ChatOptions = {
+	tools?: ChatTool[];
+	temperature?: number;
+	maxTokens?: number;
+	model?: string;
+	// Caller-side cancellation (the person pressed stop, or the overall
+	// deadline): the signal's reason is rethrown as-is.
+	signal?: AbortSignal;
+	timeoutMs?: number;
+	// Each piece of answer text as it is generated.
+	onDelta?: (text: string) => void;
+};
+
+export type ChatResult = { content: string; toolCalls: ChatToolCall[]; doneReason?: string };
+
+// The exact JSON body sent to /api/chat -- exported for the tests.
+export function buildChatBody(messages: ChatMessage[], model: string, opts: ChatOptions) {
+	const options: Record<string, number> = { num_ctx: numCtx() };
+	if (opts.temperature != null) options.temperature = opts.temperature;
+	if (opts.maxTokens != null) options.num_predict = opts.maxTokens;
+	return {
+		model,
+		messages,
+		...(opts.tools?.length ? { tools: opts.tools } : {}),
+		stream: true,
+		think: false,
+		options
+	};
+}
+
+type ChatChunk = {
+	message?: { content?: string; tool_calls?: ChatToolCall[] };
+	done?: boolean;
+	done_reason?: string;
+	error?: string;
+};
+
+export async function chat(messages: ChatMessage[], opts: ChatOptions = {}): Promise<ChatResult> {
+	if (!aiConfigured()) throw new AiUnavailable();
+	const timeoutMs = opts.timeoutMs ?? GENERATE_TIMEOUT_MS;
+	const signals = [AbortSignal.timeout(timeoutMs), ...(opts.signal ? [opts.signal] : [])];
+	const signal = signals.length > 1 ? AbortSignal.any(signals) : signals[0];
+	const model = opts.model || CHAT_MODEL();
+
+	// Maps a fetch/stream failure: the caller's own abort is passed through
+	// untouched, the timeout and network errors become AiUnavailable.
+	const fail = (e: unknown): never => {
+		if (opts.signal?.aborted) throw opts.signal.reason ?? e;
+		if ((e as Error)?.name === 'TimeoutError' || signal.aborted) {
+			throw new AiTimeout(timeoutMs);
+		}
+		throw e instanceof AiUnavailable || e instanceof OllamaHttpError ? e : new AiUnavailable();
+	};
+
+	const post = (body: unknown) =>
+		fetch(`${OLLAMA_URL()}/api/chat`, {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify(body),
+			signal
+		});
+
+	let res: Response;
+	try {
+		res = await post(buildChatBody(messages, model, opts));
+		// A model without function calling answers 400 "does not support
+		// tools": the conversation still works, only without the library.
+		if (res.status === 400 && opts.tools?.length) {
+			const detail = await res.text().catch(() => '');
+			if (!/does not support tools/i.test(detail)) throw new OllamaHttpError(400, detail);
+			res = await post(buildChatBody(messages, model, { ...opts, tools: undefined }));
+		}
+	} catch (e) {
+		return fail(e);
+	}
+	if (!res.ok) throw new OllamaHttpError(res.status, await res.text().catch(() => ''));
+	if (!res.body) throw new AiUnavailable('Empty response from the AI service.');
+
+	let content = '';
+	const toolCalls: ChatToolCall[] = [];
+	let doneReason: string | undefined;
+	const handle = (line: string) => {
+		if (!line.trim()) return;
+		let chunk: ChatChunk;
+		try {
+			chunk = JSON.parse(line);
+		} catch {
+			return; // a partial or foreign line: ignore rather than fail the answer
+		}
+		if (chunk.error) throw new OllamaHttpError(500, chunk.error);
+		const piece = chunk.message?.content ?? '';
+		if (piece) {
+			content += piece;
+			opts.onDelta?.(piece);
+		}
+		if (chunk.message?.tool_calls?.length) toolCalls.push(...chunk.message.tool_calls);
+		if (chunk.done) doneReason = chunk.done_reason;
+	};
+
+	const reader = res.body.getReader();
+	const decoder = new TextDecoder();
+	let buffer = '';
+	try {
+		for (;;) {
+			const { value, done } = await reader.read();
+			if (done) break;
+			buffer += decoder.decode(value, { stream: true });
+			let nl: number;
+			while ((nl = buffer.indexOf('\n')) !== -1) {
+				handle(buffer.slice(0, nl));
+				buffer = buffer.slice(nl + 1);
+			}
+		}
+		handle(buffer + decoder.decode());
+	} catch (e) {
+		reader.cancel().catch(() => {});
+		if (e instanceof OllamaHttpError) throw e;
+		return fail(e);
+	}
+	return { content: stripReasoning(content), toolCalls, doneReason };
 }
