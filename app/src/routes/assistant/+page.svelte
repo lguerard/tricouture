@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { openAssistant } from '$lib/assistant/store.svelte';
 	import { CRAFTS, craftLabel } from '$lib/labels';
 	import { t } from '$lib/i18n';
 
@@ -64,6 +65,16 @@
 <div class="container">
 	<h1>{t(locale, 'assistant.title')}</h1>
 	<p class="muted">{t(locale, 'assistant.subtitle')}</p>
+
+	{#if data.ai}
+		<section class="card chat-cta">
+			<div>
+				<h2>{t(locale, 'assistant.chatTitle')}</h2>
+				<p class="muted">{t(locale, 'assistant.chatHint')}</p>
+			</div>
+			<button class="btn-primary" type="button" onclick={() => openAssistant()}>{t(locale, 'assistant.chatOpen')}</button>
+		</section>
+	{/if}
 
 	<div class="tabs">
 		<button class:active={tab === 'translate'} onclick={() => (tab = 'translate')}
@@ -135,6 +146,9 @@
 </div>
 
 <style>
+	.chat-cta { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-top: 1rem; }
+	.chat-cta h2 { margin: 0 0 0.3rem; font-size: 1.1rem; }
+	.chat-cta p { margin: 0; }
 	.tabs { display: flex; gap: 0.5rem; margin: 1rem 0; }
 	.tabs button.active { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
 	.two { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }

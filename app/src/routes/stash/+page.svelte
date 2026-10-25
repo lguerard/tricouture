@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { openAssistant } from '$lib/assistant/store.svelte';
 	import { page } from '$app/stores';
 	import { mediaUrl } from '$lib/media';
 	import { enhance } from '$app/forms';
@@ -560,6 +561,16 @@
 						>
 							{previewBusy && previewYarnId === y.id ? `⏳ ${t(locale, 'stash.yarn.generating')}` : `🎨 ${t(locale, 'stash.yarn.previewBtn')}`}
 						</button>
+						{#if data.ai}
+							<button
+								type="button"
+								class="btn-ghost small"
+								title={t(locale, 'chat.ask')}
+								aria-label={t(locale, 'chat.ask')}
+								onclick={() => openAssistant({ kind: 'yarn', id: y.id, title: [y.brand, y.name].filter(Boolean).join(' ') || y.colorway || t(locale, 'stash.yarn.fallbackName') })}
+								>🤖</button
+							>
+						{/if}
 						<form method="POST" action="?/delete" use:enhance={undoableDelete()}>
 							<input type="hidden" name="kind" value="yarn" /><input type="hidden" name="id" value={y.id} />
 							<button class="del" type="submit">{t(locale, 'stash.delete')}</button>

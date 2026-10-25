@@ -8,6 +8,8 @@
 	import Toaster from '$lib/components/Toaster.svelte';
 	import ThemeSwitch from '$lib/components/ThemeSwitch.svelte';
 	import SearchPalette from '$lib/components/SearchPalette.svelte';
+	import AssistantPanel from '$lib/components/AssistantPanel.svelte';
+	import { clearConversations } from '$lib/assistant/store.svelte';
 	import { flushPendingDeletes } from '$lib/undo';
 	import { toasts } from '$lib/toast.svelte';
 
@@ -179,7 +181,7 @@
 			</div>
 			<div class="user">
 				<span class="muted">{data.user.displayName}</span>
-				<form method="POST" action="/logout">
+				<form method="POST" action="/logout" onsubmit={clearConversations}>
 					<button class="link" type="submit">{t(locale, 'nav.logout')}</button>
 				</form>
 			</div>
@@ -213,6 +215,7 @@
 
 <Toaster {locale} />
 {#if data.user}<SearchPalette {locale} ai={data.ai} bind:open={searchOpen} />{/if}
+{#if data.user && data.ai}<AssistantPanel {locale} userId={data.user.id} />{/if}
 <svelte:window onpagehide={flushPendingDeletes} onkeydown={(e) => e.key === 'Escape' && (drawerOpen = false)} />
 
 <style>

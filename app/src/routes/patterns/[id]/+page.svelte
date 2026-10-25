@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { openAssistant } from '$lib/assistant/store.svelte';
 	import { mediaUrl } from '$lib/media';
 	import PdfViewer from '$lib/components/PdfViewer.svelte';
 	import { enhance } from '$app/forms';
@@ -99,29 +100,6 @@
 		return mime === 'application/pdf';
 	}
 
-	// Copilote IA
-	let question = $state('');
-	let answer = $state('');
-	let aiBusy = $state(false);
-	let aiErr = $state('');
-	async function askCopilot() {
-		aiBusy = true;
-		aiErr = '';
-		answer = '';
-		try {
-			const res = await fetch('/api/ai/copilot', {
-				method: 'POST',
-				headers: { 'content-type': 'application/json' },
-				body: JSON.stringify({ patternId: p.id, question })
-			});
-			const d = await res.json();
-			if (!res.ok) aiErr = d.error ?? t(locale, 'patterns.detail.aiError');
-			else answer = d.result;
-		} catch {
-			aiErr = t(locale, 'patterns.detail.aiNetworkError');
-		}
-		aiBusy = false;
-	}
 </script>
 
 <div class="container">
@@ -326,15 +304,20 @@
 		{/if}
 	</section>
 
-	<section class="card copilot">
-		<h2>{t(locale, 'patterns.detail.copilotTitle')}</h2>
-		<div class="ask">
-			<input bind:value={question} placeholder={t(locale, 'patterns.detail.askPlaceholder')} onkeydown={(e) => e.key === 'Enter' && question && askCopilot()} />
-			<button class="btn-primary" onclick={askCopilot} disabled={aiBusy || !question}>{aiBusy ? '…' : t(locale, 'patterns.detail.ask')}</button>
-		</div>
-		{#if aiErr}<p class="error">{aiErr}</p>{/if}
-		{#if answer}<div class="answer">{answer}</div>{/if}
-	</section>
+	{#if data.ai}
+		<section class="card copilot">
+			<h2>{t(locale, 'patterns.detail.assistantTitle')}</h2>
+			<p class="muted">{t(locale, 'patterns.detail.assistantHint')}</p>
+			<div class="ask">
+				<button class="btn-primary" type="button" onclick={() => openAssistant({ kind: 'pattern', id: p.id, title: p.title })}>
+					{t(locale, 'chat.ask')}
+				</button>
+				<button type="button" onclick={() => openAssistant({ kind: 'pattern', id: p.id, title: p.title }, t(locale, 'chat.suggest.yarnForPattern'))}>
+					{t(locale, 'chat.suggest.yarnForPattern')}
+				</button>
+			</div>
+		</section>
+	{/if}
 </div>
 
 <style>
@@ -465,17 +448,8 @@
 	}
 	.ask {
 		display: flex;
+		flex-wrap: wrap;
 		gap: 0.5rem;
-	}
-	.ask input {
-		flex: 1;
-	}
-	.answer {
-		margin-top: 0.8rem;
-		white-space: pre-wrap;
-		background: var(--accent-soft);
-		padding: 0.8rem;
-		border-radius: var(--radius);
 	}
 	.head {
 		display: flex;
