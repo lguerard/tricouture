@@ -16,10 +16,10 @@ export const PUT: RequestHandler = async ({ request, locals, params }) => {
 	const meta = parseMeta(form.get('meta'));
 	if (!meta) throw error(400, 'Invalid design');
 	try {
-		const paths = await saveDesignFiles(uid, form);
+		const values = await saveDesignFiles(uid, form, meta);
 		await db
 			.update(embroideryDesigns)
-			.set({ ...meta, ...paths, updatedAt: new Date() })
+			.set({ ...values, updatedAt: new Date() })
 			.where(eq(embroideryDesigns.id, old.id));
 		await Promise.all(filesOf(old).map(deleteStored));
 		return json({ id: old.id });
@@ -27,6 +27,17 @@ export const PUT: RequestHandler = async ({ request, locals, params }) => {
 		if (e instanceof DesignInputError || e instanceof UnsupportedImageError) throw error(400, e.message);
 		throw e;
 	}
+};
+
+// Renames a patch (JSON { title }): the only change an imported one takes.
+export const PATCH: RequestHandler = async ({ request, locals, params }) => {
+	const row = await ownDesign(locals.user!.id, params.id);
+	if (!row) throw error(404, 'Not found');
+	const body = await request.json().catch(() => null);
+	const title = typeof body?.title === 'string' ? body.title.trim().slice(0, 200) : '';
+	if (!title) throw error(400, 'Invalid title');
+	await db.update(embroideryDesigns).set({ title, updatedAt: new Date() }).where(eq(embroideryDesigns.id, row.id));
+	return json({ id: row.id });
 };
 
 // Deletes a patch for good: the database row and its three files.

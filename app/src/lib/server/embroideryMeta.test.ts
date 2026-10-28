@@ -17,6 +17,9 @@ describe('parseMeta', () => {
 		expect(m.threads).toEqual([5, 37, 20]);
 		expect(m.settings.swaps).toEqual({ '5': 13 });
 		expect(m.stitchCount).toBe(2585);
+		expect(m.source).toBe('editor');
+		expect(parseMeta({ ...good, source: 'import' })!.source).toBe('import');
+		expect(parseMeta({ ...good, source: 'other' })!.source).toBe('editor');
 	});
 	it('rejects broken JSON and bad thread lists', () => {
 		expect(parseMeta('{nope')).toBeNull();

@@ -99,6 +99,13 @@
       "when": 1792834471444,
       "tag": "0013_app_settings",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1793208489798,
+      "tag": "0014_embroidery_import",
+      "breakpoints": true
     }
   ]
 }
