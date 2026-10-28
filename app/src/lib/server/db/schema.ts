@@ -576,8 +576,10 @@ export const storageBins = pgTable(
 	(t) => ({ ownerIdx: index('bins_owner_idx').on(t.ownerId) })
 );
 
-// Embroidered patches made in the Écussons tab: the source picture, a stitch
+// Embroidered patches of the Écussons tab: the source picture, a stitch
 // preview and the .pes file, plus the settings to reopen them in the editor.
+// Imported patches (a .pes made elsewhere) have no source picture -- their
+// image is the preview -- and can't be reopened in the editor.
 export type EmbroiderySettings = {
 	sizeMm: number;
 	colors: number;
@@ -598,6 +600,7 @@ export const embroideryDesigns = pgTable(
 			.notNull()
 			.references(() => users.id, { onDelete: 'cascade' }),
 		title: varchar('title', { length: 200 }).notNull(),
+		source: varchar('source', { length: 10 }).$type<'editor' | 'import'>().notNull().default('editor'),
 		imagePath: text('image_path').notNull(), // source picture (downscaled)
 		previewPath: text('preview_path').notNull(), // stitch preview (PNG/WebP)
 		pesPath: text('pes_path').notNull(),

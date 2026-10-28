@@ -6,6 +6,7 @@
 	import { mediaUrl } from '$lib/media';
 	import { digitize, sewingMinutes, HOOP_MM, type Design, type PatchShape, type RasterImage } from '$lib/embroidery/digitize';
 	import { writePes } from '$lib/embroidery/pes';
+	import { readPes } from '$lib/embroidery/pesRead';
 	import { PEC_THREADS, threadHex } from '$lib/embroidery/threads';
 	import { canvasBlob, drawStitches, renderThumbnail } from '$lib/embroidery/render';
 	import type { PageData } from './$types';
@@ -296,6 +297,63 @@
 		await invalidateAll();
 	}
 
+	// .pes files made elsewhere go into the library as they are: the preview
+	// is drawn from their stitches, and they can't be reopened in the editor.
+	let importing = $state(false);
+	const isPes = (f: File) => /\.pes$/i.test(f.name);
+
+	async function importPes(files: File[]) {
+		if (!files.length || importing) return;
+		importing = true;
+		let done = 0;
+		for (const file of files) {
+			try {
+				const read = readPes(new Uint8Array(await file.arrayBuffer()));
+				const form = new FormData();
+				form.set(
+					'meta',
+					JSON.stringify({
+						title: file.name.replace(/\.pes$/i, '').trim().slice(0, 200) || 'Écusson',
+						source: 'import',
+						threads: read.threads,
+						widthMm: read.widthMm,
+						heightMm: read.heightMm,
+						stitchCount: read.stitchCount
+					})
+				);
+				form.set('preview', await canvasBlob(renderThumbnail(read.commands, read.threads)), 'preview');
+				form.set('pes', file, 'design.pes');
+				const res = await fetch('/api/embroidery', { method: 'POST', body: form });
+				if (!res.ok) throw new Error(`import failed: ${res.status}`);
+				done++;
+			} catch (e) {
+				console.error(e);
+				toasts.push({ kind: 'error', message: t(locale, 'embroidery.errorPes', { name: file.name }) }, 6000);
+			}
+		}
+		importing = false;
+		if (done) {
+			toasts.push({ kind: 'success', message: t(locale, 'embroidery.importDone', { n: done }) });
+			await invalidateAll();
+		}
+	}
+
+	// Imported patches only: the editor's ones are renamed in the editor.
+	async function rename(d: EmbroideryDesign) {
+		const name = prompt(t(locale, 'embroidery.renamePrompt'), d.title)?.trim();
+		if (!name || name === d.title) return;
+		const res = await fetch(`/api/embroidery/${d.id}`, {
+			method: 'PATCH',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({ title: name })
+		});
+		if (!res.ok) {
+			toasts.push({ kind: 'error', key: 'toast.error' }, 6000);
+			return;
+		}
+		await invalidateAll();
+	}
+
 	const dateFmt = $derived(new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'short', year: 'numeric' }));
 
 	const minutes = $derived(design ? Math.max(1, Math.round(sewingMinutes(design))) : 0);
@@ -322,7 +380,10 @@
 				ondrop={(e) => {
 					e.preventDefault();
 					dragging = false;
-					load(e.dataTransfer?.files[0]);
+					const files = [...(e.dataTransfer?.files ?? [])];
+					// A .pes dropped here goes straight into the library.
+					if (files.some(isPes)) importPes(files.filter(isPes));
+					else load(files[0]);
 				}}
 			>
 				{#if imageUrl}
@@ -445,16 +506,40 @@
 	</div>
 
 	<section class="library">
-		<h2>{t(locale, 'embroidery.library')} <span class="muted">({data.designs.length})</span></h2>
+		<div class="lib-head">
+			<h2>{t(locale, 'embroidery.library')} <span class="muted">({data.designs.length})</span></h2>
+			<label class="btn import" class:disabled={importing}>
+				{importing ? t(locale, 'embroidery.importing') : `📥 ${t(locale, 'embroidery.import')}`}
+				<input
+					type="file"
+					accept=".pes"
+					multiple
+					disabled={importing}
+					onchange={(e) => {
+						const input = e.currentTarget as HTMLInputElement;
+						importPes([...(input.files ?? [])]);
+						input.value = '';
+					}}
+				/>
+			</label>
+		</div>
+		<p class="muted small">{t(locale, 'embroidery.importHint')}</p>
 		{#if data.designs.length === 0}
 			<p class="muted">{t(locale, 'embroidery.libraryEmpty')}</p>
 		{:else}
 			<div class="lib-grid">
 				{#each data.designs as d (d.id)}
 					<article class="card lib-item" id={`design-${d.id}`} class:current={d.id === currentId}>
-						<button type="button" class="lib-thumb" style:background={d.settings.fabric} onclick={() => reopen(d)} aria-label={t(locale, 'embroidery.edit')}>
-							<img src={mediaUrl(d.previewPath, 400)} alt={d.title} loading="lazy" />
-						</button>
+						{#if d.source === 'import'}
+							<div class="lib-thumb" style:background={d.settings.fabric}>
+								<img src={mediaUrl(d.previewPath, 400)} alt={d.title} loading="lazy" />
+								<span class="badge">{t(locale, 'embroidery.imported')}</span>
+							</div>
+						{:else}
+							<button type="button" class="lib-thumb" style:background={d.settings.fabric} onclick={() => reopen(d)} aria-label={t(locale, 'embroidery.edit')}>
+								<img src={mediaUrl(d.previewPath, 400)} alt={d.title} loading="lazy" />
+							</button>
+						{/if}
 						<strong class="lib-title">{d.title}</strong>
 						<span class="muted small">
 							{t(locale, 'embroidery.libraryMeta', {
@@ -475,7 +560,11 @@
 							{#if canShare}
 								<button type="button" onclick={() => shareSaved(d)} aria-label={t(locale, 'embroidery.share')}>📤</button>
 							{/if}
-							<button type="button" onclick={() => reopen(d)}>✏️ {t(locale, 'embroidery.edit')}</button>
+							{#if d.source === 'import'}
+								<button type="button" onclick={() => rename(d)}>✏️ {t(locale, 'embroidery.rename')}</button>
+							{:else}
+								<button type="button" onclick={() => reopen(d)}>✏️ {t(locale, 'embroidery.edit')}</button>
+							{/if}
 							<button type="button" class="danger" onclick={() => remove(d)} aria-label={t(locale, 'embroidery.delete')} title={t(locale, 'embroidery.delete')}>🗑</button>
 						</div>
 					</article>
@@ -662,6 +751,30 @@
 	.library h2 {
 		font-size: 1.2rem;
 	}
+	.lib-head {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.5rem;
+		flex-wrap: wrap;
+	}
+	.import {
+		position: relative;
+		min-height: 40px;
+		display: inline-flex;
+		align-items: center;
+		cursor: pointer;
+	}
+	.import.disabled {
+		opacity: 0.6;
+		cursor: progress;
+	}
+	.import input {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		opacity: 0;
+	}
 	.lib-grid {
 		display: grid;
 		gap: 1rem;
@@ -678,6 +791,7 @@
 		outline: 2px solid var(--accent);
 	}
 	.lib-thumb {
+		position: relative;
 		padding: 0;
 		border-radius: var(--radius);
 		aspect-ratio: 1;
@@ -690,6 +804,16 @@
 		height: 100%;
 		object-fit: contain;
 		display: block;
+	}
+	.badge {
+		position: absolute;
+		top: 0.4rem;
+		left: 0.4rem;
+		padding: 0.1rem 0.45rem;
+		border-radius: 999px;
+		font-size: 0.75rem;
+		background: var(--accent);
+		color: var(--on-accent);
 	}
 	.lib-title {
 		overflow: hidden;

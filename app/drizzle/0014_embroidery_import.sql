@@ -1,0 +1,1 @@
+ALTER TABLE "embroidery_designs" ADD COLUMN "source" varchar(10) DEFAULT 'editor' NOT NULL;

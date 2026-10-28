@@ -11,6 +11,7 @@ const clamp = (v: unknown, lo: number, hi: number, dflt: number) =>
 
 export type DesignMeta = {
 	title: string;
+	source: 'editor' | 'import';
 	settings: EmbroiderySettings;
 	threads: number[];
 	widthMm: number;
@@ -37,6 +38,7 @@ export function parseMeta(raw: unknown): DesignMeta | null {
 	const title = (typeof m.title === 'string' ? m.title : '').trim().slice(0, 200) || 'Écusson';
 	return {
 		title,
+		source: m.source === 'import' ? 'import' : 'editor',
 		settings: {
 			sizeMm: clamp(s.sizeMm, 10, 100, 70),
 			colors: Math.round(clamp(s.colors, 1, 8, 4)),
@@ -49,8 +51,9 @@ export function parseMeta(raw: unknown): DesignMeta | null {
 			swaps
 		},
 		threads,
-		widthMm: clamp(m.widthMm, 0, 100, 0),
-		heightMm: clamp(m.heightMm, 0, 100, 0),
+		// Imported files may be made for a larger hoop than the editor's.
+		widthMm: clamp(m.widthMm, 0, 1000, 0),
+		heightMm: clamp(m.heightMm, 0, 1000, 0),
 		stitchCount: Math.round(clamp(m.stitchCount, 0, 1_000_000, 0))
 	};
 }

@@ -4,6 +4,7 @@ import { kmeans } from './quantize';
 import { tatamiFill } from './stitches';
 import { digitize, type RasterImage } from './digitize';
 import { writePes, type Command } from './pes';
+import { PesReadError, readPes } from './pesRead';
 import { nearestThread } from './threads';
 
 // A test picture: white background, red disc, blue square with a white hole.
@@ -121,5 +122,33 @@ describe('writePes', () => {
 		const len = b[block + 2] | (b[block + 3] << 8) | (b[block + 4] << 16);
 		expect(b[block + len - 1]).toBe(0xff);
 		expect(b.length).toBe(block + len + 228 * 3);
+	});
+});
+
+describe('readPes', () => {
+	it('reads back what writePes wrote', () => {
+		const d = digitize(picture(), { sizeMm: 70, colors: 2, removeBackground: true, shape: 'circle', borderThread: 20, backgroundThread: 9 });
+		const r = readPes(writePes(d.commands, d.threads, 'circle'));
+		expect(r.threads).toEqual(d.threads);
+		expect(r.widthMm).toBeCloseTo(d.widthMm, 0);
+		expect(r.heightMm).toBeCloseTo(d.heightMm, 0);
+		// The writer adds a few zero-length stitches after jumps.
+		expect(r.stitchCount).toBeGreaterThanOrEqual(d.stitchCount);
+		expect(r.stitchCount).toBeLessThan(d.stitchCount * 1.05);
+		expect(r.commands.filter((c) => c.kind === 'color')).toHaveLength(d.threads.length - 1);
+		// Same stitch positions, in the same order (the reader starts at 0, 0).
+		const a = stitches(d.commands).map((c) => [Math.round(c.x), Math.round(c.y)].join());
+		const b = new Set(stitches(r.commands).map((c) => [c.x, c.y].join()));
+		const first = stitches(d.commands)[0];
+		const firstRead = stitches(r.commands)[0];
+		expect([firstRead.x, firstRead.y]).toEqual([Math.round(first.x), Math.round(first.y)]);
+		expect(a.filter((k) => !b.has(k)).length).toBeLessThan(a.length * 0.01);
+	});
+
+	it('rejects files that are not PES', () => {
+		expect(() => readPes(new TextEncoder().encode('#PEC0001 nothing here'))).toThrow(PesReadError);
+		expect(() => readPes(new Uint8Array(4))).toThrow(PesReadError);
+		const empty = writePes([{ kind: 'end', x: 0, y: 0 }], [20]);
+		expect(() => readPes(empty)).toThrow(PesReadError);
 	});
 });
