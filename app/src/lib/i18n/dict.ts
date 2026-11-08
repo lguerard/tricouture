@@ -468,6 +468,11 @@ export const dict: Record<Locale, Table> = {
 		'patterns.new.fetchEmpty': 'Rien trouvé sur cette page — remplis les champs à la main.',
 		'patterns.list.import': 'Import en lot',
 		'patterns.list.tagColors': '🎨 Couleurs des tags',
+		'patterns.list.findCovers': '🖼️ Couvertures manquantes ({n})',
+		'patterns.list.findCoversHint': 'Cherche une couverture pour tes patrons qui n\'en ont pas : leur première image, sinon une recherche web sur le créateur et le titre.',
+		'patterns.list.findingCovers': 'Couvertures… {i} / {n}',
+		'patterns.list.coversFound': '{found} couverture(s) trouvée(s) sur {n} patron(s).',
+		'patterns.list.coversRest': 'Pour les autres, renseigne le créateur ou choisis une couverture depuis la fiche du patron.',
 		'patterns.tags.title': 'Couleurs des tags',
 		'patterns.tags.subtitle':
 			'Chaque tag reçoit une couleur automatiquement, sans doublon tant que tu restes sous 36 tags. Choisis-en une toi-même pour n\'importe quel tag ci-dessous.',
@@ -1251,6 +1256,11 @@ export const dict: Record<Locale, Table> = {
 		'patterns.new.fetchEmpty': 'Nothing found on that page — fill the fields in by hand.',
 		'patterns.list.import': 'Batch import',
 		'patterns.list.tagColors': '🎨 Tag colors',
+		'patterns.list.findCovers': '🖼️ Missing covers ({n})',
+		'patterns.list.findCoversHint': 'Looks for a cover for your patterns without one: their first picture, else a web search on designer and title.',
+		'patterns.list.findingCovers': 'Covers… {i} / {n}',
+		'patterns.list.coversFound': '{found} cover(s) found for {n} pattern(s).',
+		'patterns.list.coversRest': 'For the others, fill in the designer or pick a cover from the pattern page.',
 		'patterns.tags.title': 'Tag colors',
 		'patterns.tags.subtitle':
 			"Each tag gets a color automatically, with no duplicates as long as you stay under 36 tags. Pick your own for any tag below.",

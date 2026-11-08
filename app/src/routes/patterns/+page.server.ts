@@ -1,4 +1,4 @@
-import { and, or, eq, desc, sql } from 'drizzle-orm';
+import { and, or, eq, desc, isNull, sql } from 'drizzle-orm';
 import { db } from '$lib/server/db';
 import { patterns, patternFiles, users, type Craft } from '$lib/server/db/schema';
 import { getAllVisibleTags } from '$lib/server/patternTags';
@@ -83,6 +83,17 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		(await db.select({ n: sql<number>`count(*)` }).from(patterns).where(and(...conds)))[0]?.n ?? 0
 	);
 
+	// The user's own patterns still without a cover (made before covers were
+	// found automatically), whatever the filters: the "find missing covers"
+	// button goes through all of them.
+	const missingCovers = (
+		await db
+			.select({ id: patterns.id })
+			.from(patterns)
+			.where(and(eq(patterns.ownerId, uid), isNull(patterns.coverPath)))
+			.orderBy(desc(patterns.updatedAt))
+	).map((r) => r.id);
+
 	// Tag ownership for display (without exposing the raw ownerId to the client).
 	const mapped = rows.map(({ ownerId, source, ...r }) => ({
 		...r,
@@ -102,6 +113,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		tagColors,
 		pageNum,
 		pageCount: Math.max(1, Math.ceil(total / PAGE_SIZE)),
-		total
+		total,
+		missingCovers
 	};
 };
