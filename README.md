@@ -39,7 +39,7 @@ besoin :
 - un **suivi de projets** (Kanban, compteur de rangs, prédiction d'échéance) ;
 - une **couche de motivation** (statistiques annuelles, objectifs, succès) ;
 - un **atelier d'écussons brodés** : n'importe quelle image devient un fichier `.pes` pour la Brother Skitch PP1 (via l'appli Artspira), et chaque écusson est rangé dans une bibliothèque, où tu peux aussi importer tes propres fichiers `.pes` ;
-- un **assistant IA** local : une conversation qui connaît tes patrons, ton stock et tes projets, plus la traduction et la génération de patrons.
+- un **assistant IA** local : une conversation qui connaît tes patrons, ton stock et tes projets, et qui peut faire pour toi tout ce que tu fais dans l'appli (créer, modifier, ranger, partager…), plus la traduction et la génération de patrons.
 
 ---
 
@@ -101,9 +101,13 @@ besoin :
 
 - **Traduction** de patrons EN/JP/DE → FR (glossaire tricot/crochet).
 - **Assistant** (bouton 💬 sur toutes les pages, en français) : il cherche et lit
-  tes patrons, ton stock de laines et tes projets (compteurs de rangs compris),
-  fait les calculs de jauge et de métrage, et peut ajouter une note à un projet
-  quand tu le demandes. Réponse en direct, même modèle Ollama que le reste ; voir
+  tes patrons, ton stock et tes projets (compteurs de rangs compris), fait les
+  calculs de jauge et de métrage, et **agit pour toi quand tu le demandes** :
+  créer, modifier, supprimer ou partager un patron ou un projet, rédiger ou
+  traduire un patron et l'enregistrer, importer un patron depuis un lien, trouver
+  les couvertures, suivre les pièces et les laines utilisées, gérer le stock, les
+  rangements, objectifs, destinataires, moodboards et écussons. Une suppression
+  demande toujours ta confirmation. Réponse en direct, même modèle Ollama que le reste ; voir
   [docs/SELF-HOSTING.md §6.4](docs/SELF-HOSTING.md#64-lassistant-chat).
 - **Génération de patron**.
 - **Lecture d'étiquettes** de pelotes (photo → marque, composition, métrage…),

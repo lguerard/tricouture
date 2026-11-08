@@ -76,13 +76,12 @@ export type ProjectDetail = {
 
 export type YarnFilter = { text?: string; weight?: string; color?: string; fiber?: string };
 
-// What the assistant may change on a pattern / project (only fields given are
-// written; null clears a field).
+// What the assistant may change on a pattern (only fields given are written;
+// null clears a field).
 export type PatternPatch = Partial<
 	Pick<PatternRecord, 'title' | 'garmentType' | 'designer' | 'difficulty' | 'sizes' | 'gaugeStitches' | 'gaugeRows' | 'yardageRequired' | 'tags'>
 >;
 export type ProjectStatus = 'idee' | 'monte' | 'bloque' | 'fini';
-export type ProjectPatch = { status?: ProjectStatus; currentRow?: number; totalRows?: number | null; deadline?: string | null };
 
 export interface AssistantData {
 	access(uid: string, type: ResourceType, id: string, ownerId: string): Promise<Access>;
@@ -97,9 +96,6 @@ export interface AssistantData {
 	appendProjectNote(id: string, note: string): Promise<void>;
 	findProjects(uid: string, text: string, limit: number): Promise<ProjectRecord[]>;
 	updatePattern(id: string, patch: PatternPatch): Promise<void>;
-	updateProject(id: string, patch: ProjectPatch): Promise<void>;
-	createProject(uid: string, p: { title: string; patternId: string | null; status: ProjectStatus }): Promise<string>;
-	updateYarnSkeins(id: string, skeins: number): Promise<void>;
 	// The account's own patterns without a cover, newest first, and how many.
 	missingCovers(uid: string, limit: number): Promise<{ items: { id: string; title: string }[]; total: number }>;
 	// Looks for a cover (first picture, else web search); the new path or null.
@@ -246,9 +242,6 @@ export function projectSearchQuery(uid: string, text: string, limit: number) {
 		.limit(limit);
 }
 
-const progressFrom = (currentRow: number, totalRows: number | null, fallback: number) =>
-	totalRows && totalRows > 0 ? Math.max(0, Math.min(100, Math.round((currentRow / totalRows) * 100))) : fallback;
-
 async function semanticPatterns(uid: string, text: string, limit: number): Promise<PatternHit[]> {
 	if (!aiConfigured()) return [];
 	try {
@@ -379,47 +372,6 @@ export const dbData: AssistantData = {
 		} catch {
 			/* embedding model missing or busy: the text search still finds it */
 		}
-	},
-
-	async updateProject(id, patch) {
-		const [p] = await db.select().from(projects).where(eq(projects.id, id)).limit(1);
-		if (!p) return;
-		const currentRow = patch.currentRow ?? p.currentRow;
-		const totalRows = patch.totalRows !== undefined ? patch.totalRows : p.totalRows;
-		const status = patch.status ?? p.status;
-		await db
-			.update(projects)
-			.set({
-				status,
-				currentRow,
-				totalRows,
-				...(patch.deadline !== undefined ? { deadline: patch.deadline } : {}),
-				progressPct: status === 'fini' ? 100 : progressFrom(currentRow, totalRows, p.progressPct),
-				// Same rule as the project page: finishing dates it, reopening clears it.
-				finishedAt: status === 'fini' ? (p.finishedAt ?? new Date()) : null,
-				updatedAt: new Date()
-			})
-			.where(eq(projects.id, id));
-	},
-
-	async createProject(uid, { title, patternId, status }) {
-		// At the end of its board column, like projects/new.
-		const maxPos =
-			(
-				await db
-					.select({ m: sql<number>`coalesce(max(${projects.boardPosition}), -1)::int` })
-					.from(projects)
-					.where(eq(projects.ownerId, uid))
-			)[0]?.m ?? -1;
-		const [row] = await db
-			.insert(projects)
-			.values({ ownerId: uid, title, patternId, status, boardPosition: maxPos + 1, ...(status === 'fini' ? { finishedAt: new Date(), progressPct: 100 } : {}) })
-			.returning({ id: projects.id });
-		return row.id;
-	},
-
-	async updateYarnSkeins(id, skeins) {
-		await db.update(yarns).set({ skeins }).where(eq(yarns.id, id));
 	},
 
 	async missingCovers(uid, limit) {

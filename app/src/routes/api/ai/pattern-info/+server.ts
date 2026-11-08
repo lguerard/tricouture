@@ -1,76 +1,23 @@
 import { json } from '@sveltejs/kit';
-import { and, eq } from 'drizzle-orm';
-import { db } from '$lib/server/db';
-import { patterns } from '$lib/server/db/schema';
 import { AiUnavailable } from '$lib/server/ai/ollama';
-import { suggestPatternInfo, mergePatternInfo, normalizeInfoLanguage } from '$lib/server/ai/patternInfo';
-import { getPatternVocabulary } from '$lib/server/patternVocabulary';
+import { normalizeInfoLanguage } from '$lib/server/ai/patternInfo';
+import { fillPatternInfo } from '$lib/server/services/patterns';
 import type { RequestHandler } from './$types';
 
+// Fills the pattern's empty info fields (and adds tags) from its text.
 export const POST: RequestHandler = async ({ request, locals }) => {
 	const body = await request.json().catch(() => ({}));
 	const patternId = String(body?.patternId ?? '');
 	if (!patternId) return json({ error: 'patternId required' }, { status: 400 });
-	const language = normalizeInfoLanguage(body?.language);
 
-	const pat = (
-		await db
-			.select({
-				title: patterns.title,
-				craft: patterns.craft,
-				notes: patterns.notes,
-				extractedText: patterns.extractedText,
-				tags: patterns.tags,
-				garmentType: patterns.garmentType,
-				designer: patterns.designer,
-				language: patterns.language,
-				difficulty: patterns.difficulty,
-				sizes: patterns.sizes,
-				gaugeStitches: patterns.gaugeStitches,
-				gaugeRows: patterns.gaugeRows,
-				yardageRequired: patterns.yardageRequired
-			})
-			.from(patterns)
-			.where(and(eq(patterns.id, patternId), eq(patterns.ownerId, locals.user!.id)))
-			.limit(1)
-	)[0];
-	if (!pat) return json({ error: 'Pattern not found' }, { status: 404 });
-
-	let suggested;
-	let vocabulary;
+	let filled;
 	try {
-		const context = [pat.title, pat.notes, pat.extractedText].filter(Boolean).join('\n\n');
-		vocabulary = await getPatternVocabulary(locals.user!.id);
-		suggested = await suggestPatternInfo(context, language, vocabulary, {
-			craft: pat.craft,
-			garmentType: pat.garmentType
-		});
+		filled = await fillPatternInfo(locals.user!.id, patternId, normalizeInfoLanguage(body?.language));
 	} catch (e) {
 		if (e instanceof AiUnavailable) return json({ error: e.message }, { status: 503 });
 		return json({ error: 'Analysis failed' }, { status: 500 });
 	}
-
-	const { tags, updates } = mergePatternInfo(
-		{
-			tags: pat.tags ?? [],
-			garmentType: pat.garmentType,
-			designer: pat.designer,
-			language: pat.language,
-			difficulty: pat.difficulty,
-			sizes: pat.sizes,
-			gaugeStitches: pat.gaugeStitches,
-			gaugeRows: pat.gaugeRows,
-			yardageRequired: pat.yardageRequired
-		},
-		suggested,
-		vocabulary
-	);
-	if (Object.keys(updates).length === 0) return json({ error: 'empty' }, { status: 422 });
-
-	await db
-		.update(patterns)
-		.set({ ...updates, updatedAt: new Date() })
-		.where(eq(patterns.id, patternId));
-
-	return json({ tags, updates });
+	if (!filled) return json({ error: 'Pattern not found' }, { status: 404 });
+	if (Object.keys(filled.updates).length === 0) return json({ error: 'empty' }, { status: 422 });
+	return json(filled);
 };

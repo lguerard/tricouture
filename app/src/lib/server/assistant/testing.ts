@@ -3,6 +3,7 @@
 // (like the real ones): the access checks in tools.ts must do the scoping.
 import type { Access, ResourceType } from '$lib/server/access';
 import type { AssistantData, PatternRecord, ProjectRecord, YarnRecord } from './data';
+import type { AssistantActions } from './actions';
 
 export const ALICE = '00000000-0000-4000-8000-00000000000a';
 export const BOB = '00000000-0000-4000-8000-00000000000b';
@@ -124,17 +125,6 @@ export function fakeData() {
 		async updatePattern(id, patch) {
 			Object.assign(patterns.find((p) => p.id === id)!, patch);
 		},
-		async updateProject(id, patch) {
-			Object.assign(projects.find((p) => p.id === id)!, patch);
-		},
-		async createProject(uid, p) {
-			const id = `20000000-0000-4000-8000-${String(projects.length + 1).padStart(12, '0')}`;
-			projects.push(project(id, uid, p.title, { patternId: p.patternId, status: p.status, currentRow: 0, totalRows: null, progressPct: 0 }));
-			return id;
-		},
-		async updateYarnSkeins(id, skeins) {
-			yarns.find((y) => y.id === id)!.skeins = skeins;
-		},
 		async missingCovers(uid, limit) {
 			const all = patterns.filter((p) => p.ownerId === uid && !p.coverPath);
 			return { items: all.slice(0, limit).map((p) => ({ id: p.id, title: p.title })), total: all.length };
@@ -147,4 +137,23 @@ export function fakeData() {
 		}
 	};
 	return { data, shares, notes, covers, patterns, projects, yarns };
+}
+
+// Stand-in for the domain tools' writes (actions.ts): records every call and
+// answers with `answers[method]` (a value or a function of the arguments),
+// undefined otherwise.
+export function fakeActions(answers: Record<string, unknown> = {}) {
+	const calls: { method: string; args: unknown[] }[] = [];
+	const act = new Proxy(
+		{},
+		{
+			get: (_t, method: string) =>
+				async (...args: unknown[]) => {
+					calls.push({ method, args });
+					const a = answers[method];
+					return typeof a === 'function' ? (a as (...x: unknown[]) => unknown)(...args) : a;
+				}
+		}
+	) as AssistantActions;
+	return { act, calls, called: (method: string) => calls.filter((c) => c.method === method) };
 }
