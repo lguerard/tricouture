@@ -13,7 +13,7 @@ import type { ChatTool, ChatToolCall } from '$lib/server/ai/ollama';
 import type { AssistantAction, AssistantRef } from '$lib/assistant/events';
 import { isUuid } from '$lib/uuid';
 import { canEdit } from '$lib/server/access';
-import type { AssistantData, PatternRecord, ProjectRecord, YarnRecord } from './data';
+import type { AssistantData, PatternPatch, PatternRecord, ProjectPatch, ProjectRecord, ProjectStatus, YarnRecord } from './data';
 import { estimateYardage, gaugeCalc } from './calc';
 
 export const TOOL_RESULT_CHARS = 2_500;
@@ -21,6 +21,9 @@ const PATTERN_EXCERPT_CHARS = 1_400;
 const NOTES_CHARS = 400;
 const NOTE_MAX_CHARS = 1_000;
 const SEARCH_LIMIT = 6;
+// Cover searches run one web search each (up to ~15 s): a few per call keeps
+// the turn inside its time limit.
+const COVERS_PER_CALL = 3;
 
 export type ToolOutcome = {
 	content: string;
@@ -82,6 +85,28 @@ function compact<T extends Record<string, unknown>>(o: T): Partial<T> {
 }
 
 const STATUS_FR: Record<string, string> = { idee: 'idée', monte: 'en cours', bloque: 'en pause', fini: 'terminé' };
+
+// The model may answer with the French label or the stored value.
+function status(a: Args): ProjectStatus | undefined {
+	const v = str(a, 'statut', 30);
+	if (!v) return undefined;
+	const k = fold(v).replace(/[^a-z]/g, '');
+	const s = ({ idee: 'idee', encours: 'monte', monte: 'monte', enpause: 'bloque', pause: 'bloque', bloque: 'bloque', termine: 'fini', fini: 'fini' } as const)[k];
+	if (!s) throw new ArgError('argument "statut" : "idée", "en cours", "en pause" ou "terminé"');
+	return s;
+}
+
+// A list given as an array or as "a, b, c".
+function list(a: Args, key: string): string[] {
+	const v = a[key];
+	const items = Array.isArray(v) ? v : typeof v === 'string' ? v.split(',') : [];
+	return [...new Set(items.map((x) => String(x).trim().slice(0, 60)).filter(Boolean))].slice(0, 20);
+}
+
+const READ_ONLY = (what: string): ToolOutcome => ({
+	content: JSON.stringify({ erreur: `${what} : partagé en lecture seule, impossible de le modifier` }),
+	error: true
+});
 
 // Case- and accent-insensitive, same length as the input (one UTF-16 unit in,
 // one out) so an index found in the folded text is valid in the original.
@@ -268,10 +293,11 @@ const SPECS: Record<string, ToolSpec> = {
 	},
 
 	projets_en_cours: {
-		description: 'Liste les projets en cours ou en pause de la personne, avec leur compteur de rangs.',
-		parameters: {},
-		async run(_a, env) {
-			const rows = await env.data.projectsInProgress(env.uid, 10);
+		description: "Liste les projets en cours ou en pause de la personne, avec leur compteur de rangs. Avec 'texte', cherche un projet par son titre, quel que soit son statut.",
+		parameters: { texte: p('string', 'mots du titre (facultatif)') },
+		async run(a, env) {
+			const texte = str(a, 'texte', 120);
+			const rows = texte ? await env.data.findProjects(env.uid, texte, 10) : await env.data.projectsInProgress(env.uid, 10);
 			return {
 				content: capResult({
 					projets: rows.map((r) =>
@@ -391,6 +417,182 @@ const SPECS: Record<string, ToolSpec> = {
 				content: JSON.stringify({ ok: true, projet: prj.title, note_ajoutee: texte }),
 				action: { kind: 'note_added', title: prj.title, href: `/projects/${prj.id}` },
 				refs: [projectRef(prj)]
+			};
+		}
+	},
+
+	modifier_patron: {
+		description: "Modifie les infos d'un patron de la personne (seuls les champs donnés changent). Uniquement à sa demande.",
+		parameters: {
+			id: p('string', 'id du patron'),
+			titre: p('string', 'nouveau titre'),
+			createur: p('string', 'créateur·rice / designer'),
+			type: p('string', 'type de vêtement, ex. "pull"'),
+			difficulte: p('number', 'de 1 à 5'),
+			tailles: p('string', 'tailles disponibles'),
+			mailles_10cm: p('number', 'jauge : mailles pour 10 cm'),
+			rangs_10cm: p('number', 'jauge : rangs pour 10 cm'),
+			metrage_m: p('number', 'mètres de fil nécessaires'),
+			ajouter_tags: p('string', 'tags à ajouter, séparés par des virgules'),
+			retirer_tags: p('string', 'tags à retirer, séparés par des virgules')
+		},
+		required: ['id'],
+		async run(a, env) {
+			const pat = await env.data.getPattern(id(a));
+			if (!pat || !(await canSeePattern(env, pat))) return NOT_FOUND('Patron');
+			if (pat.ownerId !== env.uid) return { content: JSON.stringify({ erreur: "seul·e la personne qui a ajouté ce patron peut le modifier" }), error: true };
+			const patch: PatternPatch = compact({
+				title: str(a, 'titre', 255),
+				designer: str(a, 'createur', 160),
+				garmentType: str(a, 'type', 120),
+				difficulty: num(a, 'difficulte', 1, 5),
+				sizes: str(a, 'tailles', 500),
+				gaugeStitches: num(a, 'mailles_10cm', 1, 100),
+				gaugeRows: num(a, 'rangs_10cm', 1, 150),
+				yardageRequired: num(a, 'metrage_m', 1, 100_000)
+			});
+			if (patch.difficulty != null) patch.difficulty = Math.round(patch.difficulty);
+			if (patch.yardageRequired != null) patch.yardageRequired = Math.round(patch.yardageRequired);
+			const add = list(a, 'ajouter_tags');
+			const drop = new Set(list(a, 'retirer_tags').map(fold));
+			if (add.length || drop.size) {
+				const kept = pat.tags.filter((t) => !drop.has(fold(t)));
+				patch.tags = [...kept, ...add.filter((t) => !kept.some((k) => fold(k) === fold(t)))];
+			}
+			if (!Object.keys(patch).length) throw new ArgError('rien à modifier : donne au moins un champ');
+			await env.data.updatePattern(pat.id, patch);
+			const title = patch.title ?? pat.title;
+			return {
+				content: JSON.stringify({ ok: true, patron: title, modifie: Object.keys(patch) }),
+				action: { kind: 'pattern_updated', title, href: `/patterns/${pat.id}` },
+				refs: [patternRef({ ...pat, ...patch })]
+			};
+		}
+	},
+
+	chercher_couvertures: {
+		description:
+			"Trouve une image de couverture pour un patron qui n'en a pas (sa première image, sinon une recherche web sur créateur + titre). Sans id : traite les patrons de la personne sans couverture, quelques-uns par appel. Ne dessine pas d'image.",
+		parameters: { id: p('string', 'id du patron (facultatif)') },
+		async run(a, env) {
+			let targets: { id: string; title: string }[];
+			let total: number;
+			if (a.id != null && a.id !== '') {
+				const pat = await env.data.getPattern(id(a));
+				if (!pat || !(await canSeePattern(env, pat))) return NOT_FOUND('Patron');
+				if (pat.ownerId !== env.uid) return { content: JSON.stringify({ erreur: "seul·e la personne qui a ajouté ce patron peut changer sa couverture" }), error: true };
+				if (pat.coverPath) return { content: JSON.stringify({ ok: true, patron: pat.title, note: 'ce patron a déjà une couverture' }) };
+				targets = [{ id: pat.id, title: pat.title }];
+				total = 1;
+			} else {
+				({ items: targets, total } = await env.data.missingCovers(env.uid, COVERS_PER_CALL));
+				if (!total) return { content: JSON.stringify({ ok: true, note: 'tous les patrons ont déjà une couverture' }) };
+			}
+			const found: string[] = [];
+			const missed: string[] = [];
+			let action: ToolOutcome['action'];
+			for (const t of targets) {
+				if (await env.data.fillCover(env.uid, t.id)) {
+					found.push(t.title);
+					action ??= { kind: 'cover_found', title: t.title, href: targets.length === 1 ? `/patterns/${t.id}` : '/patterns' };
+				} else missed.push(t.title);
+			}
+			if (action && found.length > 1) action = { ...action, title: `${found.length} patrons` };
+			return {
+				content: JSON.stringify(
+					compact({
+						trouvees: found,
+						sans_resultat: missed,
+						restants: total - targets.length || undefined,
+						conseil: missed.length ? 'sans résultat : renseigner le créateur aide la recherche ; on peut aussi choisir une image depuis la fiche du patron' : undefined
+					})
+				),
+				action
+			};
+		}
+	},
+
+	modifier_projet: {
+		description: "Modifie un projet : statut, compteur de rangs, nombre total de rangs, échéance. Uniquement à la demande de la personne.",
+		parameters: {
+			id: p('string', 'id du projet'),
+			statut: p('string', '"idée", "en cours", "en pause" ou "terminé"'),
+			rang_actuel: p('number', 'nouvelle valeur du compteur de rangs'),
+			rangs_total: p('number', 'nombre total de rangs'),
+			echeance: p('string', 'date AAAA-MM-JJ')
+		},
+		required: ['id'],
+		async run(a, env) {
+			const prj = await env.data.getProject(id(a));
+			const access = prj ? await projectAccess(env, prj) : null;
+			if (!prj || !access) return NOT_FOUND('Projet');
+			if (!canEdit(access)) return READ_ONLY('Ce projet');
+			const deadline = str(a, 'echeance', 10);
+			if (deadline && (!/^\d{4}-\d{2}-\d{2}$/.test(deadline) || Number.isNaN(Date.parse(deadline)))) {
+				throw new ArgError('argument "echeance" : date AAAA-MM-JJ attendue');
+			}
+			const patch: ProjectPatch = compact({
+				status: status(a),
+				currentRow: num(a, 'rang_actuel', 0, 1_000_000),
+				totalRows: num(a, 'rangs_total', 1, 1_000_000),
+				deadline
+			});
+			if (patch.currentRow != null) patch.currentRow = Math.round(patch.currentRow);
+			if (patch.totalRows != null) patch.totalRows = Math.round(patch.totalRows);
+			if (!Object.keys(patch).length) throw new ArgError('rien à modifier : donne au moins un champ');
+			await env.data.updateProject(prj.id, patch);
+			return {
+				content: JSON.stringify(
+					compact({ ok: true, projet: prj.title, statut: patch.status && STATUS_FR[patch.status], rang: patch.currentRow, rangs_total: patch.totalRows, echeance: patch.deadline })
+				),
+				action: { kind: 'project_updated', title: prj.title, href: `/projects/${prj.id}` },
+				refs: [projectRef({ ...prj, ...patch } as ProjectRecord)]
+			};
+		}
+	},
+
+	creer_projet: {
+		description: "Crée un projet, éventuellement à partir d'un patron (id de chercher_patrons). Uniquement à la demande de la personne.",
+		parameters: {
+			titre: p('string', 'titre du projet'),
+			patron_id: p('string', 'id du patron (facultatif)'),
+			statut: p('string', '"idée" (par défaut), "en cours", "en pause" ou "terminé"')
+		},
+		required: ['titre'],
+		async run(a, env) {
+			let patternId: string | null = null;
+			let title = str(a, 'titre', 200);
+			if (a.patron_id != null && a.patron_id !== '') {
+				const pat = await env.data.getPattern(id(a, 'patron_id'));
+				if (!pat || !(await canSeePattern(env, pat))) return NOT_FOUND('Patron');
+				patternId = pat.id;
+				title ??= pat.title;
+			}
+			if (!title) throw new ArgError('argument "titre" manquant');
+			const st = status(a) ?? 'idee';
+			const pid = await env.data.createProject(env.uid, { title, patternId, status: st });
+			return {
+				content: JSON.stringify({ ok: true, id: pid, projet: title, statut: STATUS_FR[st] }),
+				action: { kind: 'project_created', title, href: `/projects/${pid}` }
+			};
+		}
+	},
+
+	modifier_laine: {
+		description: "Change le nombre de pelotes d'une laine du stock de la personne. Uniquement à sa demande.",
+		parameters: { id: p('string', 'id de la laine'), pelotes: p('number', 'nouveau nombre de pelotes') },
+		required: ['id', 'pelotes'],
+		async run(a, env) {
+			const y = await env.data.getYarn(id(a));
+			// The stash is personal: only one's own yarn, even if shared.
+			if (!y || y.ownerId !== env.uid) return NOT_FOUND('Laine');
+			const skeins = num(a, 'pelotes', 0, 10_000, true)!;
+			const before = y.skeins;
+			await env.data.updateYarnSkeins(y.id, skeins);
+			return {
+				content: JSON.stringify({ ok: true, laine: yarnName(y), pelotes_avant: before, pelotes: skeins }),
+				action: { kind: 'yarn_updated', title: yarnName(y), href: yarnRef(y).href },
+				refs: [yarnRef({ ...y, skeins })]
 			};
 		}
 	}

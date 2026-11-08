@@ -17,8 +17,9 @@ export type AssistantRef = {
 	image?: string | null;
 };
 
-// Something a tool changed (the only write: a note appended to a project).
-export type AssistantAction = { kind: 'note_added'; title: string; href: string };
+// Something a tool changed, shown as a link under the answer.
+export type AssistantActionKind = 'note_added' | 'pattern_updated' | 'project_updated' | 'project_created' | 'yarn_updated' | 'cover_found';
+export type AssistantAction = { kind: AssistantActionKind; title: string; href: string };
 
 export type AssistantErrorCode = 'timeout' | 'unavailable' | 'failed';
 

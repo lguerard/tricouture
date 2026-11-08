@@ -17,7 +17,7 @@ describe('tool definitions', () => {
 	it('declares every tool as an Ollama function with an object schema', () => {
 		const names = TOOLS.map((t) => t.function.name);
 		expect(names).toEqual(
-			expect.arrayContaining(['chercher_patrons', 'lire_patron', 'chercher_laines', 'lire_projet', 'projets_en_cours', 'calculer_jauge', 'estimer_metrage', 'ajouter_note_projet'])
+			expect.arrayContaining(['chercher_patrons', 'lire_patron', 'chercher_laines', 'lire_projet', 'projets_en_cours', 'calculer_jauge', 'estimer_metrage', 'ajouter_note_projet', 'modifier_patron', 'chercher_couvertures', 'modifier_projet', 'creer_projet', 'modifier_laine'])
 		);
 		for (const t of TOOLS) expect(t.function.parameters.type).toBe('object');
 	});
@@ -132,5 +132,70 @@ describe('results', () => {
 		const r = JSON.parse((await runTool(call('lire_projet', { id: T.ALICE_PROJECT }), e)).content);
 		expect(r).toMatchObject({ titre: 'Mon pull', statut: 'en cours', rang_actuel: 42, rangs_total: 120 });
 		expect(r.pieces[0]).toEqual({ nom: 'Dos', rang: 42, rangs_total: 120 });
+	});
+});
+
+describe('write tools', () => {
+	it('edit my own pattern only, merging tags', async () => {
+		const { f, env: e } = env();
+		const r = await runTool(call('modifier_patron', { id: T.ALICE_PATTERN, createur: 'PetiteKnit', difficulte: '3', ajouter_tags: 'raglan, Hiver', retirer_tags: ['HIVER'] }), e);
+		expect(r.error).toBeFalsy();
+		expect(f.patterns[0]).toMatchObject({ designer: 'PetiteKnit', difficulty: 3, tags: ['raglan', 'Hiver'] });
+		expect(r.action).toEqual({ kind: 'pattern_updated', title: 'Pull Aran', href: `/patterns/${T.ALICE_PATTERN}` });
+
+		const pub = await runTool(call('modifier_patron', { id: T.BOB_PUBLIC_PATTERN, titre: 'Volé' }), e);
+		expect(pub.content).toContain('seul·e');
+		expect((await runTool(call('modifier_patron', { id: T.BOB_PATTERN, titre: 'Volé' }), e)).content).toContain('introuvable');
+		expect(f.patterns.map((p) => p.title)).not.toContain('Volé');
+		expect((await runTool(call('modifier_patron', { id: T.ALICE_PATTERN }), e)).content).toContain('rien à modifier');
+	});
+
+	it('find covers for my patterns without one, a few per call', async () => {
+		const { f, env: e } = env();
+		f.covers.push(T.ALICE_PATTERN);
+		const r = await runTool(call('chercher_couvertures', {}), e);
+		expect(JSON.parse(r.content)).toEqual({ trouvees: ['Pull Aran'] });
+		expect(r.action).toMatchObject({ kind: 'cover_found', title: 'Pull Aran' });
+		expect(f.patterns[0].coverPath).toBeTruthy();
+		expect(JSON.parse((await runTool(call('chercher_couvertures', {}), e)).content).note).toContain('déjà');
+		expect((await runTool(call('chercher_couvertures', { id: T.BOB_PUBLIC_PATTERN }), e)).error).toBe(true);
+	});
+
+	it('edit a project where I may, with French statuses', async () => {
+		const { f, env: e } = env();
+		const r = await runTool(call('modifier_projet', { id: T.ALICE_PROJECT, statut: 'Terminé', rang_actuel: 120, echeance: '2026-12-24' }), e);
+		expect(JSON.parse(r.content)).toMatchObject({ statut: 'terminé', rang: 120, echeance: '2026-12-24' });
+		expect(f.projects[0]).toMatchObject({ status: 'fini', currentRow: 120, deadline: '2026-12-24' });
+		expect((await runTool(call('modifier_projet', { id: T.ALICE_PROJECT, statut: 'perdu' }), e)).content).toContain('statut');
+		expect((await runTool(call('modifier_projet', { id: T.ALICE_PROJECT, echeance: 'Noël' }), e)).content).toContain('AAAA-MM-JJ');
+
+		expect((await runTool(call('modifier_projet', { id: T.BOB_PROJECT, rang_actuel: 1 }), e)).content).toContain('introuvable');
+		f.shares.push({ type: 'project', id: T.BOB_PROJECT, userId: T.ALICE, role: 'view' });
+		expect((await runTool(call('modifier_projet', { id: T.BOB_PROJECT, rang_actuel: 1 }), e)).content).toContain('lecture seule');
+		f.shares[0].role = 'edit';
+		expect((await runTool(call('modifier_projet', { id: T.BOB_PROJECT, rang_actuel: 1 }), e)).error).toBeFalsy();
+	});
+
+	it('create a project from a visible pattern, titled after it by default', async () => {
+		const { f, env: e } = env();
+		const r = await runTool(call('creer_projet', { titre: '', patron_id: T.BOB_PUBLIC_PATTERN, statut: 'en cours' }), e);
+		expect(r.error).toBeFalsy();
+		expect(f.projects.at(-1)).toMatchObject({ ownerId: T.ALICE, title: 'Bonnet public', patternId: T.BOB_PUBLIC_PATTERN, status: 'monte' });
+		expect(r.action?.kind).toBe('project_created');
+		expect((await runTool(call('creer_projet', { titre: 'X', patron_id: T.BOB_PATTERN }), e)).content).toContain('introuvable');
+		expect(f.projects).toHaveLength(3);
+	});
+
+	it('change skeins of my own yarn only, and find projects by title', async () => {
+		const { f, env: e } = env();
+		const r = await runTool(call('modifier_laine', { id: T.ALICE_YARN, pelotes: 4 }), e);
+		expect(JSON.parse(r.content)).toMatchObject({ pelotes_avant: 6, pelotes: 4 });
+		expect(f.yarns[0].skeins).toBe(4);
+		f.shares.push({ type: 'yarn', id: T.BOB_YARN, userId: T.ALICE, role: 'edit' });
+		expect((await runTool(call('modifier_laine', { id: T.BOB_YARN, pelotes: 0 }), e)).error).toBe(true);
+		expect(f.yarns[1].skeins).toBe(6);
+
+		const found = JSON.parse((await runTool(call('projets_en_cours', { texte: 'pull' }), e)).content);
+		expect(found.projets.map((p: { titre: string }) => p.titre)).toEqual(['Mon pull']);
 	});
 });

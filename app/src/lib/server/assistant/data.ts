@@ -7,12 +7,13 @@
 // - lookups by id, deliberately NOT scoped: the caller (tools.ts) checks
 //   access on the row it got, with the same helper as the pages
 //   (access.ts accessFor), and answers "not found" when it may not see it.
-import { and, asc, desc, eq, ilike, inArray, isNotNull, or, sql, type SQL } from 'drizzle-orm';
+import { and, asc, desc, eq, ilike, inArray, isNotNull, isNull, or, sql, type SQL } from 'drizzle-orm';
 import { db } from '$lib/server/db';
 import { patternPieces, patterns, projectPieceProgress, projects, projectYarns, yarns } from '$lib/server/db/schema';
 import { accessFor, visibleTo, type Access, type ResourceType } from '$lib/server/access';
 import { aiConfigured, embed } from '$lib/server/ai/ollama';
-import { ensureEmbeddingScheme } from '$lib/server/embeddings';
+import { embedDocument, ensureEmbeddingScheme, patternEmbeddingText } from '$lib/server/embeddings';
+import { fillMissingCover } from '$lib/server/patternCover';
 
 export type PatternRecord = {
 	id: string;
@@ -75,6 +76,14 @@ export type ProjectDetail = {
 
 export type YarnFilter = { text?: string; weight?: string; color?: string; fiber?: string };
 
+// What the assistant may change on a pattern / project (only fields given are
+// written; null clears a field).
+export type PatternPatch = Partial<
+	Pick<PatternRecord, 'title' | 'garmentType' | 'designer' | 'difficulty' | 'sizes' | 'gaugeStitches' | 'gaugeRows' | 'yardageRequired' | 'tags'>
+>;
+export type ProjectStatus = 'idee' | 'monte' | 'bloque' | 'fini';
+export type ProjectPatch = { status?: ProjectStatus; currentRow?: number; totalRows?: number | null; deadline?: string | null };
+
 export interface AssistantData {
 	access(uid: string, type: ResourceType, id: string, ownerId: string): Promise<Access>;
 	findPatterns(uid: string, text: string, limit: number): Promise<PatternHit[]>;
@@ -86,6 +95,15 @@ export interface AssistantData {
 	getProjectDetail(project: ProjectRecord): Promise<ProjectDetail>;
 	projectsInProgress(uid: string, limit: number): Promise<ProjectRecord[]>;
 	appendProjectNote(id: string, note: string): Promise<void>;
+	findProjects(uid: string, text: string, limit: number): Promise<ProjectRecord[]>;
+	updatePattern(id: string, patch: PatternPatch): Promise<void>;
+	updateProject(id: string, patch: ProjectPatch): Promise<void>;
+	createProject(uid: string, p: { title: string; patternId: string | null; status: ProjectStatus }): Promise<string>;
+	updateYarnSkeins(id: string, skeins: number): Promise<void>;
+	// The account's own patterns without a cover, newest first, and how many.
+	missingCovers(uid: string, limit: number): Promise<{ items: { id: string; title: string }[]; total: number }>;
+	// Looks for a cover (first picture, else web search); the new path or null.
+	fillCover(uid: string, patternId: string): Promise<string | null>;
 }
 
 // `%` and `_` typed by the person are literal characters, not wildcards.
@@ -216,6 +234,21 @@ export function projectsInProgressQuery(uid: string, limit: number) {
 		.limit(limit);
 }
 
+// Any status, by title: mine or shared with me.
+export function projectSearchQuery(uid: string, text: string, limit: number) {
+	const words = searchWords(text);
+	const terms = (words.length ? words : [text.trim()]).map(likePattern);
+	return db
+		.select(projectFields)
+		.from(projects)
+		.where(and(visibleTo(uid, 'project', projects.ownerId, projects.id), or(...terms.map((like) => ilike(projects.title, like)))))
+		.orderBy(desc(projects.updatedAt))
+		.limit(limit);
+}
+
+const progressFrom = (currentRow: number, totalRows: number | null, fallback: number) =>
+	totalRows && totalRows > 0 ? Math.max(0, Math.min(100, Math.round((currentRow / totalRows) * 100))) : fallback;
+
 async function semanticPatterns(uid: string, text: string, limit: number): Promise<PatternHit[]> {
 	if (!aiConfigured()) return [];
 	try {
@@ -332,5 +365,71 @@ export const dbData: AssistantData = {
 				updatedAt: new Date()
 			})
 			.where(eq(projects.id, id));
-	}
+	},
+
+	findProjects: (uid, text, limit) => projectSearchQuery(uid, text, limit),
+
+	async updatePattern(id, patch) {
+		const [row] = await db.update(patterns).set({ ...patch, updatedAt: new Date() }).where(eq(patterns.id, id)).returning();
+		// Same as the edit page: semantic search follows the new title / tags.
+		if (!row || !aiConfigured()) return;
+		try {
+			const embedding = await embedDocument(patternEmbeddingText(row));
+			await db.update(patterns).set({ embedding }).where(eq(patterns.id, id));
+		} catch {
+			/* embedding model missing or busy: the text search still finds it */
+		}
+	},
+
+	async updateProject(id, patch) {
+		const [p] = await db.select().from(projects).where(eq(projects.id, id)).limit(1);
+		if (!p) return;
+		const currentRow = patch.currentRow ?? p.currentRow;
+		const totalRows = patch.totalRows !== undefined ? patch.totalRows : p.totalRows;
+		const status = patch.status ?? p.status;
+		await db
+			.update(projects)
+			.set({
+				status,
+				currentRow,
+				totalRows,
+				...(patch.deadline !== undefined ? { deadline: patch.deadline } : {}),
+				progressPct: status === 'fini' ? 100 : progressFrom(currentRow, totalRows, p.progressPct),
+				// Same rule as the project page: finishing dates it, reopening clears it.
+				finishedAt: status === 'fini' ? (p.finishedAt ?? new Date()) : null,
+				updatedAt: new Date()
+			})
+			.where(eq(projects.id, id));
+	},
+
+	async createProject(uid, { title, patternId, status }) {
+		// At the end of its board column, like projects/new.
+		const maxPos =
+			(
+				await db
+					.select({ m: sql<number>`coalesce(max(${projects.boardPosition}), -1)::int` })
+					.from(projects)
+					.where(eq(projects.ownerId, uid))
+			)[0]?.m ?? -1;
+		const [row] = await db
+			.insert(projects)
+			.values({ ownerId: uid, title, patternId, status, boardPosition: maxPos + 1, ...(status === 'fini' ? { finishedAt: new Date(), progressPct: 100 } : {}) })
+			.returning({ id: projects.id });
+		return row.id;
+	},
+
+	async updateYarnSkeins(id, skeins) {
+		await db.update(yarns).set({ skeins }).where(eq(yarns.id, id));
+	},
+
+	async missingCovers(uid, limit) {
+		const where = and(eq(patterns.ownerId, uid), isNull(patterns.coverPath));
+		const [items, [{ n }]] = await Promise.all([
+			db.select({ id: patterns.id, title: patterns.title }).from(patterns).where(where).orderBy(desc(patterns.updatedAt)).limit(limit),
+			db.select({ n: sql<number>`count(*)::int` }).from(patterns).where(where)
+		]);
+		return { items, total: n };
+	},
+
+	fillCover: fillMissingCover
 };
