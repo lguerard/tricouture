@@ -69,7 +69,7 @@ describe('POST /api/ai/assistant', () => {
 	it('reports a note added to a project as an action', async () => {
 		mockOllama(calls({ name: 'ajouter_note_projet', arguments: { id: T.ALICE_PROJECT, texte: 'rang 42 : diminutions' } }), says('Note ajoutée.'));
 		const events = await readEvents(await post(ask('Note dans mon pull : rang 42 diminutions')));
-		expect(events).toContainEqual({ t: 'action', action: { kind: 'note_added', title: 'Mon pull', href: `/projects/${T.ALICE_PROJECT}` } });
+		expect(events).toContainEqual({ t: 'action', action: { kind: 'note_added', what: 'project', title: 'Mon pull', href: `/projects/${T.ALICE_PROJECT}` } });
 		expect(fake.notes).toHaveLength(1);
 	});
 

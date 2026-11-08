@@ -63,12 +63,18 @@ describe('assistant tool loop', () => {
 		expect(events.some((e) => e.t === 'refs')).toBe(false);
 	});
 
+	it('sends a group\'s tools from the round after ouvrir_outils', async () => {
+		const { bodies } = mockOllama(calls({ name: 'ouvrir_outils', arguments: { domaine: 'stock' } }), says('Prêt.'));
+		const { p } = run([{ role: 'user', content: 'Mes aiguilles ?' }]);
+		await p;
+		const names = (i: number) => bodies()[i].tools.map((t: { function: { name: string } }) => t.function.name);
+		expect(names(0)).not.toContain('gerer_stock');
+		expect(names(1)).toContain('gerer_stock');
+	});
+
 	it('stops after MAX_ROUNDS model calls, the last one without tools', async () => {
 		const { bodies, fetchMock } = mockOllama(
-			calls({ name: 'chercher_laines', arguments: {} }),
-			calls({ name: 'chercher_laines', arguments: {} }),
-			calls({ name: 'chercher_laines', arguments: {} }),
-			calls({ name: 'chercher_laines', arguments: {} }),
+			...Array.from({ length: MAX_ROUNDS - 1 }, () => calls({ name: 'chercher_laines', arguments: {} })),
 			says('Voilà.')
 		);
 		const { p, events } = run([{ role: 'user', content: 'Mes laines ?' }]);

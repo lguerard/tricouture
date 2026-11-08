@@ -2,27 +2,13 @@ import { error, fail, redirect } from '@sveltejs/kit';
 import { and, asc, eq, or } from 'drizzle-orm';
 import { db } from '$lib/server/db';
 import { patterns, patternFiles, patternPieces, users } from '$lib/server/db/schema';
-import { deleteStored, saveDataUrl } from '$lib/server/storage';
 import { getAllVisibleTags } from '$lib/server/patternTags';
 import { getTagColorOverrides } from '$lib/server/tagColorOverrides';
 import { assignTagColors } from '$lib/tagColor';
-import { findCoverCandidates, isStorableImage, resolveImageFromUrl } from '$lib/server/cover-search';
+import { findCoverCandidates } from '$lib/server/cover-search';
 import { t } from '$lib/i18n';
+import { deletePattern, removeCover, setCoverFromUrl } from '$lib/server/services/patterns';
 import type { Actions, PageServerLoad } from './$types';
-
-// Covers downloaded from the web are standalone files; a cover reusing an
-// uploaded pattern image must survive (it is deleted with the files).
-async function dropCover(patternId: string, coverPath: string | null) {
-	if (!coverPath) return;
-	const isFile = (
-		await db
-			.select({ id: patternFiles.id })
-			.from(patternFiles)
-			.where(and(eq(patternFiles.patternId, patternId), eq(patternFiles.storedPath, coverPath)))
-			.limit(1)
-	)[0];
-	if (!isFile) await deleteStored(coverPath);
-}
 
 // Pattern accessible if the user owns it OR it is shared.
 async function accessiblePattern(uid: string, id: string) {
@@ -102,14 +88,7 @@ export const actions: Actions = {
 		if (!p) return fail(403, { error: 'Owner only' });
 		const url = String((await request.formData()).get('url') ?? '').trim();
 		if (!url) return fail(400, { coverError: t(locals.locale, 'patterns.cover.urlRequired') });
-		const data = await resolveImageFromUrl(url);
-		const saved = data && isStorableImage(data) ? await saveDataUrl(uid, data, 'patterns/covers') : null;
-		if (!saved) return fail(422, { coverError: t(locals.locale, 'patterns.cover.noImage') });
-		await dropCover(p.id, p.coverPath);
-		await db
-			.update(patterns)
-			.set({ coverPath: saved.storedPath, updatedAt: new Date() })
-			.where(eq(patterns.id, p.id));
+		if (!(await setCoverFromUrl(uid, p, url))) return fail(422, { coverError: t(locals.locale, 'patterns.cover.noImage') });
 		return { coverSet: true };
 	},
 
@@ -117,8 +96,7 @@ export const actions: Actions = {
 		const uid = locals.user!.id;
 		const p = await ownedPattern(uid, params.id);
 		if (!p) return fail(403, { error: 'Owner only' });
-		await dropCover(p.id, p.coverPath);
-		await db.update(patterns).set({ coverPath: null, updatedAt: new Date() }).where(eq(patterns.id, p.id));
+		await removeCover(p);
 		return { coverSet: true };
 	},
 
@@ -126,15 +104,7 @@ export const actions: Actions = {
 		const uid = locals.user!.id;
 		const pattern = await ownedPattern(uid, params.id);
 		if (!pattern) return fail(403, { error: 'Owner only' });
-		await dropCover(pattern.id, pattern.coverPath);
-
-		const files = await db
-			.select({ storedPath: patternFiles.storedPath })
-			.from(patternFiles)
-			.where(eq(patternFiles.patternId, pattern.id));
-		for (const f of files) await deleteStored(f.storedPath);
-
-		await db.delete(patterns).where(eq(patterns.id, pattern.id));
+		await deletePattern(pattern);
 		throw redirect(303, '/patterns');
 	},
 

@@ -1,6 +1,7 @@
 import { json } from '@sveltejs/kit';
 import { aiConfigured, AiTimeout, AiUnavailable, GENERATE_TIMEOUT_MS } from '$lib/server/ai/ollama';
 import { dbData } from '$lib/server/assistant/data';
+import { dbActions } from '$lib/server/assistant/actions';
 import { MAX_BODY_CHARS, parseBody, TooLong } from '$lib/server/assistant/budget';
 import { tryLock } from '$lib/server/assistant/lock';
 import { prepareConversation, runAssistant, type RunOptions } from '$lib/server/assistant/loop';
@@ -49,6 +50,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		messages: parsed.messages,
 		context: parsed.context,
 		data: dbData,
+		act: dbActions,
 		emit: () => {},
 		signal: abort.signal,
 		deadline

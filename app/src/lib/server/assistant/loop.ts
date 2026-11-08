@@ -2,15 +2,18 @@
 // Ollama's tool-calling loop. Each model call is streamed; its text goes to
 // the person as it comes (`emit`), its tool calls are run (tools.ts, scoped to
 // the account) and their results fed back, up to MAX_ROUNDS model calls --
-// the last one without tools, so the turn always ends with an answer.
-import { chat, numCtx, GENERATE_TIMEOUT_MS, AiTimeout, type ChatMessage } from '$lib/server/ai/ollama';
+// the last one without tools, so the turn always ends with an answer. The
+// tools offered grow during the turn as groups are opened (tools.ts).
+import { chat, numCtx, GENERATE_TIMEOUT_MS, AiTimeout, type ChatMessage, type ChatTool } from '$lib/server/ai/ollama';
 import type { AssistantContext, AssistantEvent, AssistantRef, WireMessage } from '$lib/assistant/events';
 import type { AssistantData } from './data';
-import { TOOLS, describeContext, runTool, type ToolEnv } from './tools';
+import { describeContext, preopenDomains, runTool, toolsFor, type ToolEnv } from './tools';
+import type { AssistantActions } from './actions';
 import { assistantSystem } from './prompt';
 import { ANSWER_RESERVE_TOKENS, conversationTokens, estimateTokens, fitConversation, trimHistory, TooLong } from './budget';
 
-export const MAX_ROUNDS = 5;
+// Acting takes more steps than reading: find, open a group, change, check.
+export const MAX_ROUNDS = 8;
 export const MAX_CALLS_PER_ROUND = 4;
 // Lower than the model default: tool arguments and figures want precision.
 const TEMPERATURE = 0.4;
@@ -20,6 +23,8 @@ export type RunOptions = {
 	messages: WireMessage[];
 	context?: AssistantContext;
 	data: AssistantData;
+	// The domain tools' writes (actions.ts); without it only the base tools work.
+	act?: AssistantActions;
 	emit: (e: AssistantEvent) => void;
 	signal?: AbortSignal;
 	now?: Date;
@@ -31,18 +36,34 @@ export type RunOptions = {
 // cannot fit next to the system prompt and the tools. Exported for the route,
 // which checks this BEFORE starting the stream (to answer a plain 413).
 export async function prepareConversation(o: RunOptions): Promise<ChatMessage[]> {
-	const env: ToolEnv = { uid: o.uid, data: o.data, now: o.now ?? new Date() };
+	const env = toolEnv(o);
 	const ctx = o.context ? await describeContext(o.context, env) : null;
 	const system = assistantSystem(env.now, ctx?.text);
-	const fixed = estimateTokens(system) + conversationTokens([], TOOLS) + 4;
+	const fixed = estimateTokens(system) + conversationTokens([], fitTools(env.domains!)) + 4;
 	const budget = numCtx() - ANSWER_RESERVE_TOKENS - fixed;
 	if (budget <= 0) throw new TooLong('no room left for the question');
 	const history = trimHistory(o.messages, budget);
 	return [{ role: 'system', content: system }, ...history.map((m) => ({ role: m.role, content: m.content }))];
 }
 
+// The opened groups' tools, the oldest groups closed again while they would
+// take more than half the context (the conversation needs the rest).
+export function fitTools(domains: Set<string>): ChatTool[] {
+	let tools = toolsFor(domains);
+	while (domains.size > 1 && conversationTokens([], tools) > numCtx() / 2) {
+		domains.delete(domains.values().next().value!);
+		tools = toolsFor(domains);
+	}
+	return tools;
+}
+
+function toolEnv(o: RunOptions): ToolEnv {
+	const question = o.messages.at(-1)?.content ?? '';
+	return { uid: o.uid, data: o.data, act: o.act, now: o.now ?? new Date(), domains: preopenDomains(question, o.context?.kind) };
+}
+
 export async function runAssistant(o: RunOptions, prepared?: ChatMessage[]): Promise<void> {
-	const env: ToolEnv = { uid: o.uid, data: o.data, now: o.now ?? new Date() };
+	const env = toolEnv(o);
 	const deadline = o.deadline ?? Date.now() + GENERATE_TIMEOUT_MS;
 	const conv = prepared ?? (await prepareConversation(o));
 	const currentStart = conv.length - 1; // index of the new question
@@ -51,7 +72,7 @@ export async function runAssistant(o: RunOptions, prepared?: ChatMessage[]): Pro
 	let answered = false;
 
 	for (let round = 0; round < MAX_ROUNDS; round++) {
-		const tools = round < MAX_ROUNDS - 1 ? TOOLS : undefined;
+		const tools = round < MAX_ROUNDS - 1 ? fitTools(env.domains!) : undefined;
 		fitConversation(conv, limit, currentStart, tools);
 		const remaining = deadline - Date.now();
 		if (remaining <= 0) throw new AiTimeout(GENERATE_TIMEOUT_MS);

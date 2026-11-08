@@ -9,194 +9,55 @@
 // access on the row with the same rules as the pages (owner, a share, or a
 // public pattern) and answers "introuvable" otherwise -- never "forbidden",
 // which would confirm that the id exists.
+//
+// Only the base tools (reading, calculating, a project note) are sent with
+// every model call: the definitions of ~40 tools would not fit the 8192-token
+// context next to the conversation. The others come in groups ("domaines"),
+// added for the rest of the turn when the model calls ouvrir_outils -- or
+// right away when the question obviously needs them (preopenDomains).
 import type { ChatTool, ChatToolCall } from '$lib/server/ai/ollama';
-import type { AssistantAction, AssistantRef } from '$lib/assistant/events';
+import type { AssistantRef } from '$lib/assistant/events';
 import { isUuid } from '$lib/uuid';
 import { canEdit } from '$lib/server/access';
-import type { AssistantData, PatternRecord, ProjectRecord, YarnRecord } from './data';
 import { estimateYardage, gaugeCalc } from './calc';
+import {
+	ArgError,
+	canSeePattern,
+	capResult,
+	clip,
+	compact,
+	fold,
+	id,
+	NOT_FOUND,
+	NOTE_MAX_CHARS,
+	NOTES_CHARS,
+	num,
+	p,
+	patternExcerpt,
+	patternRef,
+	projectAccess,
+	projectRef,
+	SEARCH_LIMIT,
+	STATUS_FR,
+	str,
+	visibleYarn,
+	yarnRef,
+	yarnSummary,
+	type Args,
+	type ToolEnv,
+	type ToolOutcome,
+	type ToolSpec
+} from './toolkit';
+import { PATTERN_TOOLS } from './tools/patterns';
+import { PROJECT_TOOLS } from './tools/projects';
+import { STASH_TOOLS } from './tools/stash';
+import { ORGANIZE_TOOLS } from './tools/organize';
+import { SHARE_TOOL } from './tools/share';
 
-export const TOOL_RESULT_CHARS = 2_500;
-const PATTERN_EXCERPT_CHARS = 1_400;
-const NOTES_CHARS = 400;
-const NOTE_MAX_CHARS = 1_000;
-const SEARCH_LIMIT = 6;
+export { capResult, patternExcerpt, TOOL_RESULT_CHARS } from './toolkit';
+export type { ToolEnv, ToolOutcome } from './toolkit';
 
-export type ToolOutcome = {
-	content: string;
-	refs?: AssistantRef[];
-	action?: AssistantAction;
-	error?: boolean;
-};
-
-export type ToolEnv = { uid: string; data: AssistantData; now: Date };
-
-class ArgError extends Error {}
-
-type Args = Record<string, unknown>;
-
-function str(a: Args, key: string, max: number, required = false): string | undefined {
-	const v = a[key];
-	if (v == null || v === '') {
-		if (required) throw new ArgError(`argument "${key}" manquant`);
-		return undefined;
-	}
-	if (typeof v !== 'string' && typeof v !== 'number') throw new ArgError(`argument "${key}" : texte attendu`);
-	const s = String(v).trim();
-	if (!s && required) throw new ArgError(`argument "${key}" manquant`);
-	return s ? s.slice(0, max) : undefined;
-}
-
-function num(a: Args, key: string, min: number, max: number, required = false): number | undefined {
-	const v = a[key];
-	if (v == null || v === '') {
-		if (required) throw new ArgError(`argument "${key}" manquant`);
-		return undefined;
-	}
-	const n = typeof v === 'number' ? v : parseFloat(String(v).replace(',', '.'));
-	if (!Number.isFinite(n) || n < min || n > max) throw new ArgError(`argument "${key}" : nombre entre ${min} et ${max} attendu`);
-	return n;
-}
-
-function id(a: Args, key = 'id'): string {
-	const v = str(a, key, 64, true)!;
-	if (!isUuid(v)) throw new ArgError(`argument "${key}" : identifiant invalide (utilise un "id" renvoyé par un autre outil)`);
-	return v;
-}
-
-// JSON for the model, cut to the budget. A cut JSON is no longer valid JSON,
-// which the model copes with; the marker says something is missing.
-export function capResult(value: unknown, max = TOOL_RESULT_CHARS): string {
-	const s = typeof value === 'string' ? value : JSON.stringify(value);
-	return s.length <= max ? s : `${s.slice(0, max - 20)}… [tronqué]`;
-}
-
-const clip = (s: string | null | undefined, max: number) =>
-	s ? (s.length > max ? `${s.slice(0, max)}…` : s) : undefined;
-
-// Drops null / undefined / empty fields: every token counts.
-function compact<T extends Record<string, unknown>>(o: T): Partial<T> {
-	return Object.fromEntries(
-		Object.entries(o).filter(([, v]) => v != null && v !== '' && !(Array.isArray(v) && v.length === 0))
-	) as Partial<T>;
-}
-
-const STATUS_FR: Record<string, string> = { idee: 'idée', monte: 'en cours', bloque: 'en pause', fini: 'terminé' };
-
-// Case- and accent-insensitive, same length as the input (one UTF-16 unit in,
-// one out) so an index found in the folded text is valid in the original.
-function fold(s: string): string {
-	return s
-		.split('')
-		.map((c) => c.normalize('NFD')[0].toLowerCase())
-		.join('');
-}
-
-// The part of a pattern's text around `section` ("manches", "empiècement"),
-// or its beginning. Exported for the tests.
-export function patternExcerpt(text: string, section: string | undefined, max = PATTERN_EXCERPT_CHARS) {
-	if (!text) return { texte: undefined, trouve: false };
-	let at = -1;
-	if (section) {
-		const hay = fold(text);
-		at = hay.indexOf(fold(section));
-		// Fall back on the longest word of the request ("les manches" -> manches).
-		if (at === -1) {
-			const word = fold(section)
-				.split(/[^\p{L}\p{N}]+/u)
-				.sort((a, b) => b.length - a.length)[0];
-			if (word && word.length >= 4) at = hay.indexOf(word);
-		}
-	}
-	const start = at === -1 ? 0 : Math.max(0, at - 150);
-	const slice = text.slice(start, start + max);
-	return {
-		texte: `${start > 0 ? '…' : ''}${slice}${start + max < text.length ? '…' : ''}`,
-		trouve: at !== -1
-	};
-}
-
-const patternRef = (p: { id: string; title: string; craft: string; garmentType: string | null; designer: string | null; coverPath: string | null }): AssistantRef => ({
-	kind: 'pattern',
-	id: p.id,
-	title: p.title,
-	subtitle: [p.garmentType, p.designer].filter(Boolean).join(' · ') || undefined,
-	href: `/patterns/${p.id}`,
-	image: p.coverPath
-});
-
-const yarnName = (y: YarnRecord) => [y.brand, y.name].filter(Boolean).join(' ') || y.colorway || 'Laine';
-
-const yarnRef = (y: YarnRecord): AssistantRef => ({
-	kind: 'yarn',
-	id: y.id,
-	title: yarnName(y),
-	subtitle: [y.colorway, y.weightCategory].filter(Boolean).join(' · ') || undefined,
-	href: `/stash?tab=yarn&q=${encodeURIComponent(y.name ?? y.brand ?? y.colorway ?? '')}`,
-	image: y.photoPath
-});
-
-const projectRef = (p: ProjectRecord): AssistantRef => ({
-	kind: 'project',
-	id: p.id,
-	title: p.title,
-	subtitle: rowState(p) ?? STATUS_FR[p.status],
-	href: `/projects/${p.id}`
-});
-
-function rowState(p: { currentRow: number; totalRows: number | null }): string | undefined {
-	if (p.totalRows) return `rang ${p.currentRow} / ${p.totalRows}`;
-	return p.currentRow ? `rang ${p.currentRow}` : undefined;
-}
-
-function yarnSummary(y: YarnRecord) {
-	const total = y.yardsPerSkein ? Math.round(y.yardsPerSkein * y.skeins) : undefined;
-	return compact({
-		id: y.id,
-		nom: yarnName(y),
-		coloris: y.colorway,
-		poids: y.weightCategory,
-		fibre: y.fiber,
-		pelotes: y.skeins,
-		metres_par_pelote: y.yardsPerSkein,
-		grammes_par_pelote: y.gramsPerSkein,
-		metres_total: total,
-		notes: clip(y.notes, 150)
-	});
-}
-
-async function canSeePattern(env: ToolEnv, p: PatternRecord): Promise<boolean> {
-	if (p.ownerId === env.uid || p.isShared) return true;
-	return (await env.data.access(env.uid, 'pattern', p.id, p.ownerId)) !== null;
-}
-
-async function projectAccess(env: ToolEnv, p: ProjectRecord) {
-	if (p.ownerId === env.uid) return 'owner' as const;
-	return env.data.access(env.uid, 'project', p.id, p.ownerId);
-}
-
-async function visibleYarn(env: ToolEnv, yarnId: string): Promise<YarnRecord | null> {
-	const y = await env.data.getYarn(yarnId);
-	if (!y) return null;
-	if (y.ownerId === env.uid) return y;
-	return (await env.data.access(env.uid, 'yarn', y.id, y.ownerId)) ? y : null;
-}
-
-type ToolSpec = {
-	description: string;
-	parameters: Record<string, unknown>;
-	required?: string[];
-	run: (args: Args, env: ToolEnv) => Promise<ToolOutcome>;
-};
-
-const NOT_FOUND = (what: string): ToolOutcome => ({
-	content: JSON.stringify({ erreur: `${what} introuvable (ou non accessible pour ce compte)` }),
-	error: true
-});
-
-const p = (type: string, description: string, extra: Record<string, unknown> = {}) => ({ type, description, ...extra });
-
-const SPECS: Record<string, ToolSpec> = {
+const BASE: Record<string, ToolSpec> = {
 	chercher_patrons: {
 		description: 'Cherche dans la bibliothèque de patrons de la personne (par sens et par mots). Renvoie des id à passer à lire_patron.',
 		parameters: { texte: p('string', 'ce qui est cherché, ex. "pull raglan en laine épaisse"') },
@@ -268,10 +129,11 @@ const SPECS: Record<string, ToolSpec> = {
 	},
 
 	projets_en_cours: {
-		description: 'Liste les projets en cours ou en pause de la personne, avec leur compteur de rangs.',
-		parameters: {},
-		async run(_a, env) {
-			const rows = await env.data.projectsInProgress(env.uid, 10);
+		description: "Liste les projets en cours ou en pause de la personne, avec leur compteur de rangs. Avec 'texte', cherche un projet par son titre, quel que soit son statut.",
+		parameters: { texte: p('string', 'mots du titre (facultatif)') },
+		async run(a, env) {
+			const texte = str(a, 'texte', 120);
+			const rows = texte ? await env.data.findProjects(env.uid, texte, 10) : await env.data.projectsInProgress(env.uid, 10);
 			return {
 				content: capResult({
 					projets: rows.map((r) =>
@@ -389,23 +251,95 @@ const SPECS: Record<string, ToolSpec> = {
 			await env.data.appendProjectNote(prj.id, `[${day}] ${texte}`);
 			return {
 				content: JSON.stringify({ ok: true, projet: prj.title, note_ajoutee: texte }),
-				action: { kind: 'note_added', title: prj.title, href: `/projects/${prj.id}` },
+				action: { kind: 'note_added', what: 'project', title: prj.title, href: `/projects/${prj.id}` },
 				refs: [projectRef(prj)]
 			};
 		}
 	}
 };
 
-export const TOOL_NAMES = Object.keys(SPECS);
+// Tool groups. "partager" is in two of them: whichever is opened brings it.
+export const DOMAINS = {
+	patrons: {
+		description: 'créer (y compris un patron que tu rédiges), importer depuis un lien, modifier, supprimer, partager un patron ; couvertures ; pièces ; remplissage des infos par IA',
+		tools: { ...PATTERN_TOOLS, partager: SHARE_TOOL }
+	},
+	projets: {
+		description: 'créer, modifier (statut, rangs, échéance, temps, coût...), supprimer, partager un projet ; laine et tissu utilisés (déduits du stock) ; pièces',
+		tools: { ...PROJECT_TOOLS, partager: SHARE_TOOL }
+	},
+	stock: {
+		description: 'chercher, ajouter, modifier, supprimer laine, tissu, mercerie, outils ; les ranger',
+		tools: STASH_TOOLS
+	},
+	organisation: {
+		description: 'objectifs, rangements, destinataires, moodboards, écussons brodés, couleurs des tags, bilan chiffré et succès',
+		tools: ORGANIZE_TOOLS
+	}
+} satisfies Record<string, { description: string; tools: Record<string, ToolSpec> }>;
 
-export const TOOLS: ChatTool[] = Object.entries(SPECS).map(([name, s]) => ({
+export type Domain = keyof typeof DOMAINS;
+const DOMAIN_NAMES = Object.keys(DOMAINS) as Domain[];
+
+BASE.ouvrir_outils = {
+	description: `Donne accès à d'autres outils pour AGIR dans l'app, par groupe : ${DOMAIN_NAMES.map((d) => `"${d}" (${DOMAINS[d].description})`).join(' ; ')}. Les outils arrivent à l'étape suivante.`,
+	parameters: { domaine: p('string', DOMAIN_NAMES.map((d) => `"${d}"`).join(', ') + ' ; plusieurs séparés par des virgules') },
+	required: ['domaine'],
+	async run(a, env) {
+		const asked = String(a.domaine ?? '')
+			.split(/[,\s]+/)
+			.map((d) => fold(d).replace(/[^a-z]/g, ''))
+			.filter(Boolean);
+		const bad = asked.filter((d) => !(d in DOMAINS));
+		if (!asked.length || bad.length) throw new ArgError(`domaine inconnu ; au choix : ${DOMAIN_NAMES.join(', ')}`);
+		for (const d of asked) env.domains?.add(d);
+		return { content: JSON.stringify({ ok: true, outils: asked.flatMap((d) => Object.keys(DOMAINS[d as Domain].tools)) }) };
+	}
+};
+
+// Every tool, for runTool: a model may call a group's tool it saw earlier in
+// the conversation without reopening the group.
+const ALL: Record<string, ToolSpec> = Object.assign({}, BASE, ...DOMAIN_NAMES.map((d) => DOMAINS[d].tools));
+export const TOOL_NAMES = Object.keys(ALL);
+
+const definition = ([name, s]: [string, ToolSpec]): ChatTool => ({
 	type: 'function',
 	function: {
 		name,
 		description: s.description,
 		parameters: { type: 'object', properties: s.parameters, ...(s.required?.length ? { required: s.required } : {}) }
 	}
-}));
+});
+
+// The base tools.
+export const TOOLS: ChatTool[] = Object.entries(BASE).map(definition);
+
+// The tools sent to the model: the base ones plus the opened groups'.
+export function toolsFor(domains: Iterable<string>): ChatTool[] {
+	const specs: Record<string, ToolSpec> = { ...BASE };
+	for (const d of domains) if (d in DOMAINS) Object.assign(specs, DOMAINS[d as Domain].tools);
+	return Object.entries(specs).map(definition);
+}
+
+// Groups the question plainly needs, opened before the first model call to
+// save it a round (and the person a few seconds). Kept to the words that say
+// "do something": a mere question about a pattern needs no group.
+const ACT = /\b(ajout|ajoute|cr[ée]+|cr[ée]e|supprim|efface|enl[eè]v|retir|modifi|chang|renomm|mets?|passe|marque|note|range|partag|importe|remplis|d[ée]tecte|trouve|cherche.{0,20}(image|couverture)|avance|d[ée]duis|utilis|rends?|termin|compte)/i;
+const HINTS: [Domain, RegExp][] = [
+	['patrons', /patron|couverture|pi[èe]ces?\b|tag/i],
+	['projets', /projet|rangs?\b|compteur|en cours|termin|[ée]ch[ée]ance/i],
+	['stock', /stock|laine|pelote|tissu|mercerie|bouton|aiguille|crochet|outil/i],
+	['organisation', /objectif|rangement|bo[iî]te|destinataire|moodboard|tableau|[ée]cusson|broderie|bilan|statisti|succ[èe]s|couleur.{0,10}tag/i]
+];
+
+export function preopenDomains(question: string, contextKind?: 'pattern' | 'project' | 'yarn'): Set<string> {
+	const open = new Set<string>();
+	if (!ACT.test(question)) return open;
+	for (const [d, re] of HINTS) if (re.test(question)) open.add(d);
+	if (!open.size && contextKind) open.add(contextKind === 'pattern' ? 'patrons' : contextKind === 'project' ? 'projets' : 'stock');
+	// Two groups at most up front; the model opens more if it needs them.
+	return new Set([...open].slice(0, 2));
+}
 
 function parseArgs(raw: ChatToolCall['function']['arguments'] | undefined): Args {
 	if (raw == null) return {};
@@ -423,7 +357,7 @@ function parseArgs(raw: ChatToolCall['function']['arguments'] | undefined): Args
 // an {"erreur"} result. A database failure does throw (the request fails).
 export async function runTool(call: ChatToolCall, env: ToolEnv): Promise<ToolOutcome> {
 	const name = call.function?.name ?? '';
-	const spec = SPECS[name];
+	const spec = ALL[name];
 	if (!spec) {
 		return { content: JSON.stringify({ erreur: `outil inconnu "${name}". Outils : ${TOOL_NAMES.join(', ')}` }), error: true };
 	}

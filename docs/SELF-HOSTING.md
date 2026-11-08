@@ -289,16 +289,40 @@ couleur dominante d'une photo est calculée par l'app elle-même, sans GPU. L'an
 Le bouton 💬, présent sur toutes les pages (et « Demander à l'assistant » sur un
 patron, un projet ou une laine du stock), ouvre une conversation en français avec
 un assistant de tricot, crochet et couture qui **connaît la bibliothèque du
-compte** et agit par des outils :
+compte et peut y faire tout ce que la personne y fait**, par des outils.
+
+Outils toujours disponibles :
 
 | Outil | Rôle |
 |---|---|
 | `chercher_patrons` | recherche par le sens (mêmes vecteurs que Ctrl K) + par mots |
 | `lire_patron` | infos, pièces, notes et un extrait du texte autour d'une section demandée |
 | `chercher_laines` | stock de laines (texte, poids, couleur, fibre), avec le métrage total |
-| `projets_en_cours`, `lire_projet` | projets en cours, compteurs de rangs, pièces, laines utilisées |
+| `projets_en_cours`, `lire_projet` | projets en cours (ou cherchés par titre), compteurs de rangs, pièces, laines utilisées |
 | `calculer_jauge`, `estimer_metrage` | calculs exacts (mailles ↔ cm, conversion entre deux jauges, métrage d'après un échantillon) |
-| `ajouter_note_projet` | **seule écriture** : ajoute une note datée à un projet, seulement sur demande explicite ; rien n'est jamais effacé |
+| `ajouter_note_projet` | ajoute une note datée à un projet |
+| `ouvrir_outils` | donne accès à un des groupes ci-dessous |
+
+Groupes d'outils pour agir, envoyés au modèle seulement quand il les ouvre (ou
+d'emblée quand la question le demande clairement, ex. « ajoute… à mon stock ») :
+les définitions de ~30 outils ne tiendraient pas dans le contexte à chaque appel.
+
+| Groupe | Outils |
+|---|---|
+| `patrons` | `creer_patron` (y compris un patron rédigé ou traduit dans le chat), `importer_patron_lien`, `modifier_patron`, `supprimer_patron`, `chercher_couvertures`, `couverture_patron`, `pieces_patron` (dont détection IA), `remplir_infos_patron`, `partager` |
+| `projets` | `creer_projet`, `modifier_projet` (statut, rangs, échéance, temps, coût, destinataire…), `supprimer_projet`, `matiere_projet` (laine / tissu utilisés, déduits du stock ou rendus), `piece_projet`, `partager` |
+| `stock` | `chercher_stock`, `gerer_stock` (ajouter, modifier — y compris ranger dans une boîte —, supprimer laine, tissu, mercerie, outils) |
+| `organisation` | `objectifs`, `rangements`, `destinataires`, `moodboards`, `ecussons`, `couleur_tag`, `bilan` (chiffres de l'année, succès) |
+
+- **Mêmes règles que les pages** : les outils passent par le même code que les
+  formulaires (stock déduit dans la même transaction, fichiers effacés avec un
+  patron ou un projet…). Ce qui exige d'être propriétaire sur une page
+  (supprimer, partager, modifier un patron) l'exige aussi dans le chat.
+- **Suppressions** : un outil de suppression répond d'abord « confirmation
+  requise » ; le modèle doit demander, et ne rappeler l'outil avec
+  `confirme=true` qu'après un oui. Une suppression est définitive.
+- **Hors de portée** : ajouter des fichiers (PDF, photos), créer un écusson
+  depuis une image (fait dans le navigateur), le compte et l'administration.
 
 - **Même Ollama, même modèle** que le reste de l'IA (`OLLAMA_CHAT_MODEL`,
   `gemma4:12b` par défaut, qui sait appeler des outils), même `OLLAMA_NUM_CTX`
@@ -306,9 +330,10 @@ compte** et agit par des outils :
   fonctionne quand même, sans accès à la bibliothèque.
 - **Droits** : les outils ne voient que ce que le compte voit dans l'app (ses
   patrons, ceux partagés avec lui et les patrons publics ; ses projets et ceux
-  partagés ; son propre stock). Une note ne s'ajoute qu'à un projet modifiable.
+  partagés ; son propre stock) et ne modifient que ce que le compte peut
+  modifier.
 - **Latence** : la réponse s'affiche au fil de l'eau, mais chaque appel d'outil
-  coûte un aller-retour au modèle (5 au maximum par question). Les requêtes
+  coûte un aller-retour au modèle (8 au maximum par question). Les requêtes
   Ollama passent les unes après les autres : si une autre tâche IA occupe le GPU
   (import, analyse de patron, autre app), la question attend son tour. Comptez
   quelques secondes avec un modèle déjà chargé, davantage après un chargement à

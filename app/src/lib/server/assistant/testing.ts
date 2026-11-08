@@ -3,6 +3,7 @@
 // (like the real ones): the access checks in tools.ts must do the scoping.
 import type { Access, ResourceType } from '$lib/server/access';
 import type { AssistantData, PatternRecord, ProjectRecord, YarnRecord } from './data';
+import type { AssistantActions } from './actions';
 
 export const ALICE = '00000000-0000-4000-8000-00000000000a';
 export const BOB = '00000000-0000-4000-8000-00000000000b';
@@ -80,6 +81,7 @@ export function fakeData() {
 	const yarns = [yarn(ALICE_YARN, ALICE, 'Merino Extra Fine'), yarn(BOB_YARN, BOB, 'Laine de Bob')];
 	const shares: { type: ResourceType; id: string; userId: string; role: 'view' | 'edit' }[] = [];
 	const notes: { id: string; note: string }[] = [];
+	const covers: string[] = []; // patterns for which a cover "is found"
 
 	const data: AssistantData = {
 		async access(uid, type, id, ownerId): Promise<Access> {
@@ -116,7 +118,42 @@ export function fakeData() {
 		},
 		async appendProjectNote(id, note) {
 			notes.push({ id, note });
+		},
+		async findProjects(uid, text) {
+			return projects.filter((p) => p.ownerId === uid && p.title.toLowerCase().includes(text.toLowerCase()));
+		},
+		async updatePattern(id, patch) {
+			Object.assign(patterns.find((p) => p.id === id)!, patch);
+		},
+		async missingCovers(uid, limit) {
+			const all = patterns.filter((p) => p.ownerId === uid && !p.coverPath);
+			return { items: all.slice(0, limit).map((p) => ({ id: p.id, title: p.title })), total: all.length };
+		},
+		async fillCover(uid, id) {
+			const p = patterns.find((x) => x.id === id && x.ownerId === uid && !x.coverPath);
+			if (!p || !covers.includes(id)) return null;
+			p.coverPath = `${uid}/patterns/covers/${id}.jpg`;
+			return p.coverPath;
 		}
 	};
-	return { data, shares, notes, patterns, projects, yarns };
+	return { data, shares, notes, covers, patterns, projects, yarns };
+}
+
+// Stand-in for the domain tools' writes (actions.ts): records every call and
+// answers with `answers[method]` (a value or a function of the arguments),
+// undefined otherwise.
+export function fakeActions(answers: Record<string, unknown> = {}) {
+	const calls: { method: string; args: unknown[] }[] = [];
+	const act = new Proxy(
+		{},
+		{
+			get: (_t, method: string) =>
+				async (...args: unknown[]) => {
+					calls.push({ method, args });
+					const a = answers[method];
+					return typeof a === 'function' ? (a as (...x: unknown[]) => unknown)(...args) : a;
+				}
+		}
+	) as AssistantActions;
+	return { act, calls, called: (method: string) => calls.filter((c) => c.method === method) };
 }

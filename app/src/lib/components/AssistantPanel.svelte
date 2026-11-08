@@ -1,10 +1,10 @@
 <script lang="ts">
 	import { onMount, tick } from 'svelte';
-	import { afterNavigate } from '$app/navigation';
+	import { afterNavigate, invalidateAll } from '$app/navigation';
 	import { t, type Locale } from '$lib/i18n';
 	import { mediaUrl } from '$lib/media';
 	import { renderMarkdown } from '$lib/assistant/markdown';
-	import { createSseParser, type AssistantEvent, type AssistantRef, type RefKind } from '$lib/assistant/events';
+	import { createSseParser, type AssistantActionKind, type AssistantEvent, type AssistantRef, type RefKind } from '$lib/assistant/events';
 	import { assistantUi, loadConversation, saveConversation, type ChatEntry } from '$lib/assistant/store.svelte';
 
 	let { locale, userId }: { locale: Locale; userId: string } = $props();
@@ -166,6 +166,8 @@
 			controller = null;
 			scrollDown();
 		}
+		// The chat changed something: the page behind it shows it right away.
+		if (answer.actions?.length) invalidateAll().catch(() => {});
 	}
 
 	function onKey(e: KeyboardEvent) {
@@ -180,6 +182,14 @@
 	function refImage(r: AssistantRef) {
 		return r.image ? mediaUrl(r.image, 200) : null;
 	}
+
+	const ACTION_ICON: Record<AssistantActionKind, string> = {
+		created: '✨',
+		updated: '✏️',
+		deleted: '🗑',
+		note_added: '📝',
+		cover_found: '🖼️'
+	};
 </script>
 
 {#if !assistantUi.open}
@@ -235,7 +245,7 @@
 							<p class="muted small">{t(locale, 'chat.slow')}</p>
 						{/if}
 						{#each entry.actions ?? [] as a}
-							<a class="chip action" href={a.href}>📝 {t(locale, 'chat.action.noteAdded', { title: a.title })}</a>
+							<a class="chip action" href={a.href}>{ACTION_ICON[a.kind]} {t(locale, `chat.action.${a.kind}`, { what: t(locale, `chat.what.${a.what}`), title: a.title })}</a>
 						{/each}
 						{#if entry.refs?.length}
 							<div class="refs">

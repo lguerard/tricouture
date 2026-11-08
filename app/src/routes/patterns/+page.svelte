@@ -2,7 +2,8 @@
 	import { mediaUrl } from '$lib/media';
 	import { craftLabel, CRAFTS, difficultyLabel } from '$lib/labels';
 	import { t } from '$lib/i18n';
-	import { goto } from '$app/navigation';
+	import { goto, invalidateAll } from '$app/navigation';
+	import { toasts } from '$lib/toast.svelte';
 	import { page } from '$app/stores';
 	import { tagStyle } from '$lib/tagColor';
 	let { data } = $props();
@@ -13,6 +14,33 @@
 		const params = new URLSearchParams($page.url.searchParams);
 		params.set('page', String(n));
 		return `?${params}`;
+	}
+
+	// Covers for patterns made before covers were found automatically, one
+	// request per pattern; each found cover shows up in the list right away.
+	let coverProgress = $state<{ i: number; n: number } | null>(null);
+	async function findMissingCovers() {
+		const ids = [...data.missingCovers];
+		let found = 0;
+		coverProgress = { i: 0, n: ids.length };
+		for (const id of ids) {
+			try {
+				const res = await fetch(`/api/patterns/${id}/auto-cover`, { method: 'POST' });
+				if (res.ok && (await res.json()).coverPath) {
+					found++;
+					await invalidateAll();
+				}
+			} catch {
+				/* network hiccup: that pattern stays without cover */
+			}
+			coverProgress = { i: coverProgress.i + 1, n: ids.length };
+		}
+		coverProgress = null;
+		const msg = t(locale, 'patterns.list.coversFound', { found, n: ids.length });
+		toasts.push(
+			{ kind: found ? 'success' : 'info', message: found < ids.length ? `${msg} ${t(locale, 'patterns.list.coversRest')}` : msg },
+			8000
+		);
 	}
 </script>
 
@@ -26,6 +54,13 @@
 		</a>
 		<a class="btn" href="/patterns/import">{t(locale, 'patterns.list.import')}</a>
 		<a class="btn" href="/patterns/tags">{t(locale, 'patterns.list.tagColors')}</a>
+		{#if coverProgress}
+			<button type="button" disabled aria-live="polite">{t(locale, 'patterns.list.findingCovers', coverProgress)}</button>
+		{:else if data.missingCovers.length}
+			<button type="button" onclick={findMissingCovers} title={t(locale, 'patterns.list.findCoversHint')}>
+				{t(locale, 'patterns.list.findCovers', { n: data.missingCovers.length })}
+			</button>
+		{/if}
 	</header>
 
 	<form class="filters" method="GET">
