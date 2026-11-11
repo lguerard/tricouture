@@ -1,6 +1,7 @@
 // Checks the metadata the patch editor sends with a design (no database or
 // file access here, so it can be unit-tested on its own).
 import type { EmbroiderySettings } from '$lib/server/db/schema';
+import { parseTextSettings } from '$lib/embroidery/text';
 
 const SHAPES = ['none', 'circle', 'rounded'] as const;
 const DENSITIES = ['light', 'normal', 'dense'] as const;
@@ -48,7 +49,8 @@ export function parseMeta(raw: unknown): DesignMeta | null {
 			backgroundThread: isThread(s.backgroundThread) ? s.backgroundThread : 0,
 			density: DENSITIES.includes(s.density as never) ? (s.density as EmbroiderySettings['density']) : 'normal',
 			fabric: typeof s.fabric === 'string' && /^#[0-9a-f]{6}$/i.test(s.fabric) ? s.fabric : '#f3efe7',
-			swaps
+			swaps,
+			...(s.text != null && parseTextSettings(s.text) ? { text: parseTextSettings(s.text)! } : {})
 		},
 		threads,
 		// Imported files may be made for a larger hoop than the editor's.

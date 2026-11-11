@@ -7,7 +7,7 @@
 // patch with a satin border.
 
 import { kmeans, nearestIndex, type RGB } from './quantize';
-import { nearestThread } from './threads';
+import { colorDistance, nearestThread, PEC_THREADS } from './threads';
 import { circlePath, lineTo, roundedRectPath, runAlong, satinAlong, tatamiFill, type ClosedPath, type Pt } from './stitches';
 import type { Command } from './pes';
 
@@ -22,6 +22,10 @@ export type DigitizeOptions = {
 	borderThread?: number; // PEC index of the border thread
 	backgroundThread?: number | null; // PEC index to fill the patch background, or none
 	spacing?: number; // mm between fill rows (0.4 normal)
+	// Only these threads (PEC indices) for the picture's colours: a text patch
+	// drawn in chosen threads keeps exactly them, whatever the blending at the
+	// letters' edges.
+	threads?: number[];
 };
 
 export type Design = {
@@ -642,7 +646,10 @@ export function digitize(image: RasterImage, o: DigitizeOptions): Design {
 	}
 
 	// Colours → Brother threads; colours that land on the same thread merge.
-	const threadOf = centers.map((c) => nearestThread(c).index);
+	const allowed = o.threads?.length ? PEC_THREADS.filter((t) => o.threads!.includes(t.index)) : null;
+	const threadOf = centers.map((c) =>
+		allowed ? allowed.reduce((best, t) => (colorDistance(c, t.rgb) < colorDistance(c, best.rgb) ? t : best)).index : nearestThread(c).index
+	);
 	const firstWith = new Map<number, number>();
 	const remap = threadOf.map((t, i) => {
 		if (!firstWith.has(t)) firstWith.set(t, i);

@@ -1,3 +1,4 @@
+import type { TextSettings } from '../../embroidery/text';
 import {
 	pgTable,
 	pgEnum,
@@ -590,6 +591,8 @@ export type EmbroiderySettings = {
 	density: 'light' | 'normal' | 'dense';
 	fabric: string;
 	swaps: Record<string, number>;
+	// A text patch: what was typed and how, to redraw and edit it.
+	text?: TextSettings;
 };
 
 export const embroideryDesigns = pgTable(

@@ -9,6 +9,15 @@
 	import { readPes } from '$lib/embroidery/pesRead';
 	import { PEC_THREADS, threadHex } from '$lib/embroidery/threads';
 	import { canvasBlob, drawStitches, renderThumbnail } from '$lib/embroidery/render';
+	import { DEFAULT_TEXT, MAX_CHARS, MAX_LINES, TEXT_FONTS, cleanText, loadFont, renderText, textColorCount, type TextSettings } from '$lib/embroidery/text';
+	// The text patches' fonts, bundled (latin letters, accents included).
+	import '@fontsource/fredoka/latin-700.css';
+	import '@fontsource/anton/latin-400.css';
+	import '@fontsource/bebas-neue/latin-400.css';
+	import '@fontsource/alfa-slab-one/latin-400.css';
+	import '@fontsource/permanent-marker/latin-400.css';
+	import '@fontsource/lobster/latin-400.css';
+	import '@fontsource/pacifico/latin-400.css';
 	import type { PageData } from './$types';
 
 	let { data } = $props();
@@ -21,6 +30,9 @@
 	const DENSITY = { light: 0.5, normal: 0.4, dense: 0.33 } as const;
 	const MAX_PIXELS = 600; // the picture is downscaled to this before digitizing
 
+	// What the patch is made from: a picture, or text drawn in a font.
+	let mode = $state<'image' | 'text'>('image');
+	let text = $state<TextSettings>({ ...DEFAULT_TEXT });
 	let image = $state<RasterImage | null>(null);
 	let imageUrl = $state<string | null>(null);
 	let title = $state('');
@@ -69,25 +81,94 @@
 	const fileBase = $derived(safeName(title));
 
 	function currentSettings(): EmbroiderySettings {
-		return { sizeMm, colors, removeBackground, shape, borderThread, backgroundThread, density, fabric, swaps };
+		return {
+			sizeMm,
+			colors,
+			removeBackground,
+			shape,
+			borderThread,
+			backgroundThread,
+			density,
+			fabric,
+			swaps,
+			...(mode === 'text' ? { text: { ...text } } : {})
+		};
 	}
 	const keyFor = () => JSON.stringify({ session, title, settings: currentSettings() });
+
+	// A copy at most MAX_PIXELS on its longest side: what is digitized and kept.
+	function downscaled(src: CanvasImageSource, width: number, height: number): HTMLCanvasElement {
+		const scale = Math.min(1, MAX_PIXELS / Math.max(width, height));
+		const c = document.createElement('canvas');
+		c.width = Math.max(1, Math.round(width * scale));
+		c.height = Math.max(1, Math.round(height * scale));
+		c.getContext('2d')!.drawImage(src, 0, 0, c.width, c.height);
+		return c;
+	}
+
+	function useSource(c: HTMLCanvasElement) {
+		sourceCanvas = c;
+		image = { width: c.width, height: c.height, data: c.getContext('2d')!.getImageData(0, 0, c.width, c.height).data };
+	}
+
+	// Text mode: a new text patch, or one reopened from the library.
+	function startText(from?: EmbroideryDesign) {
+		if (imageUrl) URL.revokeObjectURL(imageUrl);
+		imageUrl = null;
+		mode = 'text';
+		session++;
+		if (from?.settings.text) {
+			const st = from.settings;
+			({ sizeMm, colors, removeBackground, shape, borderThread, backgroundThread, density, fabric } = st);
+			swaps = Object.fromEntries(Object.entries(st.swaps ?? {}).map(([k, v]) => [Number(k), v]));
+			text = { ...st.text! };
+			title = from.title;
+			currentId = from.id;
+			savedKey = keyFor(); // already in the library as it is
+			saveState = 'saved';
+		} else {
+			text = { ...DEFAULT_TEXT, content: text.content };
+			swaps = {};
+			currentId = null;
+			saveState = 'idle';
+			image = null;
+			design = null;
+			sourceCanvas = null;
+		}
+	}
+
+	// Redraws the text (once its font is loaded) whenever it or its style changes.
+	let textRun = 0;
+	$effect(() => {
+		if (mode !== 'text') return;
+		const t = { ...text };
+		const run = ++textRun;
+		loadFont(t.font)
+			.catch(() => {})
+			.then(() => {
+				if (run !== textRun || mode !== 'text') return;
+				const c = renderText(t);
+				if (!c) {
+					image = null;
+					design = null;
+					sourceCanvas = null;
+					return;
+				}
+				// The first line names a new patch, until the name is changed by hand.
+				if (!currentId && (!title || title === autoTitle)) title = autoTitle = t.content.split('\n')[0].trim().slice(0, 200);
+				useSource(downscaled(c, c.width, c.height));
+			});
+	});
+	let autoTitle = '';
 
 	// `from`: a design reopened from the library, to edit in place.
 	async function load(file: File | undefined, from?: EmbroideryDesign) {
 		if (!file) return;
 		try {
 			const bitmap = await createImageBitmap(file);
-			const scale = Math.min(1, MAX_PIXELS / Math.max(bitmap.width, bitmap.height));
-			const w = Math.max(1, Math.round(bitmap.width * scale));
-			const h = Math.max(1, Math.round(bitmap.height * scale));
-			const c = document.createElement('canvas');
-			c.width = w;
-			c.height = h;
-			const ctx = c.getContext('2d')!;
-			ctx.drawImage(bitmap, 0, 0, w, h);
+			const c = downscaled(bitmap, bitmap.width, bitmap.height);
 			bitmap.close();
-			sourceCanvas = c;
+			mode = 'image';
 			if (imageUrl) URL.revokeObjectURL(imageUrl);
 			imageUrl = URL.createObjectURL(file);
 			session++;
@@ -105,7 +186,7 @@
 				currentId = null;
 				saveState = 'idle';
 			}
-			image = { width: w, height: h, data: ctx.getImageData(0, 0, w, h).data };
+			useSource(c);
 		} catch {
 			toasts.push({ kind: 'error', key: 'embroidery.errorImage' }, 6000);
 		}
@@ -114,10 +195,13 @@
 	// Re-digitize (debounced) whenever the picture or an option changes.
 	$effect(() => {
 		const img = image;
+		const isText = mode === 'text';
 		const opts = {
 			sizeMm,
-			colors,
-			removeBackground,
+			// A text is drawn cropped, on a transparent background, in known threads.
+			colors: isText ? textColorCount(text) : colors,
+			removeBackground: isText ? false : removeBackground,
+			threads: isText ? [text.thread, ...(text.outline !== 'none' ? [text.outlineThread] : [])] : undefined,
 			shape,
 			borderThread,
 			backgroundThread: backgroundThread || null,
@@ -265,6 +349,11 @@
 	}
 
 	async function reopen(d: EmbroideryDesign) {
+		if (d.settings.text) {
+			startText(d);
+			window.scrollTo({ top: 0, behavior: 'smooth' });
+			return;
+		}
 		try {
 			const blob = await (await fetch(`/media/${d.imagePath}`)).blob();
 			await load(new File([blob], d.title, { type: blob.type }), d);
@@ -274,7 +363,10 @@
 		}
 	}
 
-	function clearEditor() {
+	// `toImage`: back to picture mode (from the mode switch).
+	function clearEditor(toImage = false) {
+		if (toImage) mode = 'image';
+		if (mode === 'text') text = { ...DEFAULT_TEXT };
 		image = null;
 		design = null;
 		sourceCanvas = null;
@@ -369,6 +461,94 @@
 
 	<div class="layout" class:has-image={!!image}>
 		<section class="card settings">
+			<div class="seg mode" role="radiogroup" aria-label={t(locale, 'embroidery.mode')}>
+				<button type="button" role="radio" aria-checked={mode === 'image'} class:on={mode === 'image'} onclick={() => mode !== 'image' && clearEditor(true)}>
+					🖼️ {t(locale, 'embroidery.mode.image')}
+				</button>
+				<button type="button" role="radio" aria-checked={mode === 'text'} class:on={mode === 'text'} onclick={() => mode !== 'text' && startText()}>
+					🔤 {t(locale, 'embroidery.mode.text')}
+				</button>
+			</div>
+
+			{#if mode === 'text'}
+				<div class="field">
+					<label for="emb-text">{t(locale, 'embroidery.text')}</label>
+					<textarea
+						id="emb-text"
+						rows={Math.min(MAX_LINES, Math.max(1, text.content.split('\n').length))}
+						maxlength={MAX_CHARS}
+						placeholder={t(locale, 'embroidery.textPlaceholder')}
+						value={text.content}
+						oninput={(e) => {
+							const v = cleanText((e.currentTarget as HTMLTextAreaElement).value);
+							if (v !== (e.currentTarget as HTMLTextAreaElement).value) (e.currentTarget as HTMLTextAreaElement).value = v;
+							text.content = v;
+						}}
+					></textarea>
+					<span class="muted small">{t(locale, 'embroidery.textHint', { n: MAX_LINES })}</span>
+				</div>
+				<div class="field">
+					<span class="label">{t(locale, 'embroidery.font')}</span>
+					<div class="fonts" role="radiogroup" aria-label={t(locale, 'embroidery.font')}>
+						{#each TEXT_FONTS as f}
+							<button
+								type="button"
+								role="radio"
+								aria-checked={text.font === f.id}
+								class:on={text.font === f.id}
+								style:font-family={`"${f.family}"`}
+								style:font-weight={f.weight}
+								title={f.label}
+								onclick={() => (text.font = f.id)}
+							>
+								{text.content.split('\n')[0].trim().slice(0, 10) || 'Abc'}
+							</button>
+						{/each}
+					</div>
+				</div>
+				<div class="field">
+					<label for="emb-text-thread">{t(locale, 'embroidery.textThread')}</label>
+					<div class="thread-pick">
+						<span class="swatch" style:background={threadByIndex.get(text.thread) ? threadHex(threadByIndex.get(text.thread)!) : '#000'}></span>
+						<select id="emb-text-thread" bind:value={text.thread}>
+							{#each THREADS as th}<option value={th.index}>{th.name}</option>{/each}
+						</select>
+					</div>
+				</div>
+				<div class="field">
+					<span class="label">{t(locale, 'embroidery.outline')}</span>
+					<div class="seg" role="radiogroup" aria-label={t(locale, 'embroidery.outline')}>
+						{#each [['none', 'embroidery.outline.none'], ['thin', 'embroidery.outline.thin'], ['thick', 'embroidery.outline.thick']] as [value, key]}
+							<button type="button" role="radio" aria-checked={text.outline === value} class:on={text.outline === value} onclick={() => (text.outline = value as TextSettings['outline'])}>
+								{t(locale, key)}
+							</button>
+						{/each}
+					</div>
+				</div>
+				{#if text.outline !== 'none'}
+					<div class="field">
+						<label for="emb-outline-thread">{t(locale, 'embroidery.outlineThread')}</label>
+						<div class="thread-pick">
+							<span class="swatch" style:background={threadByIndex.get(text.outlineThread) ? threadHex(threadByIndex.get(text.outlineThread)!) : '#000'}></span>
+							<select id="emb-outline-thread" bind:value={text.outlineThread}>
+								{#each THREADS as th}<option value={th.index}>{th.name}</option>{/each}
+							</select>
+						</div>
+					</div>
+				{/if}
+				{#if text.content.includes('\n')}
+					<div class="field">
+						<span class="label">{t(locale, 'embroidery.align')}</span>
+						<div class="seg" role="radiogroup" aria-label={t(locale, 'embroidery.align')}>
+							{#each [['left', 'embroidery.align.left'], ['center', 'embroidery.align.center'], ['right', 'embroidery.align.right']] as [value, key]}
+								<button type="button" role="radio" aria-checked={text.align === value} class:on={text.align === value} onclick={() => (text.align = value as TextSettings['align'])}>
+									{t(locale, key)}
+								</button>
+							{/each}
+						</div>
+					</div>
+				{/if}
+			{:else}
 			<label
 				class="drop"
 				class:dragging
@@ -402,6 +582,7 @@
 					}}
 				/>
 			</label>
+			{/if}
 
 			{#if image}
 				<div class="field">
@@ -413,14 +594,16 @@
 				<label for="emb-size">{t(locale, 'embroidery.size', { n: sizeMm })}</label>
 				<input id="emb-size" type="range" min="30" max={HOOP_MM} step="5" bind:value={sizeMm} />
 			</div>
-			<div class="field">
-				<label for="emb-colors">{t(locale, 'embroidery.colors', { n: colors })}</label>
-				<input id="emb-colors" type="range" min="1" max="8" step="1" bind:value={colors} />
-			</div>
-			<div class="field check">
-				<input id="emb-bg" type="checkbox" bind:checked={removeBackground} />
-				<label for="emb-bg">{t(locale, 'embroidery.removeBackground')}</label>
-			</div>
+			{#if mode === 'image'}
+				<div class="field">
+					<label for="emb-colors">{t(locale, 'embroidery.colors', { n: colors })}</label>
+					<input id="emb-colors" type="range" min="1" max="8" step="1" bind:value={colors} />
+				</div>
+				<div class="field check">
+					<input id="emb-bg" type="checkbox" bind:checked={removeBackground} />
+					<label for="emb-bg">{t(locale, 'embroidery.removeBackground')}</label>
+				</div>
+			{/if}
 			<div class="field">
 				<span class="label">{t(locale, 'embroidery.shape')}</span>
 				<div class="seg" role="radiogroup" aria-label={t(locale, 'embroidery.shape')}>
@@ -458,7 +641,7 @@
 
 		<section class="card result">
 			{#if !image}
-				<p class="muted empty">{t(locale, 'embroidery.empty')}</p>
+				<p class="muted empty">{t(locale, mode === 'text' ? 'embroidery.emptyText' : 'embroidery.empty')}</p>
 			{:else}
 				<div class="preview" class:busy>
 					<canvas bind:this={canvas} aria-label={t(locale, 'embroidery.preview')}></canvas>
@@ -663,6 +846,41 @@
 	.seg button {
 		flex: 1;
 		min-height: 40px;
+	}
+	.mode {
+		margin-bottom: 1rem;
+	}
+	.fonts {
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(88px, 1fr));
+		gap: 0.3rem;
+	}
+	.fonts button {
+		min-height: 44px;
+		font-size: 1.15rem;
+		line-height: 1.1;
+		overflow: hidden;
+		white-space: nowrap;
+		text-overflow: ellipsis;
+		padding: 0.2rem 0.4rem;
+	}
+	.fonts button.on {
+		border-color: var(--accent);
+		background: var(--accent-soft);
+		outline: 2px solid var(--accent);
+	}
+	.thread-pick {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+	}
+	.thread-pick select {
+		flex: 1;
+	}
+	textarea {
+		width: 100%;
+		font-size: 1.05rem;
+		resize: vertical;
 	}
 	.seg button.on {
 		background: var(--accent);

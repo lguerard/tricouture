@@ -36,4 +36,11 @@ describe('parseMeta', () => {
 		expect(m.title).toBe('Écusson');
 		expect(m.settings).toMatchObject({ sizeMm: 100, colors: 8, shape: 'circle', density: 'normal', fabric: '#f3efe7', borderThread: 20, swaps: {} });
 	});
+	it('keeps the settings of a text patch, checked', () => {
+		const text = { content: 'Club\nTricot\nde Lyon\nen trop', font: 'lobster', thread: 5, outlineThread: 99, outline: 'thick', align: 'gauche' };
+		const m = parseMeta({ ...good, settings: { ...good.settings, text } })!;
+		expect(m.settings.text).toEqual({ content: 'Club\nTricot\nde Lyon', font: 'lobster', thread: 5, outlineThread: 29, outline: 'thick', align: 'center' });
+		expect(parseMeta({ ...good, settings: { ...good.settings, text: { content: '  ' } } })!.settings.text).toBeUndefined();
+		expect(parseMeta(good)!.settings.text).toBeUndefined();
+	});
 });
