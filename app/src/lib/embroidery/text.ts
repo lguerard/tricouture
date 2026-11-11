@@ -81,7 +81,21 @@ export type TextSettings = {
 	outlineThread: number; // PEC index of the outline
 	outline: TextOutline;
 	align: TextAlign;
+	// A small picture next to the text (the picture itself is the patch's
+	// stored source image).
+	picture?: TextPicture;
 };
+
+export type PicturePosition = 'below' | 'above' | 'left' | 'right';
+export type TextPicture = {
+	position: PicturePosition;
+	scale: number; // picture height, in heights of the text block
+	colors: number; // thread colours for the picture (1..6)
+	removeBackground: boolean;
+};
+
+export const DEFAULT_PICTURE: TextPicture = { position: 'below', scale: 1.2, colors: 3, removeBackground: true };
+export const PICTURE_SCALE = { min: 0.4, max: 3 } as const;
 
 export const MAX_LINES = 3;
 export const MAX_CHARS = 60;
@@ -109,7 +123,18 @@ export function parseTextSettings(raw: unknown): TextSettings | null {
 		thread: isThread(t.thread) ? t.thread : DEFAULT_TEXT.thread,
 		outlineThread: isThread(t.outlineThread) ? t.outlineThread : DEFAULT_TEXT.outlineThread,
 		outline: t.outline === 'thin' || t.outline === 'thick' ? t.outline : 'none',
-		align: t.align === 'left' || t.align === 'right' ? t.align : 'center'
+		align: t.align === 'left' || t.align === 'right' ? t.align : 'center',
+		...(t.picture && typeof t.picture === 'object' ? { picture: parsePicture(t.picture as Record<string, unknown>) } : {})
+	};
+}
+
+function parsePicture(p: Record<string, unknown>): TextPicture {
+	const num = (v: unknown, lo: number, hi: number, d: number) => (typeof v === 'number' && Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : d);
+	return {
+		position: (['below', 'above', 'left', 'right'] as const).find((x) => x === p.position) ?? DEFAULT_PICTURE.position,
+		scale: num(p.scale, PICTURE_SCALE.min, PICTURE_SCALE.max, DEFAULT_PICTURE.scale),
+		colors: Math.round(num(p.colors, 1, 6, DEFAULT_PICTURE.colors)),
+		removeBackground: p.removeBackground !== false
 	};
 }
 
@@ -186,6 +211,104 @@ export function renderText(t: TextSettings): HTMLCanvasElement | null {
 	ctx.fillStyle = hexOf(t.thread);
 	lines.forEach((l, i) => ctx.fillText(l, xOf(i), yOf(i)));
 	return canvas;
+}
+
+// The picture's background made transparent: the colour along its edges,
+// flood-filled from the edges (so the same colour enclosed in the subject,
+// like the white of an eye, stays), then cropped to what is left.
+export function cutBackground(src: HTMLCanvasElement): HTMLCanvasElement {
+	const w = src.width;
+	const h = src.height;
+	const img = src.getContext('2d')!.getImageData(0, 0, w, h);
+	const d = img.data;
+	let r = 0;
+	let g = 0;
+	let b = 0;
+	let n = 0;
+	const border: number[] = [];
+	for (let x = 0; x < w; x++) border.push(x, (h - 1) * w + x);
+	for (let y = 1; y < h - 1; y++) border.push(y * w, y * w + w - 1);
+	for (const i of border) {
+		if (d[i * 4 + 3] < 128) continue;
+		r += d[i * 4];
+		g += d[i * 4 + 1];
+		b += d[i * 4 + 2];
+		n++;
+	}
+	if (n) {
+		const bg = [r / n, g / n, b / n];
+		const isBg = (i: number) => d[i * 4 + 3] < 128 || Math.hypot(d[i * 4] - bg[0], d[i * 4 + 1] - bg[1], d[i * 4 + 2] - bg[2]) < 60;
+		const seen = new Uint8Array(w * h);
+		const stack = border.filter(isBg);
+		for (const i of stack) seen[i] = 1;
+		while (stack.length) {
+			const i = stack.pop()!;
+			d[i * 4 + 3] = 0;
+			const x = i % w;
+			for (const j of [x > 0 ? i - 1 : -1, x < w - 1 ? i + 1 : -1, i - w, i + w]) {
+				if (j < 0 || j >= w * h || seen[j] || !isBg(j)) continue;
+				seen[j] = 1;
+				stack.push(j);
+			}
+		}
+	}
+	// Crop to the opaque pixels.
+	let x0 = w;
+	let y0 = h;
+	let x1 = -1;
+	let y1 = -1;
+	for (let y = 0; y < h; y++) {
+		for (let x = 0; x < w; x++) {
+			if (d[(y * w + x) * 4 + 3] < 128) continue;
+			x0 = Math.min(x0, x);
+			y0 = Math.min(y0, y);
+			x1 = Math.max(x1, x);
+			y1 = Math.max(y1, y);
+		}
+	}
+	const out = document.createElement('canvas');
+	if (x1 < 0) return out; // nothing left
+	out.width = x1 - x0 + 1;
+	out.height = y1 - y0 + 1;
+	const tmp = document.createElement('canvas');
+	tmp.width = w;
+	tmp.height = h;
+	tmp.getContext('2d')!.putImageData(img, 0, 0);
+	out.getContext('2d')!.drawImage(tmp, -x0, -y0);
+	return out;
+}
+
+// The text and the picture side by side (or one above the other), centred
+// on each other, on a transparent canvas.
+export function composeWithPicture(textCanvas: HTMLCanvasElement | null, picture: HTMLCanvasElement, p: TextPicture): HTMLCanvasElement | null {
+	const pic = p.removeBackground ? cutBackground(picture) : picture;
+	if (!pic.width || !pic.height) return textCanvas;
+	if (!textCanvas) return pic;
+	const ph = Math.max(1, Math.round(textCanvas.height * p.scale));
+	const pw = Math.max(1, Math.round((pic.width * ph) / pic.height));
+	const gap = Math.round(FONT_PX * 0.15);
+	const vertical = p.position === 'below' || p.position === 'above';
+	const w = vertical ? Math.max(textCanvas.width, pw) : textCanvas.width + gap + pw;
+	const h = vertical ? textCanvas.height + gap + ph : Math.max(textCanvas.height, ph);
+	const out = document.createElement('canvas');
+	out.width = w;
+	out.height = h;
+	const ctx = out.getContext('2d')!;
+	const tPos = {
+		below: [(w - textCanvas.width) / 2, 0],
+		above: [(w - textCanvas.width) / 2, ph + gap],
+		left: [pw + gap, (h - textCanvas.height) / 2],
+		right: [0, (h - textCanvas.height) / 2]
+	}[p.position];
+	const pPos = {
+		below: [(w - pw) / 2, textCanvas.height + gap],
+		above: [(w - pw) / 2, 0],
+		left: [0, (h - ph) / 2],
+		right: [textCanvas.width + gap, (h - ph) / 2]
+	}[p.position];
+	ctx.drawImage(textCanvas, tPos[0], tPos[1]);
+	ctx.drawImage(pic, pPos[0], pPos[1], pw, ph);
+	return out;
 }
 
 // Thread colours used by the text: what digitize() should keep apart.

@@ -42,5 +42,7 @@ describe('parseMeta', () => {
 		expect(m.settings.text).toEqual({ content: 'Club\nTricot\nde Lyon', font: 'lobster', thread: 5, outlineThread: 29, outline: 'thick', align: 'center' });
 		expect(parseMeta({ ...good, settings: { ...good.settings, text: { content: '  ' } } })!.settings.text).toBeUndefined();
 		expect(parseMeta(good)!.settings.text).toBeUndefined();
+		const withPic = parseMeta({ ...good, settings: { ...good.settings, text: { content: 'Lou', picture: { position: 'left', scale: 9, colors: 0.4, removeBackground: false } } } })!;
+		expect(withPic.settings.text!.picture).toEqual({ position: 'left', scale: 3, colors: 1, removeBackground: false });
 	});
 });

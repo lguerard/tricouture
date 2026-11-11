@@ -9,7 +9,7 @@
 	import { readPes } from '$lib/embroidery/pesRead';
 	import { PEC_THREADS, threadHex } from '$lib/embroidery/threads';
 	import { canvasBlob, drawStitches, renderThumbnail } from '$lib/embroidery/render';
-	import { DEFAULT_TEXT, FONT_CATEGORIES, MAX_CHARS, MAX_LINES, TEXT_FONTS, cleanText, fontOf, loadFont, renderText, textColorCount, type FontCategory, type TextSettings } from '$lib/embroidery/text';
+	import { DEFAULT_PICTURE, DEFAULT_TEXT, FONT_CATEGORIES, PICTURE_SCALE, composeWithPicture, MAX_CHARS, MAX_LINES, TEXT_FONTS, cleanText, fontOf, loadFont, renderText, textColorCount, type FontCategory, type TextSettings } from '$lib/embroidery/text';
 	import '$lib/embroidery/fonts';
 	import ThreadPicker from '$lib/components/ThreadPicker.svelte';
 	import type { PageData } from './$types';
@@ -28,6 +28,10 @@
 	let text = $state<TextSettings>({ ...DEFAULT_TEXT });
 	// The font family shown in the picker (only its fonts are downloaded).
 	let fontCat = $state<FontCategory>(fontOf(DEFAULT_TEXT.font).cat);
+	// Text mode: the optional small picture next to the text (downscaled), kept
+	// as the patch's source image so it can be reopened.
+	let picture = $state.raw<HTMLCanvasElement | null>(null);
+	let pictureUrl = $state<string | null>(null);
 	let image = $state<RasterImage | null>(null);
 	let imageUrl = $state<string | null>(null);
 	let title = $state('');
@@ -112,18 +116,21 @@
 		imageUrl = null;
 		mode = 'text';
 		session++;
+		setPicture(null);
 		if (from?.settings.text) {
 			const st = from.settings;
 			({ sizeMm, colors, removeBackground, shape, borderThread, backgroundThread, density, fabric } = st);
 			swaps = Object.fromEntries(Object.entries(st.swaps ?? {}).map(([k, v]) => [Number(k), v]));
-			text = { ...st.text! };
+			text = JSON.parse(JSON.stringify(st.text)); // a copy: the library's entry stays as it is
 			fontCat = fontOf(text.font).cat;
+			if (text.picture) loadPicture(`/media/${from.imagePath}`);
 			title = from.title;
 			currentId = from.id;
 			savedKey = keyFor(); // already in the library as it is
 			saveState = 'saved';
 		} else {
 			text = { ...DEFAULT_TEXT, content: text.content };
+			delete text.picture;
 			swaps = {};
 			currentId = null;
 			saveState = 'idle';
@@ -133,17 +140,43 @@
 		}
 	}
 
-	// Redraws the text (once its font is loaded) whenever it or its style changes.
+	function setPicture(c: HTMLCanvasElement | null) {
+		picture = c;
+		if (pictureUrl) URL.revokeObjectURL(pictureUrl);
+		pictureUrl = null;
+		c?.toBlob((b) => b && picture === c && (pictureUrl = URL.createObjectURL(b)));
+	}
+
+	async function loadPicture(src: File | string) {
+		try {
+			const blob = typeof src === 'string' ? await (await fetch(src)).blob() : src;
+			const bitmap = await createImageBitmap(blob);
+			setPicture(downscaled(bitmap, bitmap.width, bitmap.height));
+			bitmap.close();
+			text.picture ??= { ...DEFAULT_PICTURE };
+		} catch {
+			toasts.push({ kind: 'error', key: 'embroidery.errorImage' }, 6000);
+		}
+	}
+
+	function removePicture() {
+		setPicture(null);
+		delete text.picture;
+	}
+
+	// Redraws the text (once its font is loaded) whenever it, its style or its
+	// picture change.
 	let textRun = 0;
 	$effect(() => {
 		if (mode !== 'text') return;
-		const t = { ...text };
+		const t = JSON.parse(JSON.stringify(text)) as TextSettings;
+		const pic = picture;
 		const run = ++textRun;
 		loadFont(t.font)
 			.catch(() => {})
 			.then(() => {
 				if (run !== textRun || mode !== 'text') return;
-				const c = renderText(t);
+				const c = pic && t.picture ? composeWithPicture(renderText(t), pic, t.picture) : renderText(t);
 				if (!c) {
 					image = null;
 					design = null;
@@ -192,12 +225,15 @@
 	$effect(() => {
 		const img = image;
 		const isText = mode === 'text';
+		const withPicture = isText && !!picture && !!text.picture;
 		const opts = {
 			sizeMm,
 			// A text is drawn cropped, on a transparent background, in known threads.
-			colors: isText ? textColorCount(text) : colors,
+			// With a picture, its colours come on top of the text's, matched to
+			// the nearest threads like any picture.
+			colors: isText ? textColorCount(text) + (withPicture ? text.picture!.colors : 0) : colors,
 			removeBackground: isText ? false : removeBackground,
-			threads: isText ? [text.thread, ...(text.outline !== 'none' ? [text.outlineThread] : [])] : undefined,
+			threads: isText && !withPicture ? [text.thread, ...(text.outline !== 'none' ? [text.outlineThread] : [])] : undefined,
 			shape,
 			borderThread,
 			backgroundThread: backgroundThread || null,
@@ -257,7 +293,8 @@
 		const key = keyFor();
 		if (!d || !sourceCanvas || busy || key === savedKey) return;
 		const th = [...threads];
-		const src = sourceCanvas;
+		// A text patch with a picture keeps the picture, to be redrawn on reopening.
+		const src = mode === 'text' && picture && text.picture ? picture : sourceCanvas;
 		saving = (async () => {
 			saveState = 'saving';
 			try {
@@ -363,6 +400,7 @@
 	function clearEditor(toImage = false) {
 		if (toImage) mode = 'image';
 		if (mode === 'text') text = { ...DEFAULT_TEXT };
+		setPicture(null);
 		image = null;
 		design = null;
 		sourceCanvas = null;
@@ -541,6 +579,54 @@
 								</button>
 							{/each}
 						</div>
+					</div>
+				{/if}
+				<div class="field">
+					<span class="label">{t(locale, 'embroidery.picture')}</span>
+					{#if pictureUrl && text.picture}
+						<div class="pic-row">
+							<img src={pictureUrl} alt="" />
+							<button type="button" class="danger" onclick={removePicture}>✕ {t(locale, 'embroidery.pictureRemove')}</button>
+						</div>
+					{:else}
+						<label class="btn pic-add">
+							➕ {t(locale, 'embroidery.pictureAdd')}
+							<input
+								type="file"
+								accept="image/png,image/jpeg,image/webp,image/gif,image/bmp"
+								onchange={(e) => {
+									const input = e.currentTarget as HTMLInputElement;
+									const file = input.files?.[0];
+									if (file) loadPicture(file);
+									input.value = '';
+								}}
+							/>
+						</label>
+						<span class="muted small">{t(locale, 'embroidery.pictureHint')}</span>
+					{/if}
+				</div>
+				{#if picture && text.picture}
+					<div class="field">
+						<span class="label">{t(locale, 'embroidery.picturePosition')}</span>
+						<div class="seg" role="radiogroup" aria-label={t(locale, 'embroidery.picturePosition')}>
+							{#each [['below', 'embroidery.picture.below'], ['above', 'embroidery.picture.above'], ['left', 'embroidery.picture.left'], ['right', 'embroidery.picture.right']] as [value, key]}
+								<button type="button" role="radio" aria-checked={text.picture.position === value} class:on={text.picture.position === value} onclick={() => (text.picture!.position = value as typeof text.picture.position)}>
+									{t(locale, key)}
+								</button>
+							{/each}
+						</div>
+					</div>
+					<div class="field">
+						<label for="emb-pic-scale">{t(locale, 'embroidery.pictureScale', { n: Math.round(text.picture.scale * 100) })}</label>
+						<input id="emb-pic-scale" type="range" min={PICTURE_SCALE.min} max={PICTURE_SCALE.max} step="0.1" bind:value={text.picture.scale} />
+					</div>
+					<div class="field">
+						<label for="emb-pic-colors">{t(locale, 'embroidery.colors', { n: text.picture.colors })}</label>
+						<input id="emb-pic-colors" type="range" min="1" max="6" step="1" bind:value={text.picture.colors} />
+					</div>
+					<div class="field check">
+						<input id="emb-pic-bg" type="checkbox" bind:checked={text.picture.removeBackground} />
+						<label for="emb-pic-bg">{t(locale, 'embroidery.removeBackground')}</label>
 					</div>
 				{/if}
 			{:else}
@@ -832,6 +918,35 @@
 	}
 	.mode {
 		margin-bottom: 1rem;
+	}
+	.pic-row {
+		display: flex;
+		align-items: center;
+		gap: 0.6rem;
+	}
+	.pic-row img {
+		width: 64px;
+		height: 64px;
+		object-fit: contain;
+		border: 1px solid var(--border);
+		border-radius: var(--radius);
+		background: #fff;
+	}
+	.pic-row .danger {
+		color: var(--danger);
+	}
+	.pic-add {
+		position: relative;
+		display: inline-flex;
+		align-items: center;
+		min-height: 40px;
+		cursor: pointer;
+	}
+	.pic-add input {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		opacity: 0;
 	}
 	.cats {
 		margin-bottom: 0.4rem;
