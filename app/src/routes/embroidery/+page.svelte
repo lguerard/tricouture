@@ -9,15 +9,9 @@
 	import { readPes } from '$lib/embroidery/pesRead';
 	import { PEC_THREADS, threadHex } from '$lib/embroidery/threads';
 	import { canvasBlob, drawStitches, renderThumbnail } from '$lib/embroidery/render';
-	import { DEFAULT_TEXT, MAX_CHARS, MAX_LINES, TEXT_FONTS, cleanText, loadFont, renderText, textColorCount, type TextSettings } from '$lib/embroidery/text';
-	// The text patches' fonts, bundled (latin letters, accents included).
-	import '@fontsource/fredoka/latin-700.css';
-	import '@fontsource/anton/latin-400.css';
-	import '@fontsource/bebas-neue/latin-400.css';
-	import '@fontsource/alfa-slab-one/latin-400.css';
-	import '@fontsource/permanent-marker/latin-400.css';
-	import '@fontsource/lobster/latin-400.css';
-	import '@fontsource/pacifico/latin-400.css';
+	import { DEFAULT_TEXT, FONT_CATEGORIES, MAX_CHARS, MAX_LINES, TEXT_FONTS, cleanText, fontOf, loadFont, renderText, textColorCount, type FontCategory, type TextSettings } from '$lib/embroidery/text';
+	import '$lib/embroidery/fonts';
+	import ThreadPicker from '$lib/components/ThreadPicker.svelte';
 	import type { PageData } from './$types';
 
 	let { data } = $props();
@@ -25,7 +19,6 @@
 	type EmbroiderySettings = EmbroideryDesign['settings'];
 	const locale = $derived(data.locale);
 
-	const THREADS = PEC_THREADS.filter((th) => th.name !== 'Applique');
 	const threadByIndex = new Map(PEC_THREADS.map((th) => [th.index, th]));
 	const DENSITY = { light: 0.5, normal: 0.4, dense: 0.33 } as const;
 	const MAX_PIXELS = 600; // the picture is downscaled to this before digitizing
@@ -33,6 +26,8 @@
 	// What the patch is made from: a picture, or text drawn in a font.
 	let mode = $state<'image' | 'text'>('image');
 	let text = $state<TextSettings>({ ...DEFAULT_TEXT });
+	// The font family shown in the picker (only its fonts are downloaded).
+	let fontCat = $state<FontCategory>(fontOf(DEFAULT_TEXT.font).cat);
 	let image = $state<RasterImage | null>(null);
 	let imageUrl = $state<string | null>(null);
 	let title = $state('');
@@ -122,6 +117,7 @@
 			({ sizeMm, colors, removeBackground, shape, borderThread, backgroundThread, density, fabric } = st);
 			swaps = Object.fromEntries(Object.entries(st.swaps ?? {}).map(([k, v]) => [Number(k), v]));
 			text = { ...st.text! };
+			fontCat = fontOf(text.font).cat;
 			title = from.title;
 			currentId = from.id;
 			savedKey = keyFor(); // already in the library as it is
@@ -489,8 +485,15 @@
 				</div>
 				<div class="field">
 					<span class="label">{t(locale, 'embroidery.font')}</span>
+					<div class="seg cats" role="tablist" aria-label={t(locale, 'embroidery.font')}>
+						{#each FONT_CATEGORIES as c}
+							<button type="button" role="tab" aria-selected={fontCat === c} class:on={fontCat === c} onclick={() => (fontCat = c)}>
+								{t(locale, `embroidery.fontCat.${c}`)}
+							</button>
+						{/each}
+					</div>
 					<div class="fonts" role="radiogroup" aria-label={t(locale, 'embroidery.font')}>
-						{#each TEXT_FONTS as f}
+						{#each TEXT_FONTS.filter((f) => f.cat === fontCat) as f (f.id)}
 							<button
 								type="button"
 								role="radio"
@@ -498,22 +501,19 @@
 								class:on={text.font === f.id}
 								style:font-family={`"${f.family}"`}
 								style:font-weight={f.weight}
-								title={f.label}
+								title={f.family}
+								aria-label={f.family}
 								onclick={() => (text.font = f.id)}
 							>
 								{text.content.split('\n')[0].trim().slice(0, 10) || 'Abc'}
 							</button>
 						{/each}
 					</div>
+					<span class="muted small">{fontOf(text.font).family}</span>
 				</div>
 				<div class="field">
-					<label for="emb-text-thread">{t(locale, 'embroidery.textThread')}</label>
-					<div class="thread-pick">
-						<span class="swatch" style:background={threadByIndex.get(text.thread) ? threadHex(threadByIndex.get(text.thread)!) : '#000'}></span>
-						<select id="emb-text-thread" bind:value={text.thread}>
-							{#each THREADS as th}<option value={th.index}>{th.name}</option>{/each}
-						</select>
-					</div>
+					<span class="label">{t(locale, 'embroidery.textThread')}</span>
+					<ThreadPicker bind:value={text.thread} label={t(locale, 'embroidery.textThread')} />
 				</div>
 				<div class="field">
 					<span class="label">{t(locale, 'embroidery.outline')}</span>
@@ -527,13 +527,8 @@
 				</div>
 				{#if text.outline !== 'none'}
 					<div class="field">
-						<label for="emb-outline-thread">{t(locale, 'embroidery.outlineThread')}</label>
-						<div class="thread-pick">
-							<span class="swatch" style:background={threadByIndex.get(text.outlineThread) ? threadHex(threadByIndex.get(text.outlineThread)!) : '#000'}></span>
-							<select id="emb-outline-thread" bind:value={text.outlineThread}>
-								{#each THREADS as th}<option value={th.index}>{th.name}</option>{/each}
-							</select>
-						</div>
+						<span class="label">{t(locale, 'embroidery.outlineThread')}</span>
+						<ThreadPicker bind:value={text.outlineThread} label={t(locale, 'embroidery.outlineThread')} />
 					</div>
 				{/if}
 				{#if text.content.includes('\n')}
@@ -616,17 +611,12 @@
 			</div>
 			{#if shape !== 'none'}
 				<div class="field">
-					<label for="emb-border">{t(locale, 'embroidery.border')}</label>
-					<select id="emb-border" bind:value={borderThread}>
-						{#each THREADS as th}<option value={th.index}>{th.name}</option>{/each}
-					</select>
+					<span class="label">{t(locale, 'embroidery.border')}</span>
+					<ThreadPicker bind:value={borderThread} label={t(locale, 'embroidery.border')} />
 				</div>
 				<div class="field">
-					<label for="emb-fill">{t(locale, 'embroidery.background')}</label>
-					<select id="emb-fill" bind:value={backgroundThread}>
-						<option value={0}>{t(locale, 'embroidery.background.none')}</option>
-						{#each THREADS as th}<option value={th.index}>{th.name}</option>{/each}
-					</select>
+					<span class="label">{t(locale, 'embroidery.background')}</span>
+					<ThreadPicker bind:value={backgroundThread} label={t(locale, 'embroidery.background')} none={t(locale, 'embroidery.background.none')} />
 				</div>
 			{/if}
 			<div class="field">
@@ -662,14 +652,7 @@
 						{#each uniqueThreads as orig}
 							{@const th = threadByIndex.get(swaps[orig] ?? orig)}
 							<li>
-								<span class="swatch" style:background={th ? threadHex(th) : '#000'}></span>
-								<select
-									aria-label={t(locale, 'embroidery.swap')}
-									value={swaps[orig] ?? orig}
-									onchange={(e) => (swaps = { ...swaps, [orig]: Number((e.currentTarget as HTMLSelectElement).value) })}
-								>
-									{#each THREADS as opt}<option value={opt.index}>{opt.name}</option>{/each}
-								</select>
+								<ThreadPicker value={th?.index ?? orig} label={t(locale, 'embroidery.swap')} onpick={(v) => (swaps = { ...swaps, [orig]: v })} />
 							</li>
 						{/each}
 					</ol>
@@ -850,6 +833,14 @@
 	.mode {
 		margin-bottom: 1rem;
 	}
+	.cats {
+		margin-bottom: 0.4rem;
+	}
+	.cats button {
+		min-height: 34px;
+		font-size: 0.85rem;
+		padding: 0.2rem 0.5rem;
+	}
 	.fonts {
 		display: grid;
 		grid-template-columns: repeat(auto-fill, minmax(88px, 1fr));
@@ -868,14 +859,6 @@
 		border-color: var(--accent);
 		background: var(--accent-soft);
 		outline: 2px solid var(--accent);
-	}
-	.thread-pick {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-	}
-	.thread-pick select {
-		flex: 1;
 	}
 	textarea {
 		width: 100%;
@@ -934,13 +917,6 @@
 		display: flex;
 		align-items: center;
 		gap: 0.5rem;
-	}
-	.swatch {
-		flex: none;
-		width: 28px;
-		height: 28px;
-		border-radius: 50%;
-		border: 1px solid var(--border);
 	}
 	.actions {
 		display: flex;

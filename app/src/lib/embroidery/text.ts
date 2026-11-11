@@ -7,17 +7,68 @@
 
 import { PEC_THREADS, threadHex } from './threads';
 
-export type TextFont = { id: string; family: string; weight: number; label: string };
+export const FONT_CATEGORIES = ['baton', 'arrondie', 'serif', 'script', 'fantaisie'] as const;
+export type FontCategory = (typeof FONT_CATEGORIES)[number];
+export type TextFont = { id: string; family: string; weight: number; cat: FontCategory };
 
-// Loaded by the page (font CSS imports); `id` is what is stored with a patch.
+// Loaded by the page (fonts.ts); `id` is what is stored with a patch, so an
+// id never changes. Each in its heaviest weight: thin strokes don't stitch.
 export const TEXT_FONTS: readonly TextFont[] = [
-	{ id: 'fredoka', family: 'Fredoka', weight: 700, label: 'Arrondie' },
-	{ id: 'anton', family: 'Anton', weight: 400, label: 'Bâton' },
-	{ id: 'bebas', family: 'Bebas Neue', weight: 400, label: 'Capitales' },
-	{ id: 'alfa', family: 'Alfa Slab One', weight: 400, label: 'Empattements' },
-	{ id: 'marker', family: 'Permanent Marker', weight: 400, label: 'Feutre' },
-	{ id: 'lobster', family: 'Lobster', weight: 400, label: 'Rétro' },
-	{ id: 'pacifico', family: 'Pacifico', weight: 400, label: 'Manuscrite' }
+	{ id: 'anton', family: 'Anton', weight: 400, cat: 'baton' },
+	{ id: 'bebas', family: 'Bebas Neue', weight: 400, cat: 'baton' },
+	{ id: 'oswald', family: 'Oswald', weight: 700, cat: 'baton' },
+	{ id: 'montserrat', family: 'Montserrat', weight: 900, cat: 'baton' },
+	{ id: 'poppins', family: 'Poppins', weight: 900, cat: 'baton' },
+	{ id: 'archivo', family: 'Archivo Black', weight: 400, cat: 'baton' },
+	{ id: 'russo', family: 'Russo One', weight: 400, cat: 'baton' },
+	{ id: 'fjalla', family: 'Fjalla One', weight: 400, cat: 'baton' },
+	{ id: 'staatliches', family: 'Staatliches', weight: 400, cat: 'baton' },
+	{ id: 'squada', family: 'Squada One', weight: 400, cat: 'baton' },
+	{ id: 'passion', family: 'Passion One', weight: 900, cat: 'baton' },
+	{ id: 'changa', family: 'Changa One', weight: 400, cat: 'baton' },
+	{ id: 'fugaz', family: 'Fugaz One', weight: 400, cat: 'baton' },
+	{ id: 'fredoka', family: 'Fredoka', weight: 700, cat: 'arrondie' },
+	{ id: 'nunito', family: 'Nunito', weight: 900, cat: 'arrondie' },
+	{ id: 'rubik', family: 'Rubik', weight: 900, cat: 'arrondie' },
+	{ id: 'baloo', family: 'Baloo 2', weight: 800, cat: 'arrondie' },
+	{ id: 'lilita', family: 'Lilita One', weight: 400, cat: 'arrondie' },
+	{ id: 'titan', family: 'Titan One', weight: 400, cat: 'arrondie' },
+	{ id: 'concert', family: 'Concert One', weight: 400, cat: 'arrondie' },
+	{ id: 'cherrybomb', family: 'Cherry Bomb One', weight: 400, cat: 'arrondie' },
+	{ id: 'paytone', family: 'Paytone One', weight: 400, cat: 'arrondie' },
+	{ id: 'righteous', family: 'Righteous', weight: 400, cat: 'arrondie' },
+	{ id: 'alfa', family: 'Alfa Slab One', weight: 400, cat: 'serif' },
+	{ id: 'robotoslab', family: 'Roboto Slab', weight: 900, cat: 'serif' },
+	{ id: 'arvo', family: 'Arvo', weight: 700, cat: 'serif' },
+	{ id: 'bree', family: 'Bree Serif', weight: 400, cat: 'serif' },
+	{ id: 'ultra', family: 'Ultra', weight: 400, cat: 'serif' },
+	{ id: 'abril', family: 'Abril Fatface', weight: 400, cat: 'serif' },
+	{ id: 'playfair', family: 'Playfair Display', weight: 900, cat: 'serif' },
+	{ id: 'cinzel', family: 'Cinzel', weight: 900, cat: 'serif' },
+	{ id: 'bevan', family: 'Bevan', weight: 400, cat: 'serif' },
+	{ id: 'holtwood', family: 'Holtwood One SC', weight: 400, cat: 'serif' },
+	{ id: 'graduate', family: 'Graduate', weight: 400, cat: 'serif' },
+	{ id: 'rye', family: 'Rye', weight: 400, cat: 'serif' },
+	{ id: 'pacifico', family: 'Pacifico', weight: 400, cat: 'script' },
+	{ id: 'lobster', family: 'Lobster', weight: 400, cat: 'script' },
+	{ id: 'kaushan', family: 'Kaushan Script', weight: 400, cat: 'script' },
+	{ id: 'yellowtail', family: 'Yellowtail', weight: 400, cat: 'script' },
+	{ id: 'dancing', family: 'Dancing Script', weight: 700, cat: 'script' },
+	{ id: 'courgette', family: 'Courgette', weight: 400, cat: 'script' },
+	{ id: 'shrikhand', family: 'Shrikhand', weight: 400, cat: 'script' },
+	{ id: 'caveat', family: 'Caveat Brush', weight: 400, cat: 'script' },
+	{ id: 'marker', family: 'Permanent Marker', weight: 400, cat: 'script' },
+	{ id: 'bungee', family: 'Bungee', weight: 400, cat: 'fantaisie' },
+	{ id: 'luckiest', family: 'Luckiest Guy', weight: 400, cat: 'fantaisie' },
+	{ id: 'chewy', family: 'Chewy', weight: 400, cat: 'fantaisie' },
+	{ id: 'bangers', family: 'Bangers', weight: 400, cat: 'fantaisie' },
+	{ id: 'blackops', family: 'Black Ops One', weight: 400, cat: 'fantaisie' },
+	{ id: 'knewave', family: 'Knewave', weight: 400, cat: 'fantaisie' },
+	{ id: 'sigmar', family: 'Sigmar One', weight: 400, cat: 'fantaisie' },
+	{ id: 'bowlby', family: 'Bowlby One SC', weight: 400, cat: 'fantaisie' },
+	{ id: 'carter', family: 'Carter One', weight: 400, cat: 'fantaisie' },
+	{ id: 'creepster', family: 'Creepster', weight: 400, cat: 'fantaisie' },
+	{ id: 'pixel', family: 'Press Start 2P', weight: 400, cat: 'fantaisie' }
 ];
 
 export type TextOutline = 'none' | 'thin' | 'thick';
