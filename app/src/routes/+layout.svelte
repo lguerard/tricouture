@@ -12,7 +12,8 @@
 	import { clearConversations } from '$lib/assistant/store.svelte';
 	import { flushPendingDeletes } from '$lib/undo';
 	import { toasts } from '$lib/toast.svelte';
-	import { listenNotificationTaps, scheduleAdventNotifications } from '$lib/capacitor';
+	import { isCapacitor, listenNotificationTaps, scheduleAdventNotifications } from '$lib/capacitor';
+	import { captureShellHash, sendPlanToShell } from '$lib/shell';
 	import { ADVENT_DAYS, ADVENT_NOTIFY_ID_BASE, notificationPlan, parisDate } from '$lib/advent';
 
 	let { data, children } = $props();
@@ -23,11 +24,20 @@
 	// (they reveal nothing until they fire), and a reminder in the app when a
 	// door is waiting. The reminder shows once a day per device.
 	let adventScheduled = '';
+	let shellHashRead = false;
 	$effect(() => {
+		// The app's start page announces itself (and acknowledges a plan) in the
+		// hash; read it once, then clean the address. See $lib/shell.ts.
+		if (!shellHashRead) {
+			shellHashRead = true;
+			if (captureShellHash(location.hash)) {
+				history.replaceState(history.state, '', location.pathname + location.search);
+			}
+		}
 		const n = data.advent?.notify;
-		const key = n ? `${n.year}:${n.mode}:${data.locale}` : 'none';
-		if (key === adventScheduled) return;
-		adventScheduled = key;
+		const sig = n ? `${n.year}:${n.mode}:${data.locale}` : 'none';
+		if (sig === adventScheduled) return;
+		adventScheduled = sig;
 		listenNotificationTaps((href) => goto(href));
 		const plan = n
 			? notificationPlan(n.year, n.mode, new Date()).map(({ day, at }) => ({
@@ -37,7 +47,19 @@
 					at
 				}))
 			: [];
-		scheduleAdventNotifications(plan, Array.from({ length: ADVENT_DAYS }, (_, i) => ADVENT_NOTIFY_ID_BASE + i + 1));
+		const ids = Array.from({ length: ADVENT_DAYS }, (_, i) => ADVENT_NOTIFY_ID_BASE + i + 1);
+		if (isCapacitor()) {
+			// App built with its server address: the page reaches the phone directly.
+			scheduleAdventNotifications(plan, ids);
+		} else {
+			// App without a built-in address: hand the plan to its start page.
+			sendPlanToShell(
+				plan.map((p) => ({ ...p, at: p.at.toISOString(), href: '/avent' })),
+				ids,
+				sig,
+				location.origin + location.pathname + location.search
+			);
+		}
 	});
 	$effect(() => {
 		const door = data.advent?.waitingDoor;

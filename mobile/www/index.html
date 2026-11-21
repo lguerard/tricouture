@@ -98,12 +98,6 @@
 			const input = document.getElementById('url');
 			const hint = document.getElementById('hint');
 
-			// replace(), not href: the shell must not stay in the history, or the
-			// back button would land here and bounce straight back to the server.
-			function goTo(url) {
-				location.replace(url);
-			}
-
 			// A saved server that doesn't answer (offline, address changed) shows
 			// the form again instead of a dead page there is no way out of.
 			async function reachable(url) {
@@ -119,12 +113,92 @@
 				}
 			}
 
+			// What this shell can do for the site, announced in the hash of the
+			// first page it opens (see app/src/lib/shell.ts). Bump SHELL_VERSION when
+			// adding a capability, so the site only asks shells that know it.
+			const SHELL_VERSION = 2;
+			const LN = window.Capacitor?.Plugins?.LocalNotifications;
+
+			// replace(), not href: the shell must not stay in the history, or the
+			// back button would land here and bounce straight back to the server.
+			function goTo(url, hash) {
+				location.replace(hash ? url.split('#')[0] + '#' + hash : url);
+			}
+			function shellHash() {
+				return LN ? 'tc_shell=' + encodeURIComponent(location.origin) + '&tc_v=' + SHELL_VERSION : '';
+			}
+			function sameServer(url, saved) {
+				try {
+					return new URL(url).origin === new URL(saved).origin;
+				} catch {
+					return false;
+				}
+			}
+
+			// A tapped notification carries the page to open (e.g. /avent).
+			let tappedHref = null;
+			LN?.addListener?.('localNotificationActionPerformed', (e) => {
+				const href = e?.notification?.extra?.href;
+				if (typeof href === 'string' && href.startsWith('/')) tappedHref = href;
+			});
+
+			// The site sends its notifications here to be scheduled on the phone:
+			// #advent=<json {plan, ids, sig, back}>. Only this local page can reach
+			// the phone's notification system, since no server address is built in.
+			async function scheduleFromSite(raw, saved) {
+				let msg;
+				try {
+					msg = JSON.parse(decodeURIComponent(raw));
+				} catch {
+					return false;
+				}
+				const back = typeof msg.back === 'string' && sameServer(msg.back, saved) ? msg.back : saved;
+				let result = 'unavailable';
+				if (LN) {
+					try {
+						const ids = (msg.ids || []).filter((x) => Number.isInteger(x));
+						if (ids.length) await LN.cancel({ notifications: ids.map((id) => ({ id })) });
+						const plan = (msg.plan || []).filter((n) => Number.isInteger(n.id) && n.at && new Date(n.at) > new Date());
+						if (plan.length) {
+							const perms = await LN.requestPermissions();
+							if (perms.display === 'granted') {
+								await LN.schedule({
+									notifications: plan.map((n) => ({
+										id: n.id,
+										title: String(n.title || ''),
+										body: String(n.body || ''),
+										schedule: { at: new Date(n.at), allowWhileIdle: true },
+										extra: { href: typeof n.href === 'string' ? n.href : '/' }
+									}))
+								});
+								result = 'ok';
+							} else result = 'denied';
+						} else result = 'ok';
+					} catch {
+						result = 'error';
+					}
+				}
+				goTo(back, 'tc_advent=' + encodeURIComponent(String(msg.sig || '')) + '&tc_result=' + result + '&' + shellHash());
+				return true;
+			}
+
 			const saved = localStorage.getItem('serverUrl');
-			if (saved) {
+			const advent = location.hash.startsWith('#advent=') ? location.hash.slice('#advent='.length) : null;
+			if (saved && advent) {
+				document.querySelector('.card').style.visibility = 'hidden';
+				scheduleFromSite(advent, saved).then((handled) => {
+					if (!handled) goTo(saved, shellHash());
+				});
+			} else if (saved) {
 				input.value = saved;
-				reachable(saved).then((ok) => {
-					if (ok) goTo(saved);
-					else hint.innerHTML = STRINGS[locale].unreachable;
+				reachable(saved).then(async (ok) => {
+					if (!ok) {
+						hint.innerHTML = STRINGS[locale].unreachable;
+						return;
+					}
+					// Give a notification tap that launched the app time to arrive.
+					await new Promise((r) => setTimeout(r, 300));
+					goTo(tappedHref ? new URL(tappedHref, saved).href : saved, shellHash());
 				});
 			}
 			document.getElementById('go').addEventListener('click', () => {
@@ -132,7 +206,7 @@
 				if (!v) return;
 				if (!/^https?:\/\//.test(v)) v = 'https://' + v;
 				localStorage.setItem('serverUrl', v);
-				goTo(v);
+				goTo(v, shellHash());
 			});
 		</script>
 	</body>
