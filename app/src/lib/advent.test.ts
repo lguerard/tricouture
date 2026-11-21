@@ -15,7 +15,9 @@ import {
 	ADVENT_TODO_AUTO,
 	ADVENT_TODO_IDS,
 	parisInstant,
-	notificationPlan
+	notificationPlan,
+	parseTodoText,
+	groupTodos
 } from './advent';
 
 describe('parisDate', () => {
@@ -134,5 +136,30 @@ describe('notifications', () => {
 		const now = new Date('2026-12-05T12:00:00Z');
 		expect(notificationPlan(2026, 'first', now)).toEqual([]);
 		expect(notificationPlan(2026, 'daily', now)[0].day).toBe(6);
+	});
+});
+
+describe('custom tasks', () => {
+	let n = 0;
+	const id = () => String(++n);
+	it('reads groups, titles and notes from pasted text', () => {
+		const list = parseTodoText('# Commande\nCommander la laine | 60 pelotes\n\n- Acheter les patrons\n## Téléphone\nInstaller l’APK', id);
+		expect(list.map((x) => [x.group, x.title, x.note])).toEqual([
+			['Commande', 'Commander la laine', '60 pelotes'],
+			['Commande', 'Acheter les patrons', ''],
+			['Téléphone', 'Installer l’APK', '']
+		]);
+		expect(new Set(list.map((x) => x.id)).size).toBe(3);
+		expect(list.every((x) => x.id.startsWith('c-'))).toBe(true);
+	});
+	it('ignores empty lines and lines without a title', () => {
+		expect(parseTodoText('\n   \n| juste une note\n#\n', id)).toEqual([]);
+	});
+	it('keeps groups in the order they first appear', () => {
+		const list = parseTodoText('# B\nb1\n# A\na1\n# B\nb2', id);
+		expect(groupTodos(list).map((g) => [g.group, g.items.map((i) => i.title)])).toEqual([
+			['B', ['b1', 'b2']],
+			['A', ['a1']]
+		]);
 	});
 });

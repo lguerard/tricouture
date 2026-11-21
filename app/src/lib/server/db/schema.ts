@@ -1,5 +1,5 @@
 import type { TextSettings } from '../../embroidery/text';
-import type { AdventYarn, NotifyMode } from '../../advent';
+import type { AdventYarn, CustomTodo, NotifyMode } from '../../advent';
 import {
 	pgTable,
 	pgEnum,
@@ -656,6 +656,8 @@ export const adventCalendars = pgTable(
 		revealEarly: boolean('reveal_early').notNull().default(false),
 		// Ticked items of the lutin's checklist (ids from ADVENT_TODO).
 		todoDone: jsonb('todo_done').$type<string[]>().notNull().default([]),
+		// The lutin's own tasks, added to the checklist (see parseTodoText).
+		todoCustom: jsonb('todo_custom').$type<CustomTodo[]>().notNull().default([]),
 		// Phone notifications to the recipient: 'off' | 'first' | 'daily'.
 		notify: varchar('notify', { length: 10 }).$type<NotifyMode>().notNull().default('first'),
 		createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()

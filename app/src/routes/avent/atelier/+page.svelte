@@ -3,7 +3,7 @@
 	import { withFeedback } from '$lib/feedback';
 	import { t } from '$lib/i18n';
 	import { mediaUrl } from '$lib/media';
-	import { ADVENT_TODO, ADVENT_TODO_AUTO, NOTIFY_MODES, normalizeCode, type AdventYarn } from '$lib/advent';
+	import { ADVENT_TODO, ADVENT_TODO_AUTO, NOTIFY_MODES, groupTodos, normalizeCode, type AdventYarn } from '$lib/advent';
 
 	let { data } = $props();
 	const locale = $derived(data.locale);
@@ -45,8 +45,12 @@
 		if (id === 'fill') return readyCount === data.days.length && data.days.length > 0;
 		return !!data.calendar?.todoDone.includes(id);
 	}
-	const todoTotal = ADVENT_TODO.reduce((n, g) => n + g.ids.length, 0);
-	const todoDoneCount = $derived(ADVENT_TODO.reduce((n, g) => n + g.ids.filter(isDone).length, 0));
+	const custom = $derived(data.calendar?.todoCustom ?? []);
+	const customGroups = $derived(groupTodos(custom));
+	const allTodoIds = $derived([...ADVENT_TODO.flatMap((g) => g.ids), ...custom.map((c) => c.id)]);
+	const todoTotal = $derived(allTodoIds.length);
+	const todoDoneCount = $derived(allTodoIds.filter(isDone).length);
+	let todoText = $state('');
 </script>
 
 <div class="container">
@@ -171,6 +175,42 @@
 					{/each}
 				</ul>
 			{/each}
+			{#each customGroups as g}
+				<h3>{g.group || t(locale, 'advent.todo.mine')}</h3>
+				<ul>
+					{#each g.items as item (item.id)}
+						{@const done = isDone(item.id)}
+						<li class:done class="custom">
+							<form method="POST" action="?/toggleTodo" use:enhance={() => async ({ update }) => update({ reset: false, invalidateAll: true })}>
+								<input type="hidden" name="calendarId" value={data.calendar.id} />
+								<input type="hidden" name="id" value={item.id} />
+								<label class="item">
+									<input id="todo-{item.id}" type="checkbox" name="done" checked={done} onchange={(e) => e.currentTarget.form?.requestSubmit()} />
+									<span>
+										<b>{item.title}</b>
+										{#if item.note}<span class="muted small">{item.note}</span>{/if}
+									</span>
+								</label>
+							</form>
+							<form method="POST" action="?/deleteTodo" use:enhance={() => async ({ update }) => update({ reset: false, invalidateAll: true })}>
+								<input type="hidden" name="calendarId" value={data.calendar.id} />
+								<input type="hidden" name="id" value={item.id} />
+								<button type="submit" class="del" aria-label={t(locale, 'advent.todo.delete', { title: item.title })} title={t(locale, 'advent.todo.delete', { title: item.title })}>×</button>
+							</form>
+						</li>
+					{/each}
+				</ul>
+			{/each}
+			<details class="add-todo">
+				<summary>{t(locale, 'advent.todo.add')}</summary>
+				<form method="POST" action="?/addTodos" use:enhance={withFeedback({ success: 'toast.saved', inner: () => async ({ update }) => { await update({ reset: false, invalidateAll: true }); todoText = ''; } })}>
+					<input type="hidden" name="calendarId" value={data.calendar.id} />
+					<label for="todo-text">{t(locale, 'advent.todo.addLabel')}</label>
+					<textarea id="todo-text" name="text" rows="6" bind:value={todoText} placeholder={t(locale, 'advent.todo.addPh')}></textarea>
+					<p class="muted small">{t(locale, 'advent.todo.addHelp')}</p>
+					<button type="submit" class="btn-primary" disabled={!todoText.trim()}>{t(locale, 'advent.todo.addBtn')}</button>
+				</form>
+			</details>
 		</section>
 
 		{#each data.days as d (d.day)}
@@ -318,4 +358,11 @@
 	.item input { width: 18px; height: 18px; margin-top: 3px; }
 	.item > span { display: grid; min-width: 0; }
 	.todo li.done b { text-decoration: line-through; color: var(--muted); }
+	.todo li.custom { display: grid; grid-template-columns: 1fr auto; align-items: start; gap: 0.4rem; }
+	.del { border: 0; background: transparent; color: var(--muted); font-size: 1.2rem; line-height: 1; padding: 0.45rem 0.4rem; cursor: pointer; }
+	.del:hover { color: var(--danger); }
+	.add-todo { margin-top: 0.8rem; }
+	.add-todo summary { cursor: pointer; font-weight: 600; color: var(--accent); }
+	.add-todo form { margin-top: 0.6rem; }
+	.add-todo textarea { font-family: ui-monospace, monospace; font-size: 0.85rem; }
 </style>
