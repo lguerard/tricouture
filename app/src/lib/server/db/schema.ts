@@ -1,4 +1,5 @@
 import type { TextSettings } from '../../embroidery/text';
+import type { AdventYarn } from '../../advent';
 import {
 	pgTable,
 	pgEnum,
@@ -632,6 +633,64 @@ export const appSettings = pgTable('app_settings', {
 });
 
 /* ------------------------------------------------------------------ */
+/* Advent calendar                                                    */
+/* ------------------------------------------------------------------ */
+
+// One account (the "lutin") prepares a calendar of 24 doors for another
+// account. Rules in $lib/advent.ts; enforcement in $lib/server/advent.ts.
+export const adventCalendars = pgTable(
+	'advent_calendars',
+	{
+		id: uuid('id').primaryKey().defaultRandom(),
+		ownerId: uuid('owner_id')
+			.notNull()
+			.references(() => users.id, { onDelete: 'cascade' }),
+		recipientId: uuid('recipient_id')
+			.notNull()
+			.references(() => users.id, { onDelete: 'cascade' }),
+		year: integer('year').notNull(),
+		title: varchar('title', { length: 160 }).notNull(),
+		// Shown on the board under the title, e.g. a word to the recipient.
+		message: text('message'),
+		createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
+	},
+	(t) => ({
+		recipientYearIdx: uniqueIndex('advent_calendars_recipient_year_idx').on(t.recipientId, t.year),
+		ownerIdx: index('advent_calendars_owner_idx').on(t.ownerId)
+	})
+);
+
+export const adventDays = pgTable(
+	'advent_days',
+	{
+		id: uuid('id').primaryKey().defaultRandom(),
+		calendarId: uuid('calendar_id')
+			.notNull()
+			.references(() => adventCalendars.id, { onDelete: 'cascade' }),
+		day: integer('day').notNull(), // 1..24
+		title: varchar('title', { length: 160 }),
+		// Part of the "fil rouge" (the big project in several instalments).
+		isMain: boolean('is_main').notNull().default(false),
+		// Where the yarn is hidden: shown once the door's date has come.
+		hint: text('hint'),
+		hintPhotoPath: text('hint_photo_path'),
+		// Kept readable on purpose: the lutin needs to see it again. Never sent
+		// to the recipient (see $lib/server/advent.ts).
+		code: varchar('code', { length: 80 }),
+		// A pattern of the lutin's library; copied into the recipient's library
+		// when the door opens.
+		patternId: uuid('pattern_id').references(() => patterns.id, { onDelete: 'set null' }),
+		yarns: jsonb('yarns').$type<AdventYarn[]>().notNull().default([]),
+		message: text('message'), // a word revealed with the pattern
+		openedAt: timestamp('opened_at', { withTimezone: true }),
+		openedPatternId: uuid('opened_pattern_id').references(() => patterns.id, { onDelete: 'set null' }),
+		failedAttempts: integer('failed_attempts').notNull().default(0),
+		lastAttemptAt: timestamp('last_attempt_at', { withTimezone: true })
+	},
+	(t) => ({ calendarDayIdx: uniqueIndex('advent_days_calendar_day_idx').on(t.calendarId, t.day) })
+);
+
+/* ------------------------------------------------------------------ */
 /* Inferred types                                                     */
 /* ------------------------------------------------------------------ */
 
@@ -647,3 +706,5 @@ export type ProjectFabric = typeof projectFabrics.$inferSelect;
 export type ProjectStatus = (typeof projectStatus.enumValues)[number];
 export type Craft = (typeof craft.enumValues)[number];
 export type PieceStatus = (typeof pieceStatus.enumValues)[number];
+export type AdventCalendar = typeof adventCalendars.$inferSelect;
+export type AdventDay = typeof adventDays.$inferSelect;

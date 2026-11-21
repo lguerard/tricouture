@@ -55,6 +55,8 @@
 		['/gallery', 'nav.gallery'],
 		['/moodboards', 'nav.moodboards'],
 		['/embroidery', 'nav.embroidery'],
+		['/avent/atelier', 'advent.workshop.title'],
+		['/avent', 'nav.advent'],
 		['/account', 'nav.account']
 	];
 	const pageTitle = $derived.by(() => {
@@ -91,6 +93,9 @@
 		{ href: '/gallery', key: 'nav.gallery', icon: '🖼️' },
 		{ href: '/moodboards', key: 'nav.moodboards', icon: '🎨' },
 		{ href: '/embroidery', key: 'nav.embroidery', icon: '🪡' },
+		...(data.advent?.recipient || data.advent?.owner || data.user?.isAdmin
+			? [{ href: '/avent', key: 'nav.advent', icon: '✨' }]
+			: []),
 		{ href: '/account', key: 'nav.account', icon: '👤' },
 		// Reset links and roles: administrators only.
 		...(data.user?.isAdmin ? [{ href: '/admin/users', key: 'nav.users', icon: '🔐' }] : [])

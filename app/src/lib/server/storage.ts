@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { mkdir, writeFile, unlink } from 'node:fs/promises';
+import { copyFile, mkdir, writeFile, unlink } from 'node:fs/promises';
 import { join, extname, normalize, sep } from 'node:path';
 import { env } from '$env/dynamic/private';
 import { THUMB_WIDTHS, thumbPath } from '$lib/server/thumbnails';
@@ -115,4 +115,15 @@ export async function deleteStored(relative: string): Promise<void> {
 // Checks that a path belongs to the given user (first segment must equal ownerId).
 export function ownsPath(ownerId: string, relative: string): boolean {
 	return normalize(relative).split(sep).join('/').startsWith(`${ownerId}/`);
+}
+
+// Copies a stored file into another owner's directory (advent calendar: the
+// pattern given becomes the recipient's own). Returns the new relative path.
+export async function copyStored(relative: string, newOwnerId: string, subdir = ''): Promise<string> {
+	const ext = extname(relative).toLowerCase().slice(0, 12);
+	const rel = join(newOwnerId, subdir, `${randomUUID()}${ext}`).split(sep).join('/');
+	const abs = absolutePath(rel);
+	await mkdir(join(abs, '..'), { recursive: true });
+	await copyFile(absolutePath(relative), abs);
+	return rel;
 }
