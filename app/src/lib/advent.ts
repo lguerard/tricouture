@@ -120,3 +120,23 @@ export function cleanYarn(raw: Partial<Record<keyof AdventYarn, unknown>>): Adve
 	if (!y.brand && !y.name && !y.colorway) return null;
 	return y;
 }
+
+// The recipient sees the calendar (menu link and page) from December 1st, so
+// the lutin can prepare it in advance without spoiling the surprise — unless
+// they choose to show it early, as a teaser.
+export function isRevealed(year: number, today: ParisDate, revealEarly: boolean): boolean {
+	if (revealEarly) return true;
+	return dayNumber(today) >= dayNumber({ year, month: 12, day: 1 });
+}
+
+// The lutin's preparation checklist, shown in the workshop. Ids are stored in
+// advent_calendars.todo_done, so they are data: never rename one. Titles live
+// in the i18n dictionary (advent.todo.<id> and advent.todo.<id>.note).
+// `auto` items are ticked by the app itself from the calendar's state.
+export const ADVENT_TODO: { phase: 'before' | 'prepare' | 'during'; ids: string[] }[] = [
+	{ phase: 'before', ids: ['yarn', 'notions', 'patterns', 'import'] },
+	{ phase: 'prepare', ids: ['packs', 'tags', 'hints', 'fill', 'preview'] },
+	{ phase: 'during', ids: ['hide', 'watch'] }
+];
+export const ADVENT_TODO_AUTO = new Set(['fill']);
+export const ADVENT_TODO_IDS = new Set(ADVENT_TODO.flatMap((g) => g.ids));

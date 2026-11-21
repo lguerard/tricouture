@@ -21,31 +21,43 @@ import {
 	codeMatches,
 	daysUntil,
 	isDayAvailable,
+	isRevealed,
+	parisDate,
 	type AdventYarn,
 	type ParisDate
 } from '$lib/advent';
 
 export const ADVENT_TAG = 'calendrier-avent';
 
-// Which advent links the menu shows for this account.
-export async function adventRoles(uid: string): Promise<{ recipient: boolean; owner: boolean }> {
+// Which advent links the menu shows for this account. A calendar not yet
+// revealed (before December 1st) does not count for its recipient.
+export async function adventRoles(uid: string, today: ParisDate = parisDate(new Date())): Promise<{ recipient: boolean; owner: boolean }> {
 	const rows = await db
-		.select({ ownerId: adventCalendars.ownerId, recipientId: adventCalendars.recipientId })
+		.select({
+			ownerId: adventCalendars.ownerId,
+			recipientId: adventCalendars.recipientId,
+			year: adventCalendars.year,
+			revealEarly: adventCalendars.revealEarly
+		})
 		.from(adventCalendars)
 		.where(or(eq(adventCalendars.ownerId, uid), eq(adventCalendars.recipientId, uid)));
 	return {
-		recipient: rows.some((r) => r.recipientId === uid),
+		recipient: rows.some((r) => r.recipientId === uid && isRevealed(r.year, today, r.revealEarly)),
 		owner: rows.some((r) => r.ownerId === uid)
 	};
 }
 
 // The calendar this account opens: this year's, else the most recent one.
-export async function calendarForRecipient(uid: string, year: number): Promise<AdventCalendar | null> {
-	const rows = await db
-		.select()
-		.from(adventCalendars)
-		.where(eq(adventCalendars.recipientId, uid))
-		.orderBy(desc(adventCalendars.year));
+// Calendars not yet revealed are invisible to their recipient.
+export async function calendarForRecipient(uid: string, today: ParisDate): Promise<AdventCalendar | null> {
+	const rows = (
+		await db
+			.select()
+			.from(adventCalendars)
+			.where(eq(adventCalendars.recipientId, uid))
+			.orderBy(desc(adventCalendars.year))
+	).filter((c) => isRevealed(c.year, today, c.revealEarly));
+	const year = today.year;
 	return rows.find((c) => c.year === year) ?? rows.find((c) => c.year < year) ?? rows[0] ?? null;
 }
 

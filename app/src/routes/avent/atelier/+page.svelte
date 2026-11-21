@@ -3,7 +3,7 @@
 	import { withFeedback } from '$lib/feedback';
 	import { t } from '$lib/i18n';
 	import { mediaUrl } from '$lib/media';
-	import { normalizeCode, type AdventYarn } from '$lib/advent';
+	import { ADVENT_TODO, ADVENT_TODO_AUTO, normalizeCode, type AdventYarn } from '$lib/advent';
 
 	let { data } = $props();
 	const locale = $derived(data.locale);
@@ -38,6 +38,15 @@
 		if (!previewDate && data.calendar) previewDate = `${data.calendar.year}-12-01`;
 	});
 	let openDay = $state<number | null>(null);
+
+	// Preparation checklist: ticked ids are stored on the calendar; "fill" ticks
+	// itself once the 24 days are complete.
+	function isDone(id: string): boolean {
+		if (id === 'fill') return readyCount === data.days.length && data.days.length > 0;
+		return !!data.calendar?.todoDone.includes(id);
+	}
+	const todoTotal = ADVENT_TODO.reduce((n, g) => n + g.ids.length, 0);
+	const todoDoneCount = $derived(ADVENT_TODO.reduce((n, g) => n + g.ids.filter(isDone).length, 0));
 </script>
 
 <div class="container">
@@ -93,6 +102,8 @@
 					<label for="cm">{t(locale, 'advent.ws.calMessage')}</label>
 					<textarea id="cm" name="message" rows="2">{data.calendar.message ?? ''}</textarea>
 				</div>
+				<label class="check"><input id="reveal" type="checkbox" name="revealEarly" checked={data.calendar.revealEarly} /> {t(locale, 'advent.ws.revealEarly')}</label>
+				<p class="muted small">{data.calendar.revealEarly ? t(locale, 'advent.ws.revealedNow') : t(locale, 'advent.ws.hiddenUntil', { year: data.calendar.year })}</p>
 				<button type="submit">{t(locale, 'advent.ws.save')}</button>
 			</form>
 			<div class="summary">
@@ -120,6 +131,39 @@
 				{/each}
 			</div>
 			<p class="muted small">{t(locale, 'advent.ws.legend')}</p>
+		</section>
+
+		<section class="card todo">
+			<h2>{t(locale, 'advent.todo.title')} <small class="muted">{t(locale, 'advent.todo.progress', { n: todoDoneCount, total: todoTotal })}</small></h2>
+			{#each ADVENT_TODO as g}
+				<h3>{t(locale, `advent.todo.phase.${g.phase}`)}</h3>
+				<ul>
+					{#each g.ids as id}
+						{@const auto = ADVENT_TODO_AUTO.has(id)}
+						{@const done = isDone(id)}
+						<li class:done>
+							<form method="POST" action="?/toggleTodo" use:enhance={() => async ({ update }) => update({ reset: false, invalidateAll: true })}>
+								<input type="hidden" name="calendarId" value={data.calendar.id} />
+								<input type="hidden" name="id" value={id} />
+								<label class="item">
+									<input
+										id="todo-{id}"
+										type="checkbox"
+										name="done"
+										checked={done}
+										disabled={auto}
+										onchange={(e) => e.currentTarget.form?.requestSubmit()}
+									/>
+									<span>
+										<b>{t(locale, `advent.todo.${id}`)}</b>
+										<span class="muted small">{t(locale, `advent.todo.${id}.note`)}{auto ? ' ' + t(locale, 'advent.todo.auto') : ''}</span>
+									</span>
+								</label>
+							</form>
+						</li>
+					{/each}
+				</ul>
+			{/each}
 		</section>
 
 		{#each data.days as d (d.day)}
@@ -257,4 +301,14 @@
 	}
 	.yarn-head span { font-size: 0.75rem; color: var(--muted); }
 	.yarn input[type='color'] { padding: 2px; height: 2.2rem; }
+	.todo h2 { margin: 0 0 0.4rem; font-size: 1.1rem; display: flex; gap: 0.6rem; align-items: baseline; flex-wrap: wrap; }
+	.todo h3 { margin: 0.8rem 0 0.2rem; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+	.todo ul { list-style: none; margin: 0; padding: 0; }
+	.todo li { border-top: 1px solid var(--border); }
+	.todo li:first-child { border-top: 0; }
+	.todo form { display: block; }
+	.item { display: grid; grid-template-columns: 22px 1fr; gap: 0.6rem; padding: 0.45rem 0; cursor: pointer; align-items: start; }
+	.item input { width: 18px; height: 18px; margin-top: 3px; }
+	.item > span { display: grid; min-width: 0; }
+	.todo li.done b { text-decoration: line-through; color: var(--muted); }
 </style>

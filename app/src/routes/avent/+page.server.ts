@@ -15,7 +15,7 @@ async function resolve(uid: string, url: URL): Promise<{ cal: AdventCalendar; to
 		return { cal, today, preview: true };
 	}
 	const today = parisDate(new Date());
-	const cal = await calendarForRecipient(uid, today.year);
+	const cal = await calendarForRecipient(uid, today);
 	return cal ? { cal, today, preview: false } : null;
 }
 

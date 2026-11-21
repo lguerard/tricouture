@@ -652,6 +652,10 @@ export const adventCalendars = pgTable(
 		title: varchar('title', { length: 160 }).notNull(),
 		// Shown on the board under the title, e.g. a word to the recipient.
 		message: text('message'),
+		// Show the calendar to the recipient before December 1st (a teaser).
+		revealEarly: boolean('reveal_early').notNull().default(false),
+		// Ticked items of the lutin's checklist (ids from ADVENT_TODO).
+		todoDone: jsonb('todo_done').$type<string[]>().notNull().default([]),
 		createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
 	},
 	(t) => ({

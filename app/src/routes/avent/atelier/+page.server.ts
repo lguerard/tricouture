@@ -4,7 +4,7 @@ import { db } from '$lib/server/db';
 import { adventCalendars, adventDays, patterns, users } from '$lib/server/db/schema';
 import { createCalendar, daysOf, ownedCalendar } from '$lib/server/advent';
 import { deleteStored, isSupportedImage, saveImageUpload } from '$lib/server/storage';
-import { ADVENT_DAYS, cleanYarn, normalizeCode, parisDate, type AdventYarn } from '$lib/advent';
+import { ADVENT_DAYS, ADVENT_TODO_AUTO, ADVENT_TODO_IDS, cleanYarn, normalizeCode, parisDate, type AdventYarn } from '$lib/advent';
 import { t } from '$lib/i18n';
 import type { Actions, PageServerLoad } from './$types';
 
@@ -43,7 +43,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 
 	return {
 		calendars,
-		calendar: cal ? { id: cal.id, title: cal.title, message: cal.message, year: cal.year } : null,
+		calendar: cal ? { id: cal.id, title: cal.title, message: cal.message, year: cal.year, revealEarly: cal.revealEarly, todoDone: cal.todoDone } : null,
 		days,
 		myPatterns,
 		people,
@@ -85,8 +85,26 @@ export const actions: Actions = {
 		if (!cal) return fail(404, { error: t(locals.locale, 'advent.err.missing') });
 		await db
 			.update(adventCalendars)
-			.set({ title: str(form, 'title', 160) || cal.title, message: str(form, 'message', 2000) || null })
+			.set({
+				title: str(form, 'title', 160) || cal.title,
+				message: str(form, 'message', 2000) || null,
+				revealEarly: form.get('revealEarly') === 'on'
+			})
 			.where(eq(adventCalendars.id, cal.id));
+		return { ok: true };
+	},
+
+	// Ticks or unticks one item of the preparation checklist.
+	toggleTodo: async ({ locals, request }) => {
+		const form = await request.formData();
+		const cal = await ownedCalendar(locals.user!.id, str(form, 'calendarId', 40));
+		if (!cal) return fail(404, { error: t(locals.locale, 'advent.err.missing') });
+		const id = str(form, 'id', 40);
+		if (!ADVENT_TODO_IDS.has(id) || ADVENT_TODO_AUTO.has(id)) return fail(400, { error: t(locals.locale, 'advent.err.invalid') });
+		const done = new Set(cal.todoDone);
+		if (form.get('done') === 'on') done.add(id);
+		else done.delete(id);
+		await db.update(adventCalendars).set({ todoDone: [...done] }).where(eq(adventCalendars.id, cal.id));
 		return { ok: true };
 	},
 

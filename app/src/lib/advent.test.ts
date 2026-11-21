@@ -9,7 +9,11 @@ import {
 	isDayAvailable,
 	normalizeCode,
 	parisDate,
-	parseIsoDate
+	parseIsoDate,
+	isRevealed,
+	ADVENT_TODO,
+	ADVENT_TODO_AUTO,
+	ADVENT_TODO_IDS
 } from './advent';
 
 describe('parisDate', () => {
@@ -91,5 +95,24 @@ describe('cleanYarn', () => {
 			cleanYarn({ brand: 'DROPS', name: 'Lima', colorway: 'Cobalt', colorHex: '#1F4FD1', skeins: '4', metersPerSkein: '100', gramsPerSkein: 'x' })
 		).toMatchObject({ brand: 'DROPS', colorHex: '#1f4fd1', skeins: 4, metersPerSkein: 100, gramsPerSkein: null });
 		expect(cleanYarn({ name: 'Nepal', colorHex: 'red', skeins: '0' })).toMatchObject({ colorHex: '', skeins: 1 });
+	});
+});
+
+describe('reveal date', () => {
+	it('hides the calendar from the recipient until December 1st', () => {
+		expect(isRevealed(2026, { year: 2026, month: 11, day: 30 }, false)).toBe(false);
+		expect(isRevealed(2026, { year: 2026, month: 12, day: 1 }, false)).toBe(true);
+		expect(isRevealed(2026, { year: 2027, month: 1, day: 5 }, false)).toBe(true);
+	});
+	it('shows it early when the lutin asks', () => {
+		expect(isRevealed(2026, { year: 2026, month: 11, day: 21 }, true)).toBe(true);
+	});
+});
+
+describe('preparation checklist', () => {
+	it('has unique ids', () => {
+		const all = ADVENT_TODO.flatMap((g) => g.ids);
+		expect(new Set(all).size).toBe(all.length);
+		expect([...ADVENT_TODO_AUTO].every((id) => ADVENT_TODO_IDS.has(id))).toBe(true);
 	});
 });
