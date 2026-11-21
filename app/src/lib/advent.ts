@@ -99,6 +99,13 @@ export type AdventYarn = {
 
 const HEX = /^#[0-9a-f]{6}$/i;
 
+// "#1F4FD1", "1f4fd1" or " #1f4fd1 " → "#1f4fd1"; anything else → "".
+export function normalizeHex(v: string): string {
+	const s = v.trim();
+	const hex = s.startsWith('#') ? s : '#' + s;
+	return HEX.test(hex) ? hex.toLowerCase() : '';
+}
+
 // Cleans one yarn line from the editor; null when the line is empty.
 export function cleanYarn(raw: Partial<Record<keyof AdventYarn, unknown>>): AdventYarn | null {
 	const str = (v: unknown, max: number) => String(v ?? '').trim().slice(0, max);
@@ -110,7 +117,7 @@ export function cleanYarn(raw: Partial<Record<keyof AdventYarn, unknown>>): Adve
 		brand: str(raw.brand, 160),
 		name: str(raw.name, 160),
 		colorway: str(raw.colorway, 160),
-		colorHex: HEX.test(str(raw.colorHex, 7)) ? str(raw.colorHex, 7).toLowerCase() : '',
+		colorHex: normalizeHex(str(raw.colorHex, 8)),
 		weightCategory: str(raw.weightCategory, 40),
 		fiber: str(raw.fiber, 160),
 		metersPerSkein: num(raw.metersPerSkein),
