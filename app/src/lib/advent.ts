@@ -172,3 +172,39 @@ export function notificationPlan(year: number, mode: NotifyMode, now: Date): { d
 		.map((day) => ({ day, at: parisInstant(year, 12, day, ADVENT_NOTIFY_HOUR) }))
 		.filter((n) => n.at.getTime() > now.getTime());
 }
+
+// The lutin's own tasks, added to the checklist by pasting text:
+//   # Group title            starts a group
+//   Task title | a note      one task per line (the note is optional)
+// Blank lines are ignored. Ids are random, so deleting one task never
+// renumbers the others' ticks.
+export type CustomTodo = { id: string; group: string; title: string; note: string };
+export const CUSTOM_TODO_MAX = 100;
+
+export function parseTodoText(text: string, newId: () => string, defaultGroup = ''): CustomTodo[] {
+	const out: CustomTodo[] = [];
+	let group = defaultGroup.slice(0, 120);
+	for (const raw of text.split(/\r?\n/)) {
+		const line = raw.trim();
+		if (!line) continue;
+		if (line.startsWith('#')) {
+			group = line.replace(/^#+\s*/, '').slice(0, 120);
+			continue;
+		}
+		const cut = line.indexOf('|');
+		const title = (cut >= 0 ? line.slice(0, cut) : line).replace(/^[-*•]\s*/, '').trim().slice(0, 200);
+		const note = cut >= 0 ? line.slice(cut + 1).trim().slice(0, 500) : '';
+		if (title) out.push({ id: 'c-' + newId(), group, title, note });
+	}
+	return out;
+}
+
+// Custom tasks grouped in the order their groups first appear.
+export function groupTodos(list: CustomTodo[]): { group: string; items: CustomTodo[] }[] {
+	const groups: { group: string; items: CustomTodo[] }[] = [];
+	for (const item of list) {
+		const g = groups.find((x) => x.group === item.group) ?? groups[groups.push({ group: item.group, items: [] }) - 1];
+		g.items.push(item);
+	}
+	return groups;
+}

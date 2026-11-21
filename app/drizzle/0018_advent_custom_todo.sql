@@ -1,0 +1,1 @@
+ALTER TABLE "advent_calendars" ADD COLUMN "todo_custom" jsonb DEFAULT '[]'::jsonb NOT NULL;

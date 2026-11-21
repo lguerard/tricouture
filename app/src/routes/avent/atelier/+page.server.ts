@@ -4,7 +4,8 @@ import { db } from '$lib/server/db';
 import { adventCalendars, adventDays, patterns, users } from '$lib/server/db/schema';
 import { createCalendar, daysOf, ownedCalendar } from '$lib/server/advent';
 import { deleteStored, isSupportedImage, saveImageUpload } from '$lib/server/storage';
-import { ADVENT_DAYS, NOTIFY_MODES, type NotifyMode, ADVENT_TODO_AUTO, ADVENT_TODO_IDS, cleanYarn, normalizeCode, parisDate, type AdventYarn } from '$lib/advent';
+import { randomUUID } from 'node:crypto';
+import { ADVENT_DAYS, CUSTOM_TODO_MAX, parseTodoText, NOTIFY_MODES, type NotifyMode, ADVENT_TODO_AUTO, ADVENT_TODO_IDS, cleanYarn, normalizeCode, parisDate, type AdventYarn } from '$lib/advent';
 import { t } from '$lib/i18n';
 import type { Actions, PageServerLoad } from './$types';
 
@@ -43,7 +44,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 
 	return {
 		calendars,
-		calendar: cal ? { id: cal.id, title: cal.title, message: cal.message, year: cal.year, revealEarly: cal.revealEarly, todoDone: cal.todoDone, notify: cal.notify } : null,
+		calendar: cal ? { id: cal.id, title: cal.title, message: cal.message, year: cal.year, revealEarly: cal.revealEarly, todoDone: cal.todoDone, todoCustom: cal.todoCustom, notify: cal.notify } : null,
 		days,
 		myPatterns,
 		people,
@@ -101,11 +102,37 @@ export const actions: Actions = {
 		const cal = await ownedCalendar(locals.user!.id, str(form, 'calendarId', 40));
 		if (!cal) return fail(404, { error: t(locals.locale, 'advent.err.missing') });
 		const id = str(form, 'id', 40);
-		if (!ADVENT_TODO_IDS.has(id) || ADVENT_TODO_AUTO.has(id)) return fail(400, { error: t(locals.locale, 'advent.err.invalid') });
+		const known = ADVENT_TODO_IDS.has(id) || cal.todoCustom.some((x) => x.id === id);
+		if (!known || ADVENT_TODO_AUTO.has(id)) return fail(400, { error: t(locals.locale, 'advent.err.invalid') });
 		const done = new Set(cal.todoDone);
 		if (form.get('done') === 'on') done.add(id);
 		else done.delete(id);
 		await db.update(adventCalendars).set({ todoDone: [...done] }).where(eq(adventCalendars.id, cal.id));
+		return { ok: true };
+	},
+
+	// Adds the lutin's own tasks, pasted as text (see parseTodoText).
+	addTodos: async ({ locals, request }) => {
+		const form = await request.formData();
+		const cal = await ownedCalendar(locals.user!.id, str(form, 'calendarId', 40));
+		if (!cal) return fail(404, { error: t(locals.locale, 'advent.err.missing') });
+		const added = parseTodoText(String(form.get('text') ?? '').slice(0, 20_000), () => randomUUID().slice(0, 8), str(form, 'group', 120));
+		if (!added.length) return fail(400, { error: t(locals.locale, 'advent.err.noTodo') });
+		const list = [...cal.todoCustom, ...added];
+		if (list.length > CUSTOM_TODO_MAX) return fail(400, { error: t(locals.locale, 'advent.err.tooManyTodos', { n: CUSTOM_TODO_MAX }) });
+		await db.update(adventCalendars).set({ todoCustom: list }).where(eq(adventCalendars.id, cal.id));
+		return { ok: true };
+	},
+
+	deleteTodo: async ({ locals, request }) => {
+		const form = await request.formData();
+		const cal = await ownedCalendar(locals.user!.id, str(form, 'calendarId', 40));
+		if (!cal) return fail(404, { error: t(locals.locale, 'advent.err.missing') });
+		const id = str(form, 'id', 40);
+		await db
+			.update(adventCalendars)
+			.set({ todoCustom: cal.todoCustom.filter((x) => x.id !== id), todoDone: cal.todoDone.filter((x) => x !== id) })
+			.where(eq(adventCalendars.id, cal.id));
 		return { ok: true };
 	},
 
