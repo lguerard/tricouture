@@ -140,3 +140,35 @@ export const ADVENT_TODO: { phase: 'before' | 'prepare' | 'during'; ids: string[
 ];
 export const ADVENT_TODO_AUTO = new Set(['fill']);
 export const ADVENT_TODO_IDS = new Set(ADVENT_TODO.flatMap((g) => g.ids));
+
+// Notifications to the recipient: none, December 1st only, or every morning.
+export const NOTIFY_MODES = ['off', 'first', 'daily'] as const;
+export type NotifyMode = (typeof NOTIFY_MODES)[number];
+export const ADVENT_NOTIFY_HOUR = 8; // Paris time
+export const ADVENT_NOTIFY_ID_BASE = 880_000; // + day: stable ids on the phone
+
+// The instant it is `hour`:00 in Paris on that day (handles summer time).
+export function parisInstant(year: number, month: number, day: number, hour: number): Date {
+	let t = Date.UTC(year, month - 1, day, hour);
+	for (let i = 0; i < 3; i++) {
+		const parts = new Intl.DateTimeFormat('en-GB', {
+			timeZone: ADVENT_TZ, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', hourCycle: 'h23'
+		}).formatToParts(new Date(t));
+		const get = (k: string) => Number(parts.find((p) => p.type === k)?.value);
+		const shown = Date.UTC(get('year'), get('month') - 1, get('day'), get('hour'));
+		const want = Date.UTC(year, month - 1, day, hour);
+		if (shown === want) break;
+		t += want - shown;
+	}
+	return new Date(t);
+}
+
+// Which notifications to schedule from `now` on: December 1st for 'first',
+// every door for 'daily', only those still in the future.
+export function notificationPlan(year: number, mode: NotifyMode, now: Date): { day: number; at: Date }[] {
+	if (mode === 'off') return [];
+	const days = mode === 'first' ? [1] : Array.from({ length: ADVENT_DAYS }, (_, i) => i + 1);
+	return days
+		.map((day) => ({ day, at: parisInstant(year, 12, day, ADVENT_NOTIFY_HOUR) }))
+		.filter((n) => n.at.getTime() > now.getTime());
+}

@@ -3,7 +3,7 @@
 	import { withFeedback } from '$lib/feedback';
 	import { t } from '$lib/i18n';
 	import { mediaUrl } from '$lib/media';
-	import { ADVENT_TODO, ADVENT_TODO_AUTO, normalizeCode, type AdventYarn } from '$lib/advent';
+	import { ADVENT_TODO, ADVENT_TODO_AUTO, NOTIFY_MODES, normalizeCode, type AdventYarn } from '$lib/advent';
 
 	let { data } = $props();
 	const locale = $derived(data.locale);
@@ -103,6 +103,13 @@
 					<textarea id="cm" name="message" rows="2">{data.calendar.message ?? ''}</textarea>
 				</div>
 				<label class="check"><input id="reveal" type="checkbox" name="revealEarly" checked={data.calendar.revealEarly} /> {t(locale, 'advent.ws.revealEarly')}</label>
+				<div class="field">
+					<label for="notify">{t(locale, 'advent.ws.notify')}</label>
+					<select id="notify" name="notify" value={data.calendar.notify}>
+						{#each NOTIFY_MODES as m}<option value={m}>{t(locale, `advent.ws.notify.${m}`)}</option>{/each}
+					</select>
+					<span class="muted small">{t(locale, 'advent.ws.notifyHelp')}</span>
+				</div>
 				<p class="muted small">{data.calendar.revealEarly ? t(locale, 'advent.ws.revealedNow') : t(locale, 'advent.ws.hiddenUntil', { year: data.calendar.year })}</p>
 				<button type="submit">{t(locale, 'advent.ws.save')}</button>
 			</form>

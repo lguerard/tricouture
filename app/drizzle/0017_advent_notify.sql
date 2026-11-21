@@ -1,0 +1,1 @@
+ALTER TABLE "advent_calendars" ADD COLUMN "notify" varchar(10) DEFAULT 'first' NOT NULL;

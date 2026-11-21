@@ -13,7 +13,9 @@ import {
 	isRevealed,
 	ADVENT_TODO,
 	ADVENT_TODO_AUTO,
-	ADVENT_TODO_IDS
+	ADVENT_TODO_IDS,
+	parisInstant,
+	notificationPlan
 } from './advent';
 
 describe('parisDate', () => {
@@ -114,5 +116,23 @@ describe('preparation checklist', () => {
 		const all = ADVENT_TODO.flatMap((g) => g.ids);
 		expect(new Set(all).size).toBe(all.length);
 		expect([...ADVENT_TODO_AUTO].every((id) => ADVENT_TODO_IDS.has(id))).toBe(true);
+	});
+});
+
+describe('notifications', () => {
+	it('fires at 8:00 Paris time, winter and summer', () => {
+		expect(parisInstant(2026, 12, 1, 8).toISOString()).toBe('2026-12-01T07:00:00.000Z');
+		expect(parisInstant(2026, 7, 1, 8).toISOString()).toBe('2026-07-01T06:00:00.000Z');
+	});
+	it('plans December 1st only, every day, or nothing', () => {
+		const now = new Date('2026-11-21T10:00:00Z');
+		expect(notificationPlan(2026, 'first', now).map((n) => n.day)).toEqual([1]);
+		expect(notificationPlan(2026, 'daily', now)).toHaveLength(24);
+		expect(notificationPlan(2026, 'off', now)).toEqual([]);
+	});
+	it('skips notifications already past', () => {
+		const now = new Date('2026-12-05T12:00:00Z');
+		expect(notificationPlan(2026, 'first', now)).toEqual([]);
+		expect(notificationPlan(2026, 'daily', now)[0].day).toBe(6);
 	});
 });

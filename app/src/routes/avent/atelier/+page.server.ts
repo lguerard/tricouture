@@ -4,7 +4,7 @@ import { db } from '$lib/server/db';
 import { adventCalendars, adventDays, patterns, users } from '$lib/server/db/schema';
 import { createCalendar, daysOf, ownedCalendar } from '$lib/server/advent';
 import { deleteStored, isSupportedImage, saveImageUpload } from '$lib/server/storage';
-import { ADVENT_DAYS, ADVENT_TODO_AUTO, ADVENT_TODO_IDS, cleanYarn, normalizeCode, parisDate, type AdventYarn } from '$lib/advent';
+import { ADVENT_DAYS, NOTIFY_MODES, type NotifyMode, ADVENT_TODO_AUTO, ADVENT_TODO_IDS, cleanYarn, normalizeCode, parisDate, type AdventYarn } from '$lib/advent';
 import { t } from '$lib/i18n';
 import type { Actions, PageServerLoad } from './$types';
 
@@ -43,7 +43,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 
 	return {
 		calendars,
-		calendar: cal ? { id: cal.id, title: cal.title, message: cal.message, year: cal.year, revealEarly: cal.revealEarly, todoDone: cal.todoDone } : null,
+		calendar: cal ? { id: cal.id, title: cal.title, message: cal.message, year: cal.year, revealEarly: cal.revealEarly, todoDone: cal.todoDone, notify: cal.notify } : null,
 		days,
 		myPatterns,
 		people,
@@ -88,7 +88,8 @@ export const actions: Actions = {
 			.set({
 				title: str(form, 'title', 160) || cal.title,
 				message: str(form, 'message', 2000) || null,
-				revealEarly: form.get('revealEarly') === 'on'
+				revealEarly: form.get('revealEarly') === 'on',
+				notify: (NOTIFY_MODES as readonly string[]).includes(str(form, 'notify', 10)) ? (str(form, 'notify', 10) as NotifyMode) : cal.notify
 			})
 			.where(eq(adventCalendars.id, cal.id));
 		return { ok: true };

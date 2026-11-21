@@ -24,6 +24,7 @@ import {
 	isRevealed,
 	parisDate,
 	type AdventYarn,
+	type NotifyMode,
 	type ParisDate
 } from '$lib/advent';
 
@@ -282,4 +283,40 @@ export async function isVisibleHintPhoto(uid: string, rel: string, today: ParisD
 		.where(and(eq(adventDays.hintPhotoPath, rel), eq(adventCalendars.recipientId, uid)))
 		.limit(1);
 	return rows.some((r) => isDayAvailable(r.year, r.day, today));
+}
+
+export type AdventLayout = {
+	recipient: boolean;
+	owner: boolean;
+	// Phone notifications to schedule for the recipient. Sent even before the
+	// calendar is revealed (only a year and a mode, nothing about its content),
+	// so the phone can hold the December 1st notification in advance.
+	notify: { year: number; mode: NotifyMode } | null;
+	// The most recent door available today and not opened yet, for the
+	// in-app reminder. null when there is none.
+	waitingDoor: number | null;
+};
+
+export async function adventForLayout(uid: string, today: ParisDate = parisDate(new Date())): Promise<AdventLayout> {
+	const roles = await adventRoles(uid, today);
+	const mine = await db
+		.select()
+		.from(adventCalendars)
+		.where(and(eq(adventCalendars.recipientId, uid), eq(adventCalendars.year, today.year)))
+		.limit(1);
+	const cal = mine[0];
+	let notify: AdventLayout['notify'] = null;
+	let waitingDoor: number | null = null;
+	if (cal) {
+		if (cal.notify !== 'off') notify = { year: cal.year, mode: cal.notify };
+		if (isRevealed(cal.year, today, cal.revealEarly)) {
+			const closed = await db
+				.select({ day: adventDays.day })
+				.from(adventDays)
+				.where(and(eq(adventDays.calendarId, cal.id), isNull(adventDays.openedAt)));
+			const available = closed.map((d) => d.day).filter((d) => isDayAvailable(cal.year, d, today));
+			waitingDoor = available.length ? Math.max(...available) : null;
+		}
+	}
+	return { ...roles, notify, waitingDoor };
 }
