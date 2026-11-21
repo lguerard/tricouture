@@ -1,0 +1,2 @@
+ALTER TABLE "advent_calendars" ADD COLUMN "reveal_early" boolean DEFAULT false NOT NULL;--> statement-breakpoint
+ALTER TABLE "advent_calendars" ADD COLUMN "todo_done" jsonb DEFAULT '[]'::jsonb NOT NULL;

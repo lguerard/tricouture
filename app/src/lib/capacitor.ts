@@ -67,3 +67,36 @@ export async function cancelDeadlineReminder(projectId: string): Promise<void> {
 	const id = Math.abs(projectId.split('').reduce((acc, c) => acc ^ c.charCodeAt(0), 0)) % 2_147_483_647;
 	await LocalNotifications.cancel({ notifications: [{ id }] }).catch(() => {});
 }
+
+// Advent calendar: (re)schedules the recipient's notifications on the phone.
+// Idempotent: the 24 possible ids are cancelled first, then the plan is
+// scheduled again, so changing the mode in the workshop is picked up on the
+// next app start. Tapping a notification opens /avent.
+export async function scheduleAdventNotifications(
+	plan: { id: number; title: string; body: string; at: Date }[],
+	allIds: number[]
+): Promise<void> {
+	if (!isCapacitor()) return;
+	const LocalNotifications = plugin('LocalNotifications');
+	if (!LocalNotifications) return;
+	await LocalNotifications.cancel({ notifications: allIds.map((id) => ({ id })) }).catch(() => {});
+	if (!plan.length) return;
+	const perms = await LocalNotifications.requestPermissions().catch(() => ({ display: 'denied' }));
+	if (perms.display !== 'granted') return;
+	await LocalNotifications.schedule({
+		notifications: plan.map((n) => ({ id: n.id, title: n.title, body: n.body, schedule: { at: n.at, allowWhileIdle: true }, extra: { href: '/avent' } }))
+	}).catch(() => {});
+}
+
+let tapListener = false;
+// Opens the page a notification points to when it is tapped.
+export function listenNotificationTaps(go: (href: string) => void): void {
+	if (!isCapacitor() || tapListener) return;
+	const LocalNotifications = plugin('LocalNotifications');
+	if (!LocalNotifications?.addListener) return;
+	tapListener = true;
+	LocalNotifications.addListener('localNotificationActionPerformed', (e: any) => {
+		const href = e?.notification?.extra?.href;
+		if (typeof href === 'string' && href.startsWith('/')) go(href);
+	});
+}

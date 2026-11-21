@@ -9,6 +9,8 @@ import { patternFiles, patterns, projectPhotos, projects } from '$lib/server/db/
 import { visibleTo } from '$lib/server/access';
 import { absolutePath, ownsPath } from '$lib/server/storage';
 import { ensureThumbnail, isResizable, isThumbWidth } from '$lib/server/thumbnails';
+import { isVisibleHintPhoto } from '$lib/server/advent';
+import { parisDate } from '$lib/advent';
 import type { RequestHandler } from './$types';
 
 // A file not owned by the user is still accessible if it belongs to a shared
@@ -62,7 +64,8 @@ export const GET: RequestHandler = async ({ params, locals, url }) => {
 	if (
 		!ownsPath(locals.user.id, rel) &&
 		!(await isSharedPatternFile(rel)) &&
-		!(await isVisibleProjectPhoto(locals.user.id, rel))
+		!(await isVisibleProjectPhoto(locals.user.id, rel)) &&
+		!(await isVisibleHintPhoto(locals.user.id, rel, parisDate(new Date())))
 	) {
 		throw error(403, 'Access denied');
 	}

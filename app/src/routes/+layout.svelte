@@ -1,7 +1,7 @@
 <script lang="ts">
 	import '../app.css';
 	import { page, updated } from '$app/stores';
-	import { afterNavigate, beforeNavigate, invalidateAll } from '$app/navigation';
+	import { afterNavigate, beforeNavigate, goto, invalidateAll } from '$app/navigation';
 	import { t, LOCALES, type Locale } from '$lib/i18n';
 	import { craftLabel, CRAFTS } from '$lib/labels';
 	import type { Craft } from '$lib/server/db/schema';
@@ -12,10 +12,53 @@
 	import { clearConversations } from '$lib/assistant/store.svelte';
 	import { flushPendingDeletes } from '$lib/undo';
 	import { toasts } from '$lib/toast.svelte';
+	import { listenNotificationTaps, scheduleAdventNotifications } from '$lib/capacitor';
+	import { ADVENT_DAYS, ADVENT_NOTIFY_ID_BASE, notificationPlan, parisDate } from '$lib/advent';
 
 	let { data, children } = $props();
 
 	beforeNavigate(flushPendingDeletes);
+
+	// Advent calendar, for its recipient: phone notifications scheduled ahead
+	// (they reveal nothing until they fire), and a reminder in the app when a
+	// door is waiting. The reminder shows once a day per device.
+	let adventScheduled = '';
+	$effect(() => {
+		const n = data.advent?.notify;
+		const key = n ? `${n.year}:${n.mode}:${data.locale}` : 'none';
+		if (key === adventScheduled) return;
+		adventScheduled = key;
+		listenNotificationTaps((href) => goto(href));
+		const plan = n
+			? notificationPlan(n.year, n.mode, new Date()).map(({ day, at }) => ({
+					id: ADVENT_NOTIFY_ID_BASE + day,
+					title: day === 1 ? t(data.locale, 'advent.notif.firstTitle') : t(data.locale, 'advent.notif.dayTitle', { n: day }),
+					body: day === 1 ? t(data.locale, 'advent.notif.firstBody') : t(data.locale, 'advent.notif.dayBody'),
+					at
+				}))
+			: [];
+		scheduleAdventNotifications(plan, Array.from({ length: ADVENT_DAYS }, (_, i) => ADVENT_NOTIFY_ID_BASE + i + 1));
+	});
+	$effect(() => {
+		const door = data.advent?.waitingDoor;
+		if (!door || $page.url.pathname.startsWith('/avent')) return;
+		const today = parisDate(new Date());
+		const seenKey = `advent-reminder-${today.year}-${today.month}-${today.day}`;
+		try {
+			if (localStorage.getItem(seenKey)) return;
+			localStorage.setItem(seenKey, '1');
+		} catch {
+			/* private mode: show it anyway */
+		}
+		toasts.push(
+			{
+				kind: 'info',
+				message: door === 1 ? t(data.locale, 'advent.notif.firstTitle') : t(data.locale, 'advent.notif.dayTitle', { n: door }),
+				action: { key: 'advent.notif.open', run: () => goto('/avent') }
+			},
+			15_000
+		);
+	});
 
 	// A new version of the site was deployed while this page was open (the
 	// Android app can stay open for days): offer a reload, and turn the next
@@ -55,6 +98,8 @@
 		['/gallery', 'nav.gallery'],
 		['/moodboards', 'nav.moodboards'],
 		['/embroidery', 'nav.embroidery'],
+		['/avent/atelier', 'advent.workshop.title'],
+		['/avent', 'nav.advent'],
 		['/account', 'nav.account']
 	];
 	const pageTitle = $derived.by(() => {
@@ -91,6 +136,9 @@
 		{ href: '/gallery', key: 'nav.gallery', icon: '🖼️' },
 		{ href: '/moodboards', key: 'nav.moodboards', icon: '🎨' },
 		{ href: '/embroidery', key: 'nav.embroidery', icon: '🪡' },
+		...(data.advent?.recipient || data.advent?.owner || data.user?.isAdmin
+			? [{ href: '/avent', key: 'nav.advent', icon: '✨' }]
+			: []),
 		{ href: '/account', key: 'nav.account', icon: '👤' },
 		// Reset links and roles: administrators only.
 		...(data.user?.isAdmin ? [{ href: '/admin/users', key: 'nav.users', icon: '🔐' }] : [])
