@@ -10,6 +10,7 @@ import {
 	normalizeCode,
 	parisDate,
 	parseIsoDate,
+	normalizeHex,
 	isRevealed,
 	ADVENT_TODO,
 	ADVENT_TODO_AUTO,
@@ -161,5 +162,18 @@ describe('custom tasks', () => {
 			['B', ['b1', 'b2']],
 			['A', ['a1']]
 		]);
+	});
+});
+
+describe('normalizeHex', () => {
+	it('accepts a colour code with or without #', () => {
+		expect(normalizeHex('#1F4FD1')).toBe('#1f4fd1');
+		expect(normalizeHex('1f4fd1')).toBe('#1f4fd1');
+		expect(normalizeHex(' #2f2c7e ')).toBe('#2f2c7e');
+	});
+	it('rejects anything else', () => {
+		expect(normalizeHex('red')).toBe('');
+		expect(normalizeHex('#12345')).toBe('');
+		expect(normalizeHex('')).toBe('');
 	});
 });

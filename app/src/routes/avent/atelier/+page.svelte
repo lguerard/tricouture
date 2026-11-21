@@ -265,7 +265,7 @@
 					<fieldset>
 						<legend>{t(locale, 'advent.ws.yarns')}</legend>
 						<div class="yarn-head">
-							<span>{t(locale, 'advent.ws.y.brand')}</span><span>{t(locale, 'advent.ws.y.name')}</span><span>{t(locale, 'advent.ws.y.colorway')}</span><span>🎨</span><span>{t(locale, 'advent.ws.y.skeins')}</span><span>{t(locale, 'advent.ws.y.grams')}</span><span>{t(locale, 'advent.ws.y.meters')}</span><span>{t(locale, 'advent.ws.y.weight')}</span><span>{t(locale, 'advent.ws.y.fiber')}</span>
+							<span>{t(locale, 'advent.ws.y.brand')}</span><span>{t(locale, 'advent.ws.y.name')}</span><span>{t(locale, 'advent.ws.y.colorway')}</span><span>{t(locale, 'advent.ws.y.color')}</span><span>{t(locale, 'advent.ws.y.skeins')}</span><span>{t(locale, 'advent.ws.y.grams')}</span><span>{t(locale, 'advent.ws.y.meters')}</span><span>{t(locale, 'advent.ws.y.weight')}</span><span>{t(locale, 'advent.ws.y.fiber')}</span>
 						</div>
 						{#each Array(YARN_ROWS) as _, i}
 							{@const y = yarnRow(d, i)}
@@ -273,7 +273,31 @@
 								<input name="y{i}_brand" value={y.brand ?? ''} placeholder="DROPS" aria-label={t(locale, 'advent.ws.y.brand')} />
 								<input name="y{i}_name" value={y.name ?? ''} placeholder="Lima" aria-label={t(locale, 'advent.ws.y.name')} />
 								<input name="y{i}_colorway" value={y.colorway ?? ''} aria-label={t(locale, 'advent.ws.y.colorway')} />
-								<input name="y{i}_colorHex" type="color" value={y.colorHex || '#d9c7a7'} aria-label={t(locale, 'advent.ws.y.color')} />
+								<span class="color">
+									<input
+										type="color"
+										value={y.colorHex || '#d9c7a7'}
+										aria-label={t(locale, 'advent.ws.y.color')}
+										oninput={(e) => {
+											const text = e.currentTarget.nextElementSibling as HTMLInputElement;
+											text.value = e.currentTarget.value;
+										}}
+									/>
+									<input
+										name="y{i}_colorHex"
+										value={y.colorHex ?? ''}
+										placeholder="#d9c7a7"
+										maxlength="7"
+										spellcheck="false"
+										autocomplete="off"
+										aria-label={t(locale, 'advent.ws.y.colorCode')}
+										oninput={(e) => {
+											const v = e.currentTarget.value.trim();
+											const hex = /^#?[0-9a-f]{6}$/i.test(v) ? (v.startsWith('#') ? v : '#' + v) : null;
+											if (hex) (e.currentTarget.previousElementSibling as HTMLInputElement).value = hex.toLowerCase();
+										}}
+									/>
+								</span>
 								<input name="y{i}_skeins" inputmode="decimal" value={y.skeins ?? ''} aria-label={t(locale, 'advent.ws.y.skeins')} />
 								<input name="y{i}_grams" inputmode="numeric" value={y.gramsPerSkein ?? ''} aria-label={t(locale, 'advent.ws.y.grams')} />
 								<input name="y{i}_meters" inputmode="numeric" value={y.metersPerSkein ?? ''} aria-label={t(locale, 'advent.ws.y.meters')} />
@@ -342,12 +366,14 @@
 	fieldset { border: 1px solid var(--border); border-radius: var(--radius); padding: 0.6rem 0.8rem; display: grid; gap: 0.4rem; min-width: 0; overflow-x: auto; }
 	.yarn, .yarn-head {
 		display: grid;
-		grid-template-columns: 1fr 1fr 1.2fr 44px 64px 64px 64px 72px 1.2fr;
+		grid-template-columns: 1fr 1fr 1.2fr 118px 64px 64px 64px 72px 1.2fr;
 		gap: 0.35rem;
 		min-width: 760px;
 	}
 	.yarn-head span { font-size: 0.75rem; color: var(--muted); }
-	.yarn input[type='color'] { padding: 2px; height: 2.2rem; }
+	.color { display: flex; gap: 4px; align-items: center; min-width: 0; }
+	.color input[type='color'] { padding: 2px; height: 2.2rem; width: 36px; flex: none; }
+	.color input:not([type='color']) { min-width: 0; font-family: ui-monospace, monospace; font-size: 0.85rem; }
 	.todo h2 { margin: 0 0 0.4rem; font-size: 1.1rem; display: flex; gap: 0.6rem; align-items: baseline; flex-wrap: wrap; }
 	.todo h3 { margin: 0.8rem 0 0.2rem; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
 	.todo ul { list-style: none; margin: 0; padding: 0; }
