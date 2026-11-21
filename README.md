@@ -322,6 +322,15 @@ mémorise : aucune adresse n'est codée en dur dans le dépôt.
 > au build. Cette valeur reste privée (variable d'Actions), elle n'apparaît
 > pas dans le code source.
 
+**Notifications du calendrier de l'Avent sans adresse figée.** Si l'app est
+construite sans `SERVER_URL` (dépôt et APK publics), le site ne peut pas
+programmer de notification lui-même. Il confie le programme à la page de
+démarrage de l'app (`mobile/www/index.html`), qui, elle, y a accès : la page
+s'annonce dans l'adresse du site à l'ouverture, le site lui renvoie le
+programme une seule fois, elle le programme sur le téléphone et revient
+aussitôt. Aucune adresse n'est enregistrée dans l'APK ; il faut seulement une
+app compilée avec cette page (à partir de cette version).
+
 ---
 
 ## Exposer sur Internet
