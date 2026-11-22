@@ -7,9 +7,14 @@
 // (#tc_shell=<its origin>&tc_v=<version>); to schedule notifications, the site
 // sends the WebView to that page with the plan in the hash, and the page sends
 // it back with an acknowledgement (#tc_advent=<signature>&tc_result=...).
+// Since version 3 it also passes the phone's Material You color
+// (&tc_accent=#rrggbb, or "none" before Android 12): only that local page can
+// read it, through the app's SystemColors plugin (mobile/native).
 
 export const SHELL_MIN_VERSION_NOTIFY = 2;
+export const SHELL_MIN_VERSION_COLORS = 3;
 const SHELL_KEY = 'tc-shell';
+const ACCENT_KEY = 'tc-accent';
 const SIG_KEY = 'tc-advent-sig';
 const TRY_KEY = 'tc-advent-try';
 const RETRY_MS = 12 * 3600_000;
@@ -22,7 +27,12 @@ export function isShellOrigin(origin: string): boolean {
 	return /^(https?|capacitor):\/\/localhost(:\d{1,5})?$/.test(origin);
 }
 
-export type ShellHash = { shell: ShellInfo | null; ack: { sig: string; result: string } | null };
+export type ShellHash = {
+	shell: ShellInfo | null;
+	ack: { sig: string; result: string } | null;
+	/** Material You color, null when the phone has none, undefined when not sent. */
+	accent?: string | null;
+};
 
 export function parseShellHash(hash: string): ShellHash {
 	const p = new URLSearchParams(hash.replace(/^#/, ''));
@@ -31,7 +41,9 @@ export function parseShellHash(hash: string): ShellHash {
 	const shell = origin && isShellOrigin(origin) && Number.isInteger(version) && version > 0 ? { origin, version } : null;
 	const sig = p.get('tc_advent');
 	const ack = sig !== null ? { sig, result: p.get('tc_result') ?? '' } : null;
-	return { shell, ack };
+	const rawAccent = p.get('tc_accent');
+	if (rawAccent === null) return { shell, ack };
+	return { shell, ack, accent: /^#[0-9a-f]{6}$/i.test(rawAccent) ? rawAccent.toLowerCase() : null };
 }
 
 // Whether to send the plan to the phone now: it changed since the last time
@@ -69,8 +81,9 @@ function set(key: string, value: string) {
 // Reads what the start page put in the hash, remembers it, and says whether
 // the hash should be cleaned from the address.
 export function captureShellHash(hash: string): boolean {
-	const { shell, ack } = parseShellHash(hash);
+	const { shell, ack, accent } = parseShellHash(hash);
 	if (shell) set(SHELL_KEY, JSON.stringify(shell));
+	if (accent !== undefined) set(ACCENT_KEY, accent ?? 'none');
 	// "error" is retried later; any other answer (scheduled, refused by the
 	// person, plugin missing) is final for this plan.
 	if (ack && ack.result !== 'error') set(SIG_KEY, ack.sig);
@@ -86,14 +99,32 @@ export function knownShell(): ShellInfo | null {
 	}
 }
 
+// The phone's Material You color, as the start page last passed it: the
+// color, null when the phone has none (Android before 12), undefined when the
+// start page never sent one (opened in a browser, or an app too old).
+export function shellAccent(): string | null | undefined {
+	const shell = knownShell();
+	if (!shell || shell.version < SHELL_MIN_VERSION_COLORS) return undefined;
+	const a = get(ACCENT_KEY);
+	return a && /^#[0-9a-f]{6}$/i.test(a) ? a : null;
+}
+
 // Sends the plan to the start page if needed. Returns true when the page is
 // navigating away.
 export function sendPlanToShell(plan: ShellPlan[], ids: number[], sig: string, back: string): boolean {
 	const shell = knownShell();
 	if (!shell || shell.version < SHELL_MIN_VERSION_NOTIFY) return false;
+	const planSig = shellPlanSig(sig, shell.version);
 	const lastTry = Number(get(TRY_KEY)) || 0;
-	if (!shouldSend(sig, get(SIG_KEY), lastTry, Date.now())) return false;
+	if (!shouldSend(planSig, get(SIG_KEY), lastTry, Date.now())) return false;
 	set(TRY_KEY, String(Date.now()));
-	location.replace(bounceUrl(shell, { plan, ids, sig, back }));
+	location.replace(bounceUrl(shell, { plan, ids, sig: planSig, back }));
 	return true;
+}
+
+// The plan's signature for a given version of the start page. Updating the
+// app (a new start page) may drop the notifications Android had scheduled:
+// a new version gives a new signature, so the plan is sent again once.
+export function shellPlanSig(sig: string, version: number): string {
+	return sig === 'none' ? sig : `${sig}@v${version}`;
 }

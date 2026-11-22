@@ -14,6 +14,7 @@
 	import { toasts } from '$lib/toast.svelte';
 	import { isCapacitor, listenNotificationTaps, scheduleAdventNotifications } from '$lib/capacitor';
 	import { captureShellHash, sendPlanToShell } from '$lib/shell';
+	import { theme } from '$lib/theme.svelte';
 	import { ADVENT_DAYS, ADVENT_NOTIFY_ID_BASE, notificationPlan, parisDate } from '$lib/advent';
 
 	let { data, children } = $props();
@@ -32,6 +33,8 @@
 			shellHashRead = true;
 			if (captureShellHash(location.hash)) {
 				history.replaceState(history.state, '', location.pathname + location.search);
+				// La couleur Material You vient d'arriver de la page de départ de l'app.
+				void theme.refreshSystemAccent();
 			}
 		}
 		const n = data.advent?.notify;
