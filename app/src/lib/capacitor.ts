@@ -102,15 +102,20 @@ export function listenNotificationTaps(go: (href: string) => void): void {
 }
 
 // Material You : couleur principale du fond d'écran (Android 12 et plus),
-// donnée par le plugin SystemColors de l'app (mobile/native). null ailleurs.
-export async function systemAccentColor(): Promise<string | null> {
-	if (!isCapacitor()) return null;
+// donnée par le plugin SystemColors de l'app (mobile/native). Sinon, la
+// raison : site ouvert dans un navigateur, app trop ancienne (sans le
+// plugin) ou Android d'avant la 12.
+export type SystemColors = { accent: string } | { accent: null; missing: 'web' | 'app' | 'android' };
+
+export async function systemColors(): Promise<SystemColors> {
+	if (!isCapacitor()) return { accent: null, missing: 'web' };
 	const SystemColors = plugin('SystemColors');
-	if (!SystemColors) return null;
+	if (!SystemColors) return { accent: null, missing: 'app' };
 	try {
 		const { accent } = await SystemColors.get();
-		return typeof accent === 'string' && /^#[0-9a-f]{6}$/i.test(accent) ? accent : null;
+		if (typeof accent === 'string' && /^#[0-9a-f]{6}$/i.test(accent)) return { accent };
 	} catch {
-		return null;
+		// plugin en erreur : comme un Android trop ancien
 	}
+	return { accent: null, missing: 'android' };
 }
