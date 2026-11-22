@@ -79,6 +79,14 @@ jobs:
           CAP_SERVER_URL: ${{ steps.url.outputs.value }}
         run: npx cap add android
 
+      # The 🪡 app icon (see mobile/resources/README.md) replaces Capacitor's
+      # default one: classic, round and adaptive launcher icons.
+      - name: Set app icon
+        working-directory: mobile
+        run: |
+          cp -r resources/res/. android/app/src/main/res/
+          ls android/app/src/main/res/mipmap-xxxhdpi
+
       # Capacitor's template ships versionName "1.0" / versionCode 1 forever:
       # Android then can't tell an APK from the previous one. Stamp the release
       # version instead (versionCode must grow: 0.18.1 -> 18001).
