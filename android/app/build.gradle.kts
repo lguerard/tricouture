@@ -16,9 +16,16 @@ android {
         targetSdk = 35
         versionCode = (project.findProperty("versionCode") as String?)?.toInt() ?: 1
         versionName = (project.findProperty("versionName") as String?) ?: "dev"
+        resValue("string", "app_name", "Tricouture")
     }
 
     buildTypes {
+        // Version de test : s'installe à côté de l'appli publiée (autre
+        // identifiant, autre nom), pour l'essayer sans rien remplacer.
+        debug {
+            applicationIdSuffix = ".test"
+            resValue("string", "app_name", "Tricouture (test)")
+        }
         release {
             isMinifyEnabled = true
             proguardFiles(
