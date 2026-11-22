@@ -113,6 +113,14 @@ private fun Door(day: Int, door: JsonObject, onClick: () -> Unit) {
         if (state == "open") {
             val cover = door.str("coverPath")
             if (cover != null) MediaImage(cover, Modifier.fillMaxSize(), width = 200, contentScale = ContentScale.Crop)
+            // La laine de la porte, sur la photo du modèle : c'est elle qui compte.
+            val balls = door.objs("yarns").take(3)
+            if (cover != null && balls.isNotEmpty()) Row(
+                Modifier.align(Alignment.TopStart).padding(3.dp).clip(CircleShape).background(Color(0xD9FFFAEE)).padding(2.dp),
+                horizontalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                balls.forEach { y -> Box(Modifier.size(10.dp).clip(CircleShape).background(hexColor(y.str("colorHex"), Color.LightGray))) }
+            }
             Text(door.str("title") ?: tr("advent.opened"), color = Color.White, style = MaterialTheme.typography.labelSmall,
                 maxLines = 2, textAlign = TextAlign.Center,
                 modifier = Modifier.align(Alignment.BottomCenter).background(Color.Black.copy(alpha = 0.5f)).padding(2.dp))
@@ -189,26 +197,53 @@ private fun DoorSheet(
                 }
                 else -> {
                     Text(door.str("title") ?: tr("advent.opened"), style = MaterialTheme.typography.headlineSmall)
-                    door.str("coverPath")?.let { MediaImage(it, Modifier.fillMaxWidth().heightIn(max = 320.dp).clip(RoundedCornerShape(10.dp)), width = 400, contentScale = ContentScale.Fit) }
                     door.str("message")?.let { Text(it, style = MaterialTheme.typography.bodyLarge) }
                     val yarns = door.objs("yarns")
-                    if (yarns.isNotEmpty()) {
-                        Text(tr("advent.yarnTitle"), style = MaterialTheme.typography.titleMedium)
+                    val pid = door.str("patternId")
+                    val patternTitle = door.str("patternTitle")
+                    val cover = door.str("coverPath")
+                    if (pid != null || patternTitle != null) {
+                        // Le patron de la porte : dit clairement qu'il rejoint la bibliothèque.
+                        GiftBox {
+                            Text("📜 " + tr(if (preview) "advent.patternPreview" else "advent.patternAdded"),
+                                style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                cover?.let { MediaImage(it, Modifier.width(110.dp).height(140.dp).clip(RoundedCornerShape(10.dp)), width = 400) }
+                                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    patternTitle?.let { Text(it, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold) }
+                                    if (cover != null && yarns.isNotEmpty()) {
+                                        val colors = yarns.mapNotNull { it.str("colorway")?.trim()?.takeIf { c -> c.isNotEmpty() } }.distinct()
+                                        Text(
+                                            if (colors.isNotEmpty()) tr("advent.coverNote", "colors" to colors.joinToString(", "))
+                                            else tr("advent.coverNoteNoColor"),
+                                            style = MaterialTheme.typography.bodyMedium,
+                                        )
+                                    }
+                                }
+                            }
+                            if (pid != null) {
+                                Button(onClick = { onClose(); nav.navigate("pattern/$pid") }, modifier = Modifier.fillMaxWidth()) { Text("📜 " + tr("advent.seePattern")) }
+                                if (!preview) OutlinedButton(onClick = { onClose(); nav.navigate("projects/new?pattern=$pid") }, modifier = Modifier.fillMaxWidth()) {
+                                    Text("🧶 " + tr("advent.startProject"))
+                                }
+                            }
+                        }
+                    } else cover?.let {
+                        MediaImage(it, Modifier.fillMaxWidth().heightIn(max = 320.dp).clip(RoundedCornerShape(10.dp)), width = 400, contentScale = ContentScale.Fit)
+                    }
+                    if (yarns.isNotEmpty()) GiftBox {
+                        Text(tr(if (pid != null || patternTitle != null) "advent.yarnForPattern" else "advent.yarnTitle"),
+                            style = MaterialTheme.typography.titleMedium)
                         yarns.forEach { y ->
                             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 Box(Modifier.size(20.dp).clip(CircleShape).background(hexColor(y.str("colorHex"), Color.LightGray)))
                                 Text(listOfNotNull(y.str("brand"), y.str("name")).filter { it.isNotBlank() }.joinToString(" ") +
-                                    (y.str("colorway")?.takeIf { it.isNotBlank() }?.let { " · $it" } ?: ""))
+                                    (y.str("colorway")?.takeIf { it.isNotBlank() }?.let { " · $it" } ?: ""), Modifier.weight(1f))
+                                y.double("skeins")?.let { n -> Text("× " + if (n == Math.floor(n)) n.toLong().toString() else n.toString()) }
                             }
                         }
-                        if (!preview) Text(tr("advent.inStash"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                    val pid = door.str("patternId")
-                    if (pid != null && !preview) {
-                        Button(onClick = { onClose(); nav.navigate("pattern/$pid") }, modifier = Modifier.fillMaxWidth()) { Text("📜 " + tr("advent.seePattern")) }
-                        OutlinedButton(onClick = { onClose(); nav.navigate("projects/new?pattern=$pid") }, modifier = Modifier.fillMaxWidth()) {
-                            Text("🧶 " + tr("advent.startProject"))
-                        }
+                        Text(tr(if (preview) "advent.inStashPreview" else "advent.inStash"), style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             }
@@ -231,5 +266,18 @@ private fun PreviewBar(calendarId: String, date: String) {
                 OutlinedButton(onClick = { nav.popBackStack() }) { Text(tr("advent.preview.back"), color = Color.White) }
             }
         }
+    }
+}
+
+/** Encadré d'une porte ouverte : le patron, ou la laine. */
+@Composable
+private fun GiftBox(content: @Composable ColumnScope.() -> Unit) {
+    Surface(
+        shape = RoundedCornerShape(12.dp),
+        color = GOLD.copy(alpha = 0.12f),
+        border = androidx.compose.foundation.BorderStroke(1.dp, GOLD.copy(alpha = 0.5f)),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp), content = content)
     }
 }

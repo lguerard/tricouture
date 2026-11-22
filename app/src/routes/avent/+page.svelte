@@ -22,6 +22,8 @@
 
 	// Content revealed in the lutin's preview (nothing is saved there).
 	let revealed = $state<Record<number, Door>>({});
+	// Noms de couleur de la laine d'une porte (« Bleu nuit »), pour l'expliquer à côté de la photo du modèle.
+	const colorways = (d: Door) => [...new Set(d.yarns.map((y) => y.colorway?.trim()).filter((c): c is string => !!c))];
 	let selected = $state<number | null>(null);
 	const current = $derived(selected ? (revealed[selected] ?? byDay.get(selected) ?? null) : null);
 	let dialog: HTMLDialogElement | undefined = $state();
@@ -160,6 +162,12 @@
 						{#if d.state === 'open'}
 							{#if d.coverPath}
 								<img src={mediaUrl(d.coverPath, 200)} alt="" loading="lazy" />
+								<!-- La laine de la porte, sur la photo du modèle : c'est elle qui compte. -->
+								{#if d.yarns.length}
+									<span class="balls on-cover">
+										{#each d.yarns.slice(0, 3) as y}<i style="--c: {y.colorHex || '#d9c7a7'}"></i>{/each}
+									</span>
+								{/if}
 							{:else}
 								<span class="balls">
 									{#each d.yarns.slice(0, 4) as y}<i style="--c: {y.colorHex || '#d9c7a7'}"></i>{/each}
@@ -231,29 +239,53 @@
 			<div class="reveal">
 				{#each sparkles as s (s.id)}<i class="sparkle" style="--x:{s.x}px;--y:{s.y}px;--d:{s.d}ms;--c:{s.c}"></i>{/each}
 				<h2>{current.title ?? t(locale, 'advent.opened')}</h2>
-				{#if current.coverPath}<img class="cover" src={mediaUrl(current.coverPath, 400)} alt="" />{/if}
 				{#if current.message}<p class="note">{current.message}</p>{/if}
-				{#if current.yarns.length}
-					<h3>{t(locale, 'advent.yarnTitle')}</h3>
-					<ul class="yarns">
-						{#each current.yarns as y}
-							<li>
-								<i style="--c: {y.colorHex || '#d9c7a7'}"></i>
-								<span><b>{[y.brand, y.name].filter(Boolean).join(' ')}</b>{#if y.colorway} · {y.colorway}{/if}</span>
-								<span class="qty">× {y.skeins}</span>
-							</li>
-						{/each}
-					</ul>
-					{#if !data.preview}<p class="muted small">{t(locale, 'advent.inStash')}</p>{/if}
+
+				{#if current.patternId || current.patternTitle}
+					<!-- Le patron de la porte : dit clairement qu'il rejoint la bibliothèque. -->
+					<section class="gift">
+						<p class="kicker">📜 {t(locale, data.preview ? 'advent.patternPreview' : 'advent.patternAdded')}</p>
+						<div class="pat">
+							{#if current.coverPath}<img class="cover" src={mediaUrl(current.coverPath, 400)} alt="" />{/if}
+							<div class="pat-text">
+								{#if current.patternTitle}<b class="pat-title">{current.patternTitle}</b>{/if}
+								{#if current.coverPath && current.yarns.length}
+									<p class="small cover-note">
+										{colorways(current).length
+											? t(locale, 'advent.coverNote', { colors: colorways(current).join(', ') })
+											: t(locale, 'advent.coverNoteNoColor')}
+									</p>
+								{/if}
+							</div>
+						</div>
+						{#if current.patternId}
+							<div class="actions">
+								<a class="cta" href="/patterns/{current.patternId}">📜 {t(locale, 'advent.seePattern')}</a>
+								{#if !data.preview}
+									<a class="cta alt" href="/projects/new?pattern={current.patternId}">🧶 {t(locale, 'advent.startProject')}</a>
+								{/if}
+							</div>
+						{/if}
+					</section>
+				{:else if current.coverPath}
+					<img class="cover" src={mediaUrl(current.coverPath, 400)} alt="" />
 				{/if}
-				<div class="actions">
-					{#if current.patternId && !data.preview}
-						<a class="cta" href="/patterns/{current.patternId}">📜 {t(locale, 'advent.seePattern')}</a>
-						<a class="cta alt" href="/projects/new?pattern={current.patternId}">🧶 {t(locale, 'advent.startProject')}</a>
-					{:else if current.patternTitle}
-						<p class="muted small">📜 {current.patternTitle}</p>
-					{/if}
-				</div>
+
+				{#if current.yarns.length}
+					<section class="gift">
+						<h3>{t(locale, current.patternId || current.patternTitle ? 'advent.yarnForPattern' : 'advent.yarnTitle')}</h3>
+						<ul class="yarns">
+							{#each current.yarns as y}
+								<li>
+									<i style="--c: {y.colorHex || '#d9c7a7'}"></i>
+									<span><b>{[y.brand, y.name].filter(Boolean).join(' ')}</b>{#if y.colorway} · {y.colorway}{/if}</span>
+									<span class="qty">× {y.skeins}</span>
+								</li>
+							{/each}
+						</ul>
+						<p class="muted small">{t(locale, data.preview ? 'advent.inStashPreview' : 'advent.inStash')}</p>
+					</section>
+				{/if}
 			</div>
 		{/if}
 	{/if}
@@ -554,6 +586,32 @@
 	}
 	.hphoto, .cover { width: 100%; border-radius: 10px; margin: 0.2rem 0 0.8rem; border: 1px solid #d8bf8b; }
 	.cover { max-height: 260px; object-fit: cover; }
+	/* Ce que contient une porte : le patron, puis la laine, chacun dans son encadré. */
+	.gift {
+		margin: 0.9rem 0 0;
+		padding: 0.8rem 0.9rem;
+		border: 1px solid #d8bf8b;
+		border-radius: 12px;
+		background: rgba(255, 248, 230, 0.55);
+	}
+	.gift h3 { margin: 0 0 0.5rem; }
+	.kicker { margin: 0 0 0.6rem; font-weight: 700; color: #6b4a12; }
+	.pat { display: flex; gap: 0.8rem; align-items: flex-start; }
+	.pat .cover { width: 110px; height: 140px; flex: none; margin: 0; }
+	.pat-text { display: flex; flex-direction: column; gap: 0.3rem; min-width: 0; }
+	.pat-title { font-size: 1.05rem; }
+	.cover-note { margin: 0; color: #5d4630; line-height: 1.45; }
+	.gift .actions { margin-top: 0.8rem; }
+	/* Pelotes posées sur la photo du modèle, dans la case ouverte. */
+	.balls.on-cover {
+		position: absolute;
+		right: 6px;
+		bottom: 6px;
+		z-index: 1;
+		padding: 3px 4px;
+		border-radius: 999px;
+		background: rgba(255, 250, 238, 0.85);
+	}
 	.big-msg { font-size: 1.15rem; margin: 0.6rem 0 0.2rem; }
 	.muted { color: #7d6650; }
 	.small { font-size: 0.85rem; }
