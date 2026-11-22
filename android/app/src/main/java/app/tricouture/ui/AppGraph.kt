@@ -22,7 +22,7 @@ private fun str(name: String, default: String? = "") = navArgument(name) {
 fun NavGraphBuilder.appGraph(nav: NavHostController) {
     val back: () -> Unit = { nav.popBackStack() }
     composable(Routes.HOME) { HomeScreen() }
-    composable(Routes.MORE) { MoreScreen(advent = false) }
+    composable(Routes.MORE) { MoreScreen() }
     composable(Routes.SETTINGS) { SettingsScreen(onBack = back) }
 
     // Patrons
@@ -47,13 +47,14 @@ fun NavGraphBuilder.appGraph(nav: NavHostController) {
 
     // Pas encore réécrits en natif.
     composable("assistant?kind={kind}&id={id}&title={title}&q={q}", listOf(str("kind"), str("id"), str("title"), str("q"))) {
-        TodoScreen(tr0("nav.assistant"), back)
+        app.tricouture.ui.assistant.AssistantScreen(it.arg("kind"), it.arg("id"), it.arg("title"), it.arg("q"))
     }
     composable("bins") { BinsScreen() }
+    composable("account") { AccountScreen() }
     for ((route, key) in listOf(
         "calendar" to "nav.calendar", "goals" to "nav.goals", "stats" to "nav.stats", "achievements" to "nav.achievements",
         "recipients" to "nav.recipients", "gallery" to "nav.gallery", "moodboards" to "nav.moodboards",
-        "embroidery" to "nav.embroidery", "avent" to "nav.advent", "account" to "nav.account", "admin/users" to "nav.users",
+        "embroidery" to "nav.embroidery", "avent" to "nav.advent", "admin/users" to "nav.users",
     )) composable(route) { TodoScreen(tr0(key), back) }
 }
 

@@ -12,6 +12,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import app.tricouture.data.Session
+import app.tricouture.data.bool
 import app.tricouture.data.tr
 import app.tricouture.ui.LocalNav
 import app.tricouture.ui.Routes
@@ -42,9 +43,12 @@ fun moreItems(advent: Boolean): List<MoreItem> {
 }
 
 @Composable
-fun MoreScreen(advent: Boolean) {
+fun MoreScreen() {
     val nav = LocalNav.current
-    val items = moreItems(advent)
+    val adv by Session.advent.collectAsState()
+    val me by Session.me.collectAsState()
+    // Comme sur le site : la personne qui reçoit un calendrier, le lutin qui en prépare un, et les administrateurs.
+    val items = moreItems(adv?.bool("recipient") == true || adv?.bool("owner") == true || me?.isAdmin == true)
     Screen(tr("app.more"), actions = {
         IconButton(onClick = { nav.navigate(Routes.SETTINGS) }) { Icon(Icons.Default.Settings, tr("app.settings")) }
     }) { padding ->

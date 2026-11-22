@@ -114,7 +114,12 @@ object Session {
     }
 
     /** Données communes renvoyées par le layout du site, à chaque page. */
+    /** Calendrier de l'Avent (layout du site) : rôle, porte en attente, notifications. */
+    private val _advent = MutableStateFlow<com.google.gson.JsonObject?>(null)
+    val advent: StateFlow<com.google.gson.JsonObject?> = _advent.asStateFlow()
+
     fun absorbLayout(data: com.google.gson.JsonObject) {
+        data.obj("advent")?.let { _advent.value = it }
         data.obj("user")?.let { u ->
             _me.value = Me(
                 id = u.str("id").orEmpty(),
