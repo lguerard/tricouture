@@ -5,7 +5,7 @@ import { adventCalendars, adventDays, patterns, users } from '$lib/server/db/sch
 import { createCalendar, daysOf, ownedCalendar } from '$lib/server/advent';
 import { deleteStored, isSupportedImage, saveImageUpload } from '$lib/server/storage';
 import { randomUUID } from 'node:crypto';
-import { ADVENT_DAYS, CUSTOM_TODO_MAX, parseTodoText, NOTIFY_MODES, type NotifyMode, ADVENT_TODO_AUTO, ADVENT_TODO_IDS, cleanYarn, normalizeCode, parisDate, type AdventYarn } from '$lib/advent';
+import { ADVENT_DAYS, cleanTime, CUSTOM_TODO_MAX, parseTodoText, NOTIFY_MODES, type NotifyMode, ADVENT_TODO_AUTO, ADVENT_TODO_IDS, cleanYarn, normalizeCode, parisDate, type AdventYarn } from '$lib/advent';
 import { t } from '$lib/i18n';
 import type { Actions, PageServerLoad } from './$types';
 
@@ -44,7 +44,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 
 	return {
 		calendars,
-		calendar: cal ? { id: cal.id, title: cal.title, message: cal.message, year: cal.year, revealEarly: cal.revealEarly, todoDone: cal.todoDone, todoCustom: cal.todoCustom, notify: cal.notify } : null,
+		calendar: cal ? { id: cal.id, title: cal.title, message: cal.message, year: cal.year, revealEarly: cal.revealEarly, todoDone: cal.todoDone, todoCustom: cal.todoCustom, notify: cal.notify, notifyTimeWeek: cal.notifyTimeWeek, notifyTimeWeekend: cal.notifyTimeWeekend } : null,
 		days,
 		myPatterns,
 		people,
@@ -90,7 +90,9 @@ export const actions: Actions = {
 				title: str(form, 'title', 160) || cal.title,
 				message: str(form, 'message', 2000) || null,
 				revealEarly: form.get('revealEarly') === 'on',
-				notify: (NOTIFY_MODES as readonly string[]).includes(str(form, 'notify', 10)) ? (str(form, 'notify', 10) as NotifyMode) : cal.notify
+				notify: (NOTIFY_MODES as readonly string[]).includes(str(form, 'notify', 10)) ? (str(form, 'notify', 10) as NotifyMode) : cal.notify,
+				notifyTimeWeek: cleanTime(form.get('notifyTimeWeek')) ?? cal.notifyTimeWeek,
+				notifyTimeWeekend: cleanTime(form.get('notifyTimeWeekend')) ?? cal.notifyTimeWeekend
 			})
 			.where(eq(adventCalendars.id, cal.id));
 		return { ok: true };
@@ -206,7 +208,8 @@ export const actions: Actions = {
 				code: code || null,
 				patternId,
 				yarns: yarnList,
-				message: str(form, 'message', 4000) || null
+				message: str(form, 'message', 4000) || null,
+				notifyTime: cleanTime(form.get('notifyTime'))
 			})
 			.where(eq(adventDays.id, current.id));
 		return { ok: true, day: dayNo };

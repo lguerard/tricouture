@@ -17,6 +17,8 @@ import {
 	ADVENT_TODO_IDS,
 	parisInstant,
 	notificationPlan,
+	cleanTime,
+	isWeekend,
 	parseTodoText,
 	groupTodos
 } from './advent';
@@ -175,5 +177,45 @@ describe('normalizeHex', () => {
 		expect(normalizeHex('red')).toBe('');
 		expect(normalizeHex('#12345')).toBe('');
 		expect(normalizeHex('')).toBe('');
+	});
+});
+
+describe('notification times', () => {
+	it('reads times in several spellings', () => {
+		expect(cleanTime('8:00')).toBe('08:00');
+		expect(cleanTime('08:05')).toBe('08:05');
+		expect(cleanTime('7h30')).toBe('07:30');
+		expect(cleanTime('9h')).toBe('09:00');
+		expect(cleanTime('24:00')).toBeNull();
+		expect(cleanTime('demain')).toBeNull();
+	});
+	it('knows the weekends of December 2026', () => {
+		expect(isWeekend(2026, 12, 5)).toBe(true); // samedi
+		expect(isWeekend(2026, 12, 6)).toBe(true); // dimanche
+		expect(isWeekend(2026, 12, 7)).toBe(false); // lundi
+	});
+	it('uses the weekday time on weekdays and the weekend time on weekends', () => {
+		const now = new Date('2026-11-21T10:00:00Z');
+		const plan = notificationPlan(2026, 'daily', now, { week: '07:15', weekend: '09:30' });
+		const at = (d: number) => plan.find((n) => n.day === d)!.at.toISOString();
+		expect(at(1)).toBe('2026-12-01T06:15:00.000Z'); // mardi, 7 h 15 à Paris
+		expect(at(5)).toBe('2026-12-05T08:30:00.000Z'); // samedi, 9 h 30
+		expect(at(24)).toBe('2026-12-24T06:15:00.000Z'); // jeudi
+	});
+	it('falls back to 8:00 on a broken time', () => {
+		const plan = notificationPlan(2026, 'first', new Date('2026-11-21T10:00:00Z'), { week: 'n/a', weekend: '' });
+		expect(plan[0].at.toISOString()).toBe('2026-12-01T07:00:00.000Z');
+	});
+});
+
+describe('time set on a day', () => {
+	it('wins over the weekday and weekend times', () => {
+		const now = new Date('2026-11-21T10:00:00Z');
+		const plan = notificationPlan(2026, 'daily', now, { week: '08:00', weekend: '09:00' }, { 1: '06:45', 6: '11:00', 7: 'oups' });
+		const at = (d: number) => plan.find((n) => n.day === d)!.at.toISOString();
+		expect(at(1)).toBe('2026-12-01T05:45:00.000Z'); // 6 h 45 à Paris
+		expect(at(6)).toBe('2026-12-06T10:00:00.000Z'); // dimanche, 11 h
+		expect(at(7)).toBe('2026-12-07T07:00:00.000Z'); // heure illisible : heure de semaine
+		expect(at(5)).toBe('2026-12-05T08:00:00.000Z'); // samedi sans heure propre : 9 h
 	});
 });

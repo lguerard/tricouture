@@ -35,12 +35,12 @@
 			}
 		}
 		const n = data.advent?.notify;
-		const sig = n ? `${n.year}:${n.mode}:${data.locale}` : 'none';
+		const sig = n ? `${n.year}:${n.mode}:${n.week}:${n.weekend}:${JSON.stringify(n.days)}:${data.locale}` : 'none';
 		if (sig === adventScheduled) return;
 		adventScheduled = sig;
 		listenNotificationTaps((href) => goto(href));
 		const plan = n
-			? notificationPlan(n.year, n.mode, new Date()).map(({ day, at }) => ({
+			? notificationPlan(n.year, n.mode, new Date(), { week: n.week, weekend: n.weekend }, n.days).map(({ day, at }) => ({
 					id: ADVENT_NOTIFY_ID_BASE + day,
 					title: day === 1 ? t(data.locale, 'advent.notif.firstTitle') : t(data.locale, 'advent.notif.dayTitle', { n: day }),
 					body: day === 1 ? t(data.locale, 'advent.notif.firstBody') : t(data.locale, 'advent.notif.dayBody'),

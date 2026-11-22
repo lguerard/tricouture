@@ -660,6 +660,9 @@ export const adventCalendars = pgTable(
 		todoCustom: jsonb('todo_custom').$type<CustomTodo[]>().notNull().default([]),
 		// Phone notifications to the recipient: 'off' | 'first' | 'daily'.
 		notify: varchar('notify', { length: 10 }).$type<NotifyMode>().notNull().default('first'),
+		// Time of day of the notifications (Paris), weekdays and weekends.
+		notifyTimeWeek: varchar('notify_time_week', { length: 5 }).notNull().default('08:00'),
+		notifyTimeWeekend: varchar('notify_time_weekend', { length: 5 }).notNull().default('09:00'),
 		createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
 	},
 	(t) => ({
@@ -690,6 +693,9 @@ export const adventDays = pgTable(
 		patternId: uuid('pattern_id').references(() => patterns.id, { onDelete: 'set null' }),
 		yarns: jsonb('yarns').$type<AdventYarn[]>().notNull().default([]),
 		message: text('message'), // a word revealed with the pattern
+		// Time of this day's notification ("HH:MM", Paris); empty = the
+		// calendar's weekday or weekend time.
+		notifyTime: varchar('notify_time', { length: 5 }),
 		openedAt: timestamp('opened_at', { withTimezone: true }),
 		openedPatternId: uuid('opened_pattern_id').references(() => patterns.id, { onDelete: 'set null' }),
 		failedAttempts: integer('failed_attempts').notNull().default(0),
