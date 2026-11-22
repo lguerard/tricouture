@@ -1,3 +1,5 @@
+import { knownShell, shellAccent } from '$lib/shell';
+
 // Access Capacitor plugins from the WebView.
 // Uses the global bridge injected by the native shell — no Node imports.
 
@@ -105,10 +107,19 @@ export function listenNotificationTaps(go: (href: string) => void): void {
 // donnée par le plugin SystemColors de l'app (mobile/native). Sinon, la
 // raison : site ouvert dans un navigateur, app trop ancienne (sans le
 // plugin) ou Android d'avant la 12.
+//
+// L'app publiée n'a pas d'adresse de serveur intégrée : ses plugins ne
+// sont pas joignables depuis le site, seulement depuis sa page de départ,
+// qui passe la couleur dans l'adresse à l'ouverture ($lib/shell.ts).
 export type SystemColors = { accent: string } | { accent: null; missing: 'web' | 'app' | 'android' };
 
 export async function systemColors(): Promise<SystemColors> {
-	if (!isCapacitor()) return { accent: null, missing: 'web' };
+	if (!isCapacitor()) {
+		if (!knownShell()) return { accent: null, missing: 'web' };
+		const accent = shellAccent();
+		if (accent === undefined) return { accent: null, missing: 'app' };
+		return accent ? { accent } : { accent: null, missing: 'android' };
+	}
 	const SystemColors = plugin('SystemColors');
 	if (!SystemColors) return { accent: null, missing: 'app' };
 	try {

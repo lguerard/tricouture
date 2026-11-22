@@ -22,6 +22,12 @@ describe('parseShellHash', () => {
 	it('reads an acknowledgement', () => {
 		expect(parseShellHash('#tc_advent=2026%3Afirst%3Afr&tc_result=ok').ack).toEqual({ sig: '2026:first:fr', result: 'ok' });
 	});
+	it('reads the Material You color', () => {
+		expect(parseShellHash('#tc_shell=https%3A%2F%2Flocalhost&tc_v=3&tc_accent=%233F7A5C').accent).toBe('#3f7a5c');
+		expect(parseShellHash('#tc_shell=https%3A%2F%2Flocalhost&tc_v=3&tc_accent=none').accent).toBeNull();
+		expect(parseShellHash('#tc_shell=https%3A%2F%2Flocalhost&tc_v=3&tc_accent=red;x').accent).toBeNull();
+		expect(parseShellHash('#tc_shell=https%3A%2F%2Flocalhost&tc_v=2')).not.toHaveProperty('accent');
+	});
 	it('returns nothing for an ordinary hash', () => {
 		expect(parseShellHash('#day-3')).toEqual({ shell: null, ack: null });
 	});

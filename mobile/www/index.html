@@ -116,16 +116,31 @@
 			// What this shell can do for the site, announced in the hash of the
 			// first page it opens (see app/src/lib/shell.ts). Bump SHELL_VERSION when
 			// adding a capability, so the site only asks shells that know it.
-			const SHELL_VERSION = 2;
+			const SHELL_VERSION = 3;
 			const LN = window.Capacitor?.Plugins?.LocalNotifications;
+			// Material You (version 3): the wallpaper's main color, read by the
+			// app's SystemColors plugin (mobile/native), "none" before Android 12.
+			const SC = window.Capacitor?.Plugins?.SystemColors;
+			const accent = (async () => {
+				try {
+					const r = SC ? await SC.get() : null;
+					return /^#[0-9a-f]{6}$/i.test(r?.accent || '') ? r.accent : 'none';
+				} catch {
+					return 'none';
+				}
+			})();
 
 			// replace(), not href: the shell must not stay in the history, or the
 			// back button would land here and bounce straight back to the server.
 			function goTo(url, hash) {
 				location.replace(hash ? url.split('#')[0] + '#' + hash : url);
 			}
-			function shellHash() {
-				return LN ? 'tc_shell=' + encodeURIComponent(location.origin) + '&tc_v=' + SHELL_VERSION : '';
+			async function shellHash() {
+				if (!LN) return '';
+				return (
+					'tc_shell=' + encodeURIComponent(location.origin) + '&tc_v=' + SHELL_VERSION +
+					'&tc_accent=' + encodeURIComponent(await accent)
+				);
 			}
 			function sameServer(url, saved) {
 				try {
@@ -178,7 +193,7 @@
 						result = 'error';
 					}
 				}
-				goTo(back, 'tc_advent=' + encodeURIComponent(String(msg.sig || '')) + '&tc_result=' + result + '&' + shellHash());
+				goTo(back, 'tc_advent=' + encodeURIComponent(String(msg.sig || '')) + '&tc_result=' + result + '&' + (await shellHash()));
 				return true;
 			}
 
@@ -186,8 +201,8 @@
 			const advent = location.hash.startsWith('#advent=') ? location.hash.slice('#advent='.length) : null;
 			if (saved && advent) {
 				document.querySelector('.card').style.visibility = 'hidden';
-				scheduleFromSite(advent, saved).then((handled) => {
-					if (!handled) goTo(saved, shellHash());
+				scheduleFromSite(advent, saved).then(async (handled) => {
+					if (!handled) goTo(saved, await shellHash());
 				});
 			} else if (saved) {
 				input.value = saved;
@@ -198,15 +213,15 @@
 					}
 					// Give a notification tap that launched the app time to arrive.
 					await new Promise((r) => setTimeout(r, 300));
-					goTo(tappedHref ? new URL(tappedHref, saved).href : saved, shellHash());
+					goTo(tappedHref ? new URL(tappedHref, saved).href : saved, await shellHash());
 				});
 			}
-			document.getElementById('go').addEventListener('click', () => {
+			document.getElementById('go').addEventListener('click', async () => {
 				let v = input.value.trim();
 				if (!v) return;
 				if (!/^https?:\/\//.test(v)) v = 'https://' + v;
 				localStorage.setItem('serverUrl', v);
-				goTo(v, shellHash());
+				goTo(v, await shellHash());
 			});
 		</script>
 	</body>
