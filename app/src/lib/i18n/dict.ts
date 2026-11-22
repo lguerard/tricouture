@@ -405,6 +405,7 @@ export const dict: Record<Locale, Table> = {
 		'dash.deadlines': 'Échéances proches',
 		'dash.recentPatterns': 'Derniers patrons',
 		'dash.allPatterns': 'Tous les patrons',
+		'dash.noDeadlines': 'Aucune échéance dans les 30 jours.',
 
 		// Shared labels: project status
 		'status.idee': 'Idée / Queue',
@@ -1419,6 +1420,7 @@ export const dict: Record<Locale, Table> = {
 		'dash.deadlines': 'Upcoming deadlines',
 		'dash.recentPatterns': 'Latest patterns',
 		'dash.allPatterns': 'All patterns',
+		'dash.noDeadlines': 'No deadline in the next 30 days.',
 
 		// Shared labels: project status
 		'status.idee': 'Idea / Queue',
