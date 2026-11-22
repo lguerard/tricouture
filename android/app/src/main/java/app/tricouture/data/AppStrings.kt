@@ -52,6 +52,8 @@ internal val APP_STRINGS: Map<String, Map<String, String>> = mapOf(
         "app.none" to "Aucun",
         "app.pdfPages" to "{n} p.",
         "app.openWith" to "Ouvrir avec…",
+        "app.deadlineSoon" to "⏰ Échéance dans {n} jours",
+        "app.reminders" to "Rappels",
     ),
     "en" to mapOf(
         "app.server" to "Server address",
@@ -100,5 +102,7 @@ internal val APP_STRINGS: Map<String, Map<String, String>> = mapOf(
         "app.none" to "None",
         "app.pdfPages" to "{n} p.",
         "app.openWith" to "Open with…",
+        "app.deadlineSoon" to "⏰ Deadline in {n} days",
+        "app.reminders" to "Reminders",
     ),
 )

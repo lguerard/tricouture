@@ -118,6 +118,20 @@ class MainActivity : ComponentActivity() {
             openPath = null
             Routes.fromSitePath(path)?.let { nav.navigate(it) }
         }
+        // Rappels du calendrier de l'Avent (pour la personne qui le reçoit),
+        // reprogrammés quand le planning change sur le site.
+        val advent by Session.advent.collectAsState()
+        val askNotifications = androidx.activity.compose.rememberLauncherForActivityResult(
+            androidx.activity.result.contract.ActivityResultContracts.RequestPermission(),
+        ) {}
+        LaunchedEffect(advent?.get("notify")?.toString()) {
+            val a = advent ?: return@LaunchedEffect
+            val notify = a.get("notify")?.takeIf { it.isJsonObject }?.asJsonObject
+            if (notify != null && android.os.Build.VERSION.SDK_INT >= 33 &&
+                checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED
+            ) askNotifications.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+            app.tricouture.data.Reminders.syncAdvent(applicationContext, notify)
+        }
         LaunchedEffect(sharedText) {
             val text = sharedText ?: return@LaunchedEffect
             sharedText = null

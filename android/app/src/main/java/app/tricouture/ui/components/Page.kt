@@ -41,6 +41,10 @@ class PageModel : ViewModel() {
     val error: StateFlow<String?> = _error.asStateFlow()
     private val _loading = MutableStateFlow(false)
     val loading: StateFlow<Boolean> = _loading.asStateFlow()
+    private val _redirect = MutableStateFlow<String?>(null)
+    /** Le site a renvoyé ailleurs (ex. /avent → /avent/atelier pour le lutin). */
+    val redirect: StateFlow<String?> = _redirect.asStateFlow()
+    fun redirectHandled() { _redirect.value = null }
     private val _busy = MutableStateFlow(false)
     /** Un formulaire est en cours d'envoi. */
     val busy: StateFlow<Boolean> = _busy.asStateFlow()
@@ -73,6 +77,8 @@ class PageModel : ViewModel() {
                 throw e
             } catch (e: UnauthorizedException) {
                 // L'appli repasse sur l'écran de connexion.
+            } catch (e: app.tricouture.data.RedirectException) {
+                _redirect.value = e.location
             } catch (e: KitException) {
                 _error.value = e.message
             } catch (e: Exception) {
@@ -175,6 +181,17 @@ fun PageBody(
     val data by page.data.collectAsState()
     val error by page.error.collectAsState()
     val loading by page.loading.collectAsState()
+    val redirect by page.redirect.collectAsState()
+    val nav = app.tricouture.ui.LocalNav.current
+    LaunchedEffect(redirect) {
+        val to = redirect ?: return@LaunchedEffect
+        page.redirectHandled()
+        val route = app.tricouture.ui.Routes.fromSitePath(to)
+        if (route != null) {
+            nav.popBackStack()
+            runCatching { nav.navigate(route) }
+        }
+    }
     val d = data
     when {
         d != null -> PullToRefreshBox(isRefreshing = loading, onRefresh = { page.reload() }, modifier = modifier.fillMaxSize()) {

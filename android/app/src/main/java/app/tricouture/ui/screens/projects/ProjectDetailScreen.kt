@@ -53,6 +53,11 @@ fun ProjectDetailScreen(id: String) {
     ) { padding ->
         PageBody(page, Modifier.padding(padding)) { d ->
             val proj = d.obj("project") ?: return@PageBody
+            // Rappel 3 jours avant l'échéance (comme le site dans l'appli).
+            val ctx = LocalContext.current
+            LaunchedEffect(proj.str("deadline"), proj.str("status")) {
+                Reminders.syncDeadline(ctx, id, proj.str("title").orEmpty(), proj.str("deadline"), proj.str("status") == "fini")
+            }
             Column(
                 Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp, 8.dp, 16.dp, 32.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),

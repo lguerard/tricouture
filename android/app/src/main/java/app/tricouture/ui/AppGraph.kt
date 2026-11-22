@@ -11,6 +11,7 @@ import app.tricouture.ui.screens.*
 import app.tricouture.ui.screens.patterns.*
 import app.tricouture.ui.screens.projects.*
 import app.tricouture.ui.screens.stash.*
+import app.tricouture.ui.screens.advent.*
 
 private fun str(name: String, default: String? = "") = navArgument(name) {
     type = NavType.StringType
@@ -51,10 +52,14 @@ fun NavGraphBuilder.appGraph(nav: NavHostController) {
     }
     composable("bins") { BinsScreen() }
     composable("account") { AccountScreen() }
+
+    // Calendrier de l'Avent
+    composable("avent?preview={preview}&date={date}", listOf(str("preview"), str("date"))) { AdventScreen(it.arg("preview"), it.arg("date")) }
+    composable("avent/atelier?c={c}", listOf(str("c"))) { AtelierScreen(it.arg("c")) }
     for ((route, key) in listOf(
         "calendar" to "nav.calendar", "goals" to "nav.goals", "stats" to "nav.stats", "achievements" to "nav.achievements",
         "recipients" to "nav.recipients", "gallery" to "nav.gallery", "moodboards" to "nav.moodboards",
-        "embroidery" to "nav.embroidery", "avent" to "nav.advent", "admin/users" to "nav.users",
+        "embroidery" to "nav.embroidery", "admin/users" to "nav.users",
     )) composable(route) { TodoScreen(tr0(key), back) }
 }
 
