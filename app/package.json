@@ -10,6 +10,7 @@
     "start": "node build",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
     "test": "vitest run",
+    "i18n:android": "UPDATE_ANDROID_I18N=1 vitest run src/lib/i18n/android.test.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "node ./scripts/migrate.js",
     "db:push": "drizzle-kit push"
