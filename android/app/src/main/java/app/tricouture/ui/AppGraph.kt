@@ -9,6 +9,7 @@ import androidx.navigation.navArgument
 import app.tricouture.data.tr
 import app.tricouture.ui.screens.*
 import app.tricouture.ui.screens.patterns.*
+import app.tricouture.ui.screens.projects.*
 
 private fun str(name: String, default: String? = "") = navArgument(name) {
     type = NavType.StringType
@@ -35,12 +36,13 @@ fun NavGraphBuilder.appGraph(nav: NavHostController) {
     composable("patterns/tags") { TagColorsScreen() }
     composable("pdf?path={path}&title={title}", listOf(str("path"), str("title"))) { PdfScreen(it.arg("path"), it.arg("title")) }
 
-    composable(Routes.PROJECTS) { TodoScreen(tr0("nav.projects"), back) }
+    // Projets
+    composable(Routes.PROJECTS) { ProjectsBoardScreen() }
+    composable("projects/new?pattern={pattern}", listOf(str("pattern"))) { ProjectNewScreen(it.arg("pattern")) }
+    composable("project/{id}", listOf(str("id"))) { ProjectDetailScreen(it.arg("id")) }
     composable(Routes.STASH) { TodoScreen(tr0("nav.stash"), back) }
 
     // Pas encore réécrits en natif.
-    composable("projects/new?pattern={pattern}", listOf(str("pattern"))) { TodoScreen(tr0("nav.projects"), back) }
-    composable("project/{id}", listOf(str("id"))) { TodoScreen(tr0("nav.projects"), back) }
     composable("assistant?kind={kind}&id={id}&title={title}&q={q}", listOf(str("kind"), str("id"), str("title"), str("q"))) {
         TodoScreen(tr0("nav.assistant"), back)
     }
