@@ -43,6 +43,7 @@ fun NavGraphBuilder.appGraph(nav: NavHostController) {
     composable(Routes.PROJECTS) { ProjectsBoardScreen() }
     composable("projects/new?pattern={pattern}", listOf(str("pattern"))) { ProjectNewScreen(it.arg("pattern")) }
     composable("project/{id}", listOf(str("id"))) { ProjectDetailScreen(it.arg("id")) }
+    composable("project/{id}/focus", listOf(str("id"))) { ProjectFocusScreen(it.arg("id")) }
     // Stock
     composable(Routes.STASH) { StashScreen() }
     composable("stash/{tab}?q={q}", listOf(str("tab"), str("q"))) { StashScreen(it.arg("tab"), it.arg("q")) }

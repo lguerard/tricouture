@@ -10,6 +10,12 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -95,6 +101,7 @@ fun StashScreen(presetTab: String = "", presetQuery: String = "") {
     var adding by rememberSaveable { mutableStateOf(false) }
     var deleting by remember { mutableStateOf<Pair<String, String>?>(null) }
     var viewing by remember { mutableStateOf<String?>(null) }
+    var hue by rememberSaveable { mutableStateOf("") }
     val ai by Session.ai.collectAsState()
     val current = TABS.first { it.kind == tab }
 
@@ -123,27 +130,48 @@ fun StashScreen(presetTab: String = "", presetQuery: String = "") {
                     AddItemForm(page, tab, onDone = { adding = false })
                     return@Column
                 }
-                OutlinedTextField(
+                PillSearchField(
                     query, { query = it },
-                    placeholder = { Text(tr("stash.searchPlaceholder")) },
-                    leadingIcon = { Icon(Icons.Default.Search, null) },
-                    trailingIcon = { if (query.isNotEmpty()) IconButton(onClick = { query = "" }) { Icon(Icons.Default.Close, null) } },
-                    singleLine = true,
+                    placeholder = tr("stash.searchPlaceholder"),
+                    trailing = { if (query.isNotEmpty()) IconButton(onClick = { query = "" }) { Icon(Icons.Default.Close, null) } },
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
                 )
-                val items = d.objs(current.listKey).filter { item -> matches(searchFields(item, tab), item.str("colorHex"), query) }
-                LazyColumn(
-                    contentPadding = PaddingValues(start = 12.dp, end = 12.dp, bottom = 96.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                // Laine et tissu : la couleur d'abord (filtre par famille, grandes pastilles).
+                val colorful = tab == "yarn" || tab == "fabric"
+                if (colorful) Row(
+                    Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    RoundChip(tr("app.hue.all"), hue.isEmpty(), onClick = { hue = "" })
+                    HUE_FAMILIES.forEach { (id, dot) ->
+                        RoundChip(tr("app.hue.$id"), hue == id, onClick = { hue = if (hue == id) "" else id }, dot = hexColor(dot))
+                    }
+                }
+                val items = d.objs(current.listKey).filter { item ->
+                    matches(searchFields(item, tab), item.str("colorHex"), query) &&
+                        (!colorful || hue.isEmpty() || hueFamily(item.str("colorHex")) == hue)
+                }
+                LazyVerticalGrid(
+                    columns = if (colorful) GridCells.Adaptive(160.dp) else GridCells.Fixed(1),
+                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 96.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
                     modifier = Modifier.fillMaxSize(),
                 ) {
-                    if (items.isEmpty()) item { EmptyState(if (query.isBlank()) tr("app.empty") else tr("stash.noResults"), emoji = current.emoji) }
+                    if (items.isEmpty()) item(span = { GridItemSpan(maxLineSpan) }) {
+                        EmptyState(if (query.isBlank() && hue.isEmpty()) tr("app.empty") else tr("stash.noResults"), emoji = current.emoji)
+                    }
                     items(items, key = { it.str("id").orEmpty() }) { item ->
-                        StashCard(item, tab,
+                        val onRemovePhoto = {
+                            page.submit(action = "removePhoto", fields = listOf("kind" to tab, "id" to item.str("id").orEmpty()), onError = toast)
+                        }
+                        if (colorful) SwatchCard(item, tab,
                             onPhoto = { viewing = item.str("photoPath") },
-                            onRemovePhoto = {
-                                page.submit(action = "removePhoto", fields = listOf("kind" to tab, "id" to item.str("id").orEmpty()), onError = toast)
-                            },
+                            onRemovePhoto = onRemovePhoto,
+                            onDelete = { deleting = tab to item.str("id").orEmpty() })
+                        else StashCard(item, tab,
+                            onPhoto = { viewing = item.str("photoPath") },
+                            onRemovePhoto = onRemovePhoto,
                             onDelete = { deleting = tab to item.str("id").orEmpty() })
                     }
                 }
@@ -158,6 +186,87 @@ fun StashScreen(presetTab: String = "", presetQuery: String = "") {
     viewing?.let { PhotoViewer(it) { viewing = null } }
 }
 
+/** Familles de couleur du filtre, avec la pastille qui les montre. */
+private val HUE_FAMILIES = listOf(
+    "red" to "#C94A3E", "ochre" to "#D49640", "green" to "#7E9C6D",
+    "blue" to "#4F79A8", "violet" to "#9A6FB0", "neutral" to "#CFC7BA",
+)
+
+/** Famille d'une couleur (#rrggbb) : teinte, ou « neutre » si elle est peu saturée, très claire ou très sombre. */
+internal fun hueFamily(hex: String?): String? {
+    val h = hex?.removePrefix("#")?.takeIf { it.length == 6 } ?: return null
+    val rgb = h.toLongOrNull(16) ?: return null
+    val r = ((rgb shr 16) and 0xFF) / 255f
+    val g = ((rgb shr 8) and 0xFF) / 255f
+    val b = (rgb and 0xFF) / 255f
+    val max = maxOf(r, g, b)
+    val min = minOf(r, g, b)
+    val l = (max + min) / 2f
+    val d = max - min
+    val sat = if (d == 0f) 0f else d / (1f - kotlin.math.abs(2f * l - 1f))
+    if (sat < 0.18f || l > 0.9f || l < 0.12f) return "neutral"
+    var hue = when (max) {
+        r -> 60f * (((g - b) / d) % 6f)
+        g -> 60f * ((b - r) / d + 2f)
+        else -> 60f * ((r - g) / d + 4f)
+    }
+    if (hue < 0) hue += 360f
+    return when {
+        hue < 18f || hue >= 335f -> "red"
+        hue < 65f -> "ochre"
+        hue < 170f -> "green"
+        hue < 255f -> "blue"
+        else -> "violet"
+    }
+}
+
+/** Laine ou tissu en grande pastille : la couleur (ou la photo) d'abord, puis le nom. */
+@Composable
+private fun SwatchCard(item: JsonObject, kind: String, onPhoto: () -> Unit, onRemovePhoto: () -> Unit, onDelete: () -> Unit) {
+    var menu by remember { mutableStateOf(false) }
+    val cs = MaterialTheme.colorScheme
+    Surface(shape = RoundedCornerShape(24.dp), color = cs.surfaceContainerLow, modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(start = 8.dp, end = 8.dp, top = 8.dp, bottom = 6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Box {
+                val photo = item.str("photoPath")
+                val swatch = Modifier.fillMaxWidth().height(110.dp).clip(RoundedCornerShape(18.dp))
+                if (photo != null) MediaImage(photo, swatch.clickable(onClick = onPhoto), width = 400)
+                else Box(swatch.background(item.str("colorHex")?.let { hexColor(it) } ?: cs.surfaceVariant), contentAlignment = Alignment.Center) {
+                    if (item.str("colorHex") == null) Text(TABS.first { it.kind == kind }.emoji, style = MaterialTheme.typography.headlineSmall)
+                }
+                if (kind == "yarn") {
+                    val skeins = item.double("skeins") ?: 1.0
+                    Pill("×" + if (skeins == Math.floor(skeins)) skeins.toLong().toString() else skeins.toString(),
+                        Modifier.align(Alignment.TopEnd).padding(8.dp), container = cs.inverseSurface, content = cs.inverseOnSurface)
+                }
+            }
+            Row(verticalAlignment = Alignment.Top) {
+                Column(Modifier.weight(1f).padding(start = 6.dp), verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                    val title = if (kind == "yarn")
+                        (item.str("colorway") ?: listOfNotNull(item.str("brand"), item.str("name")).joinToString(" ")).ifBlank { tr("stash.yarn.fallbackName") }
+                    else item.str("name") ?: item.str("fabricType") ?: tr("stash.fabric.fallbackName")
+                    Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.ExtraBold,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    val sub = if (kind == "yarn") listOfNotNull(
+                        item.str("brand")?.takeIf { item.str("colorway") != null },
+                        item.str("fiber"),
+                        item.int("yardsPerSkein")?.let { y -> "${(y * (item.double("skeins") ?: 1.0)).toLong()} m" },
+                    ) else listOfNotNull(item.str("fabricType"), item.int("lengthCm")?.let { "$it cm" })
+                    if (sub.isNotEmpty()) Text(sub.joinToString(" · "), style = MaterialTheme.typography.labelMedium,
+                        color = cs.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+                Box {
+                    IconButton(onClick = { menu = true }, modifier = Modifier.size(40.dp)) { Icon(Icons.Default.MoreVert, null) }
+                    DropdownMenu(menu, onDismissRequest = { menu = false }) {
+                        if (item.str("photoPath") != null) DropdownMenuItem(text = { Text(tr("stash.removePhoto")) }, onClick = { menu = false; onRemovePhoto() })
+                        DropdownMenuItem(text = { Text(tr("stash.delete"), color = cs.error) }, onClick = { menu = false; onDelete() })
+                    }
+                }
+            }
+        }
+    }
+}
+
 @Composable
 private fun searchFields(item: JsonObject, kind: String): List<String?> = when (kind) {
     "yarn" -> listOf(item.str("brand"), item.str("name"), item.str("colorway"), item.str("fiber"), item.str("weightCategory"),
@@ -170,7 +279,7 @@ private fun searchFields(item: JsonObject, kind: String): List<String?> = when (
 @Composable
 private fun StashCard(item: JsonObject, kind: String, onPhoto: () -> Unit, onRemovePhoto: () -> Unit, onDelete: () -> Unit) {
     var menu by remember { mutableStateOf(false) }
-    ElevatedCard(Modifier.fillMaxWidth()) {
+    Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surfaceContainerLow) {
         Row(Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             val photo = item.str("photoPath")
             if (photo != null) {
