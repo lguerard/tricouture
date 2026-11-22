@@ -1,4 +1,4 @@
-import { systemAccentColor } from '$lib/capacitor';
+import { systemColors } from '$lib/capacitor';
 import { THEME_SWATCHES, themeCss, themeVars } from '$lib/palette';
 
 export type Theme = 'auto' | 'light' | 'dark';
@@ -16,6 +16,8 @@ class ThemeState {
 	custom = $state<string>(THEME_SWATCHES[1]);
 	/** Couleur du fond d'écran (app Android 12+), null ailleurs. */
 	systemAccent = $state<string | null>(null);
+	/** Pourquoi Material You manque : navigateur, app à mettre à jour, Android < 12. */
+	systemMissing = $state<'web' | 'app' | 'android' | null>('web');
 	private started = false;
 
 	init() {
@@ -66,7 +68,9 @@ class ThemeState {
 	}
 
 	private async refreshSystemAccent() {
-		this.systemAccent = await systemAccentColor();
+		const found = await systemColors();
+		this.systemAccent = found.accent;
+		this.systemMissing = 'missing' in found ? found.missing : null;
 		// Material You choisi sur un appareil qui ne le propose plus : retour au violet.
 		this.apply();
 	}
