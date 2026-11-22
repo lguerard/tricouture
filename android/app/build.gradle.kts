@@ -10,7 +10,7 @@ android {
 
     defaultConfig {
         // Même identifiant que l'ancienne appli (Capacitor) : la nouvelle la
-        // remplace à l'installation, signée avec la même clé.
+        // remplacera à l'installation, signée avec la même clé.
         applicationId = "app.tricouture"
         minSdk = 26
         targetSdk = 35
@@ -26,8 +26,18 @@ android {
             applicationIdSuffix = ".test"
             resValue("string", "app_name", "Tricouture (test)")
         }
+        // Tant que les releases publient aussi l'ancienne appli, la native
+        // s'installe à côté : -PappIdSuffix=.native lui donne un autre
+        // identifiant et un autre nom.
         release {
-            isMinifyEnabled = true
+            val suffix = (project.findProperty("appIdSuffix") as String?).orEmpty()
+            if (suffix.isNotEmpty()) {
+                applicationIdSuffix = suffix
+                resValue("string", "app_name", "Tricouture (natif)")
+            }
+            // Pas de R8 pour l'instant : rien ne le vérifie à l'exécution avant
+            // la publication, et une classe retirée à tort ferait planter l'appli.
+            isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",

@@ -62,9 +62,20 @@ jobs:
       version: ${{ needs.changelog.outputs.version }}
     secrets: inherit
 
-  publish:
-    needs: [changelog, android]
+  # The native app (android/), published next to the Capacitor one. A failed
+  # native build does not hold back the release.
+  android-native:
+    needs: changelog
     if: needs.changelog.outputs.released == 'true'
+    uses: ./.github/workflows/android-native.yml
+    with:
+      release: true
+      version: ${{ needs.changelog.outputs.version }}
+    secrets: inherit
+
+  publish:
+    needs: [changelog, android, android-native]
+    if: ${{ !cancelled() && needs.changelog.outputs.released == 'true' && needs.android.result == 'success' }}
     runs-on: ubuntu-latest
     outputs:
       tag_name: ${{ needs.changelog.outputs.version }}
@@ -82,6 +93,22 @@ jobs:
           name: tricouture-android-release
           path: apk-release
 
+      - name: Download native release APK
+        if: needs.android-native.result == 'success'
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: tricouture-native-release
+          path: apk-native
+
+      - name: Name the native APK
+        run: |
+          if [ -f apk-native/app-release.apk ]; then
+            mv apk-native/app-release.apk apk-native/tricouture-native.apk
+          else
+            echo "::warning::No native APK for this release."
+          fi
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -89,4 +116,6 @@ jobs:
           target_commitish: ${{ github.sha }}
           name: ${{ needs.changelog.outputs.version }}
           body_path: RELEASE_NOTES.md
-          files: apk-release/app-release.apk
+          files: |
+            apk-release/app-release.apk
+            apk-native/tricouture-native.apk
