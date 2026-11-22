@@ -50,6 +50,8 @@ internal val APP_STRINGS: Map<String, Map<String, String>> = mapOf(
         "app.share" to "Partager",
         "app.all" to "Tout",
         "app.none" to "Aucun",
+        "app.pdfPages" to "{n} p.",
+        "app.openWith" to "Ouvrir avec…",
     ),
     "en" to mapOf(
         "app.server" to "Server address",
@@ -96,5 +98,7 @@ internal val APP_STRINGS: Map<String, Map<String, String>> = mapOf(
         "app.share" to "Share",
         "app.all" to "All",
         "app.none" to "None",
+        "app.pdfPages" to "{n} p.",
+        "app.openWith" to "Open with…",
     ),
 )

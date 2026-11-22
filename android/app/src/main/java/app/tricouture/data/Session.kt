@@ -48,11 +48,17 @@ object Session {
     private val _ai = MutableStateFlow(false)
     val ai: StateFlow<Boolean> = _ai.asStateFlow()
 
+    /** Compteur de modifications (formulaires envoyés) : une page affichée se recharge s'il a bougé. */
+    private val _changes = MutableStateFlow(0)
+    val changes: StateFlow<Int> = _changes.asStateFlow()
+    fun changed() { _changes.value++ }
+
     val kit = Kit(
         base = { _server.value },
         token = { _token.value },
         locale = { _locale.value },
         onUnauthorized = { forget() },
+        onChanged = { changed() },
     )
 
     fun init(context: Context) {

@@ -40,7 +40,12 @@ sealed class ActionResult {
     val ok: Boolean get() = this !is Failure
     /** Message d'erreur du formulaire, sous la forme qu'utilise le site (`error`, `message`). */
     val error: String?
-        get() = (this as? Failure)?.data?.let { it.str("error") ?: it.str("message") ?: "Erreur ${it.str("status") ?: status}" }
+        get() = (this as? Failure)?.let { f ->
+            // Le site nomme ses messages selon le formulaire : error, coverError, pieceError…
+            f.data.str("error") ?: f.data.str("message")
+                ?: f.data.entrySet().firstOrNull { (k, v) -> k.endsWith("Error") && v.isJsonPrimitive }?.value?.asString
+                ?: "Erreur ${f.status}"
+        }
 }
 
 /** Fichier joint à un formulaire. */
@@ -57,6 +62,8 @@ class Kit(
     private val token: () -> String?,
     private val locale: () -> String,
     private val onUnauthorized: () -> Unit,
+    /** Un formulaire a modifié des données : les écrans se rechargeront en réapparaissant. */
+    private val onChanged: () -> Unit = {},
 ) {
     val http: OkHttpClient = OkHttpClient.Builder()
         .addInterceptor { chain ->
@@ -153,6 +160,7 @@ class Kit(
         val json = parseJson(text) ?: throw KitException("Réponse illisible du serveur (${res.code})", res.code)
         val data = json.get("data")?.takeIf { it.isJsonPrimitive }?.asString?.let { Devalue.parse(it) }
         val obj = data?.takeIf { it.isJsonObject }?.asJsonObject ?: JsonObject()
+        if (json.str("type") == "success" || json.str("type") == "redirect") onChanged()
         return when (json.str("type")) {
             "success" -> ActionResult.Success(obj)
             "failure" -> ActionResult.Failure(json.int("status") ?: 400, obj)
@@ -179,6 +187,7 @@ class Kit(
             }
             t
         }
+        if (method != "GET") onChanged()
         return if (text.isBlank()) JsonNull.INSTANCE else JsonParser.parseString(text)
     }
 
@@ -198,6 +207,7 @@ class Kit(
             }
             t
         }
+        onChanged()
         return if (text.isBlank()) JsonNull.INSTANCE else JsonParser.parseString(text)
     }
 

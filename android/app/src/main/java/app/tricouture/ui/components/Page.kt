@@ -47,12 +47,16 @@ class PageModel : ViewModel() {
 
     private var path = ""
     private var query: Map<String, String?> = emptyMap()
+    private var version = -1
     private var job: Job? = null
 
-    fun bind(path: String, query: Map<String, String?>) {
-        if (path == this.path && query == this.query && (_data.value != null || _loading.value)) return
+    /** Charge la page ; la recharge si elle a changé, ou si des données ont été modifiées depuis. */
+    fun bind(path: String, query: Map<String, String?>, version: Int) {
+        val same = path == this.path && query == this.query && version == this.version
+        if (same && (_data.value != null || _loading.value)) return
         this.path = path
         this.query = query
+        this.version = version
         reload()
     }
 
@@ -103,9 +107,9 @@ class PageModel : ViewModel() {
         viewModelScope.launch {
             _busy.value = true
             try {
+                // Un formulaire réussi fait recharger les pages affichées (Session.changes).
                 val res = Session.kit.action(path, action, fields, files)
                 if (res is ActionResult.Failure) onError(res.error ?: "Erreur")
-                else if (reload) reload()
                 onDone(res)
             } catch (e: CancellationException) {
                 throw e
@@ -140,7 +144,8 @@ class PageModel : ViewModel() {
 @Composable
 fun rememberPage(path: String, query: Map<String, String?> = emptyMap(), key: String = path): PageModel {
     val model: PageModel = viewModel(key = "page:$key")
-    LaunchedEffect(path, query) { model.bind(path, query) }
+    val version by Session.changes.collectAsState()
+    LaunchedEffect(path, query, version) { model.bind(path, query, version) }
     return model
 }
 
