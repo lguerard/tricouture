@@ -1,8 +1,8 @@
 name: Android native
 
 # Native app (android/, Kotlin/Compose), rewritten from the Capacitor shell.
-# Built on every change for now; releases still ship the Capacitor APK until
-# the native app covers every screen.
+# Debug build on every change (installs as "Tricouture (test)"). Releases are
+# built by release.yml, which reuses this workflow with `release: true`.
 on:
   push:
     branches: [main]
@@ -10,6 +10,34 @@ on:
   pull_request:
     paths: ['android/**', '.github/workflows/android-native.yml']
   workflow_dispatch:
+    inputs:
+      release:
+        description: "Build the signed release APK instead of the debug one"
+        required: false
+        type: boolean
+        default: false
+      version:
+        description: "Version (e.g. 0.34.0); defaults to a dev build number"
+        required: false
+        type: string
+  workflow_call:
+    inputs:
+      release:
+        required: false
+        type: boolean
+        default: false
+      version:
+        required: false
+        type: string
+    secrets:
+      KEYSTORE_BASE64:
+        required: false
+      KEYSTORE_PASSWORD:
+        required: false
+      KEY_ALIAS:
+        required: false
+      KEY_PASSWORD:
+        required: false
 
 jobs:
   build:
@@ -27,11 +55,58 @@ jobs:
 
       - run: chmod +x android/gradlew
 
+      # Maven Central sometimes answers 429 (too many requests) while the
+      # dependencies download: one more try after a pause.
       - name: Build debug APK
+        if: ${{ !inputs.release }}
         working-directory: android
-        run: ./gradlew assembleDebug --no-daemon
+        run: ./gradlew assembleDebug --no-daemon || { sleep 60; ./gradlew assembleDebug --no-daemon; }
 
       - uses: actions/upload-artifact@v4
+        if: ${{ !inputs.release }}
         with:
           name: tricouture-native-debug
           path: android/app/build/outputs/apk/debug/app-debug.apk
+
+      # Signed with the same key as the Capacitor app. Installs next to it
+      # (app.tricouture.native, "Tricouture (natif)") until the switch.
+      - name: Build signed release APK
+        if: ${{ inputs.release }}
+        working-directory: android
+        env:
+          VERSION: ${{ inputs.version }}
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "No KEYSTORE_BASE64 secret set — no signed native APK."
+            exit 0
+          fi
+          if echo "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            IFS=. read -r MAJ MIN PAT <<< "$VERSION"
+            CODE=$((MAJ * 1000000 + MIN * 1000 + PAT))
+          else
+            CODE=${{ github.run_number }}
+            VERSION="dev-${GITHUB_SHA::7}"
+          fi
+          echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/tricouture.jks"
+          build() {
+            ./gradlew assembleRelease --no-daemon \
+              -PversionCode="$CODE" -PversionName="$VERSION" -PappIdSuffix=.native \
+              -Pandroid.injected.signing.store.file="$RUNNER_TEMP/tricouture.jks" \
+              -Pandroid.injected.signing.store.password="$KEYSTORE_PASSWORD" \
+              -Pandroid.injected.signing.key.alias="$KEY_ALIAS" \
+              -Pandroid.injected.signing.key.password="$KEY_PASSWORD"
+          }
+          STATUS=0
+          build || { sleep 60; build; } || STATUS=$?
+          rm -f "$RUNNER_TEMP/tricouture.jks"
+          exit $STATUS
+
+      - uses: actions/upload-artifact@v4
+        if: ${{ inputs.release && hashFiles('android/app/build/outputs/apk/release/app-release.apk') != '' }}
+        with:
+          name: tricouture-native-release
+          path: android/app/build/outputs/apk/release/app-release.apk
