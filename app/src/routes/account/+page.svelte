@@ -3,6 +3,7 @@
 	import { withFeedback } from '$lib/feedback';
 	import { invalidateAll } from '$app/navigation';
 	import ThemeSwitch from '$lib/components/ThemeSwitch.svelte';
+	import ThemeColors from '$lib/components/ThemeColors.svelte';
 	import { t, LOCALES, type Locale } from '$lib/i18n';
 	let { data, form } = $props();
 	const locale = $derived(data.locale);
@@ -42,6 +43,10 @@
 		<div class="pref-row">
 			<span>{t(locale, 'theme.label')}</span>
 			<ThemeSwitch {locale} />
+		</div>
+		<div class="pref-row colors-row">
+			<span>{t(locale, 'theme.colors.label')}</span>
+			<ThemeColors {locale} />
 		</div>
 	</section>
 
@@ -134,6 +139,9 @@
 	}
 	.pref-row :global(.themeswitch) {
 		padding: 0;
+	}
+	.colors-row {
+		align-items: flex-start;
 	}
 	.ai-toggle-row {
 		display: flex;

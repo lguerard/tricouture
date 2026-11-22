@@ -87,6 +87,15 @@ jobs:
           cp -r resources/res/. android/app/src/main/res/
           ls android/app/src/main/res/mipmap-xxxhdpi
 
+      # Native code of the app (mobile/native/README.md): the SystemColors
+      # plugin (Material You colors for the site) and the MainActivity that
+      # registers it, replacing Capacitor's generated one.
+      - name: Add native code
+        working-directory: mobile
+        run: |
+          cp -r native/app/. android/app/src/main/java/app/
+          cat android/app/src/main/java/app/tricouture/MainActivity.java
+
       # Capacitor's template ships versionName "1.0" / versionCode 1 forever:
       # Android then can't tell an APK from the previous one. Stamp the release
       # version instead (versionCode must grow: 0.18.1 -> 18001).
