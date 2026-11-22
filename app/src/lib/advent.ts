@@ -151,19 +151,37 @@ export const ADVENT_TODO_IDS = new Set(ADVENT_TODO.flatMap((g) => g.ids));
 // Notifications to the recipient: none, December 1st only, or every morning.
 export const NOTIFY_MODES = ['off', 'first', 'daily'] as const;
 export type NotifyMode = (typeof NOTIFY_MODES)[number];
-export const ADVENT_NOTIFY_HOUR = 8; // Paris time
 export const ADVENT_NOTIFY_ID_BASE = 880_000; // + day: stable ids on the phone
 
-// The instant it is `hour`:00 in Paris on that day (handles summer time).
-export function parisInstant(year: number, month: number, day: number, hour: number): Date {
-	let t = Date.UTC(year, month - 1, day, hour);
+// Times of day ("HH:MM", Paris time) the notifications fire, one for weekdays
+// and one for Saturdays and Sundays.
+export type NotifyTimes = { week: string; weekend: string };
+export const DEFAULT_NOTIFY_TIMES: NotifyTimes = { week: '08:00', weekend: '09:00' };
+
+// "8:5", "08:05", "8h05" → "08:05"; anything else → null.
+export function cleanTime(v: unknown): string | null {
+	const m = /^\s*(\d{1,2})\s*[:hH]\s*(\d{1,2})?\s*$/.exec(String(v ?? ''));
+	if (!m) return null;
+	const h = Number(m[1]), min = Number(m[2] ?? 0);
+	if (h > 23 || min > 59) return null;
+	return `${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}`;
+}
+
+export function isWeekend(year: number, month: number, day: number): boolean {
+	const d = new Date(Date.UTC(year, month - 1, day)).getUTCDay();
+	return d === 0 || d === 6;
+}
+
+// The instant it is hour:minute in Paris on that day (handles summer time).
+export function parisInstant(year: number, month: number, day: number, hour: number, minute = 0): Date {
+	const want = Date.UTC(year, month - 1, day, hour, minute);
+	let t = want;
 	for (let i = 0; i < 3; i++) {
 		const parts = new Intl.DateTimeFormat('en-GB', {
-			timeZone: ADVENT_TZ, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', hourCycle: 'h23'
+			timeZone: ADVENT_TZ, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23'
 		}).formatToParts(new Date(t));
 		const get = (k: string) => Number(parts.find((p) => p.type === k)?.value);
-		const shown = Date.UTC(get('year'), get('month') - 1, get('day'), get('hour'));
-		const want = Date.UTC(year, month - 1, day, hour);
+		const shown = Date.UTC(get('year'), get('month') - 1, get('day'), get('hour'), get('minute'));
 		if (shown === want) break;
 		t += want - shown;
 	}
@@ -171,12 +189,22 @@ export function parisInstant(year: number, month: number, day: number, hour: num
 }
 
 // Which notifications to schedule from `now` on: December 1st for 'first',
-// every door for 'daily', only those still in the future.
-export function notificationPlan(year: number, mode: NotifyMode, now: Date): { day: number; at: Date }[] {
+// every door for 'daily', only those still in the future, at the weekday or
+// weekend time of each day.
+export function notificationPlan(
+	year: number,
+	mode: NotifyMode,
+	now: Date,
+	times: NotifyTimes = DEFAULT_NOTIFY_TIMES
+): { day: number; at: Date }[] {
 	if (mode === 'off') return [];
 	const days = mode === 'first' ? [1] : Array.from({ length: ADVENT_DAYS }, (_, i) => i + 1);
 	return days
-		.map((day) => ({ day, at: parisInstant(year, 12, day, ADVENT_NOTIFY_HOUR) }))
+		.map((day) => {
+			const time = cleanTime(isWeekend(year, 12, day) ? times.weekend : times.week) ?? '08:00';
+			const [h, m] = time.split(':').map(Number);
+			return { day, at: parisInstant(year, 12, day, h, m) };
+		})
 		.filter((n) => n.at.getTime() > now.getTime());
 }
 

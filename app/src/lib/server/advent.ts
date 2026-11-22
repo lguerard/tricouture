@@ -291,7 +291,7 @@ export type AdventLayout = {
 	// Phone notifications to schedule for the recipient. Sent even before the
 	// calendar is revealed (only a year and a mode, nothing about its content),
 	// so the phone can hold the December 1st notification in advance.
-	notify: { year: number; mode: NotifyMode } | null;
+	notify: { year: number; mode: NotifyMode; week: string; weekend: string } | null;
 	// The most recent door available today and not opened yet, for the
 	// in-app reminder. null when there is none.
 	waitingDoor: number | null;
@@ -308,7 +308,7 @@ export async function adventForLayout(uid: string, today: ParisDate = parisDate(
 	let notify: AdventLayout['notify'] = null;
 	let waitingDoor: number | null = null;
 	if (cal) {
-		if (cal.notify !== 'off') notify = { year: cal.year, mode: cal.notify };
+		if (cal.notify !== 'off') notify = { year: cal.year, mode: cal.notify, week: cal.notifyTimeWeek, weekend: cal.notifyTimeWeekend };
 		if (isRevealed(cal.year, today, cal.revealEarly)) {
 			const closed = await db
 				.select({ day: adventDays.day })

@@ -114,6 +114,16 @@
 					</select>
 					<span class="muted small">{t(locale, 'advent.ws.notifyHelp')}</span>
 				</div>
+				<div class="row">
+					<div class="field">
+						<label for="ntw">{t(locale, 'advent.ws.notifyTimeWeek')}</label>
+						<input id="ntw" name="notifyTimeWeek" type="time" value={data.calendar.notifyTimeWeek} />
+					</div>
+					<div class="field">
+						<label for="ntwe">{t(locale, 'advent.ws.notifyTimeWeekend')}</label>
+						<input id="ntwe" name="notifyTimeWeekend" type="time" value={data.calendar.notifyTimeWeekend} />
+					</div>
+				</div>
 				<p class="muted small">{data.calendar.revealEarly ? t(locale, 'advent.ws.revealedNow') : t(locale, 'advent.ws.hiddenUntil', { year: data.calendar.year })}</p>
 				<button type="submit">{t(locale, 'advent.ws.save')}</button>
 			</form>

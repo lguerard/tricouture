@@ -660,6 +660,9 @@ export const adventCalendars = pgTable(
 		todoCustom: jsonb('todo_custom').$type<CustomTodo[]>().notNull().default([]),
 		// Phone notifications to the recipient: 'off' | 'first' | 'daily'.
 		notify: varchar('notify', { length: 10 }).$type<NotifyMode>().notNull().default('first'),
+		// Time of day of the notifications (Paris), weekdays and weekends.
+		notifyTimeWeek: varchar('notify_time_week', { length: 5 }).notNull().default('08:00'),
+		notifyTimeWeekend: varchar('notify_time_weekend', { length: 5 }).notNull().default('09:00'),
 		createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
 	},
 	(t) => ({
