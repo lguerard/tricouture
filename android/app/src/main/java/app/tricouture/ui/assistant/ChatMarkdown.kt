@@ -2,6 +2,8 @@ package app.tricouture.ui.assistant
 
 import androidx.compose.foundation.layout.height
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.withLink
+import androidx.compose.ui.text.withStyle
 
 // Markdown simple des réponses de l'assistant : listes, titres, **gras** et
 // liens. Pas de HTML, rien d'exécuté : seuls les liens vers une page du site
