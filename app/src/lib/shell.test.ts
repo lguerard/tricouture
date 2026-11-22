@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { bounceUrl, isShellOrigin, parseShellHash, shouldSend } from './shell';
+import { bounceUrl, isShellOrigin, parseShellHash, shellPlanSig, shouldSend } from './shell';
 
 describe('shell origin', () => {
 	it('accepts only the app’s own local origin', () => {
@@ -21,6 +21,12 @@ describe('parseShellHash', () => {
 	});
 	it('reads an acknowledgement', () => {
 		expect(parseShellHash('#tc_advent=2026%3Afirst%3Afr&tc_result=ok').ack).toEqual({ sig: '2026:first:fr', result: 'ok' });
+	});
+	it('reads the Material You color', () => {
+		expect(parseShellHash('#tc_shell=https%3A%2F%2Flocalhost&tc_v=3&tc_accent=%233F7A5C').accent).toBe('#3f7a5c');
+		expect(parseShellHash('#tc_shell=https%3A%2F%2Flocalhost&tc_v=3&tc_accent=none').accent).toBeNull();
+		expect(parseShellHash('#tc_shell=https%3A%2F%2Flocalhost&tc_v=3&tc_accent=red;x').accent).toBeNull();
+		expect(parseShellHash('#tc_shell=https%3A%2F%2Flocalhost&tc_v=2')).not.toHaveProperty('accent');
 	});
 	it('returns nothing for an ordinary hash', () => {
 		expect(parseShellHash('#day-3')).toEqual({ shell: null, ack: null });
@@ -51,5 +57,21 @@ describe('bounceUrl', () => {
 		const url = bounceUrl({ origin: 'https://localhost', version: 2 }, { plan: [], ids: [1], sig: 's', back: 'https://srv/' });
 		expect(url.startsWith('https://localhost/index.html#advent=')).toBe(true);
 		expect(JSON.parse(decodeURIComponent(url.split('#advent=')[1]))).toEqual({ plan: [], ids: [1], sig: 's', back: 'https://srv/' });
+	});
+});
+
+describe('shellPlanSig', () => {
+	it('sends the plan again after an app update', () => {
+		const before = shellPlanSig('2026:first:fr', 2);
+		const after = shellPlanSig('2026:first:fr', 3);
+		expect(before).not.toBe(after);
+		expect(shouldSend(after, before, 0, Date.now())).toBe(true);
+		expect(shouldSend(after, after, 0, Date.now())).toBe(false);
+	});
+	it('an old acknowledgement (no version) also gets the plan again', () => {
+		expect(shouldSend(shellPlanSig('2026:first:fr', 3), '2026:first:fr', 0, Date.now())).toBe(true);
+	});
+	it('still sends nothing when there was never anything to schedule', () => {
+		expect(shouldSend(shellPlanSig('none', 3), null, 0, Date.now())).toBe(false);
 	});
 });

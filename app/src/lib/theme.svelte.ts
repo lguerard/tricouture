@@ -67,7 +67,9 @@ class ThemeState {
 		this.apply();
 	}
 
-	private async refreshSystemAccent() {
+	/** Relit la couleur Material You (appelé aussi quand la page de départ de l'app l'a passée). */
+	async refreshSystemAccent() {
+		if (!this.started) return this.init();
 		const found = await systemColors();
 		this.systemAccent = found.accent;
 		this.systemMissing = 'missing' in found ? found.missing : null;

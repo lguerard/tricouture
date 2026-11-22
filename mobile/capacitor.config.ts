@@ -14,7 +14,8 @@ const config: CapacitorConfig = {
 	// a host outside `allowNavigation` to the system browser, and that host is
 	// only known at runtime -- hence '*', or the app just opens a browser.
 	// (Native plugins are only injected with a build-time URL; the site itself
-	// works either way.) Cleartext lets a LAN server on plain http:// load too.
+	// works either way, and the start page relays what it needs: notifications,
+	// Material You color -- see app/src/lib/shell.ts.) Cleartext lets a LAN server on plain http:// load too.
 	server: serverUrl
 		? {
 				url: serverUrl,
