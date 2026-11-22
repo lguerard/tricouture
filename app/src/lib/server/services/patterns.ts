@@ -1,9 +1,11 @@
 // Pattern changes shared by the pattern pages / AI routes and the assistant.
-import { and, eq } from 'drizzle-orm';
+import { and, asc, eq } from 'drizzle-orm';
+import { readFile } from 'node:fs/promises';
 import { lookup } from 'node:dns/promises';
 import { db } from '$lib/server/db';
 import { patternFiles, patternPieces, patterns } from '$lib/server/db/schema';
-import { deleteStored, saveDataUrl } from '$lib/server/storage';
+import { absolutePath, deleteStored, saveDataUrl, saveUpload } from '$lib/server/storage';
+import { extractPdfText } from '$lib/server/pdf';
 import { dropSharesOf } from '$lib/server/access';
 import { generate } from '$lib/server/ai/ollama';
 import { PIECES_SYSTEM, piecesPrompt } from '$lib/server/ai/prompts';
@@ -300,4 +302,83 @@ export async function readPatternPage(url: string): Promise<PatternPage> {
 		designer: decodeEntities(rawAuthor).trim().slice(0, 160) || null,
 		source: target.href
 	};
+}
+
+// Text of the pattern for full-text search: from its first PDF still attached.
+async function refreshExtractedText(patternId: string) {
+	const pdf = (
+		await db
+			.select({ storedPath: patternFiles.storedPath })
+			.from(patternFiles)
+			.where(and(eq(patternFiles.patternId, patternId), eq(patternFiles.mimeType, 'application/pdf')))
+			.orderBy(asc(patternFiles.createdAt))
+			.limit(1)
+	)[0];
+	let text: string | null = null;
+	if (pdf) {
+		try {
+			text = await extractPdfText(await readFile(absolutePath(pdf.storedPath)));
+		} catch {
+			text = null;
+		}
+	}
+	await db.update(patterns).set({ extractedText: text, updatedAt: new Date() }).where(eq(patterns.id, patternId));
+}
+
+// Removes one file of a pattern: the stored file, the cover if it was that
+// file, and hands the "primary" mark to the oldest file left.
+// Returns false when the file is not one of this pattern's.
+export async function deletePatternFile(p: { id: string; coverPath: string | null }, fileId: string): Promise<boolean> {
+	const f = (
+		await db
+			.select()
+			.from(patternFiles)
+			.where(and(eq(patternFiles.id, fileId), eq(patternFiles.patternId, p.id)))
+			.limit(1)
+	)[0];
+	if (!f) return false;
+	await db.delete(patternFiles).where(eq(patternFiles.id, f.id));
+	await deleteStored(f.storedPath);
+	if (p.coverPath === f.storedPath) {
+		await db.update(patterns).set({ coverPath: null, updatedAt: new Date() }).where(eq(patterns.id, p.id));
+	}
+	if (f.isPrimary) {
+		const next = (
+			await db.select({ id: patternFiles.id }).from(patternFiles).where(eq(patternFiles.patternId, p.id)).orderBy(asc(patternFiles.createdAt)).limit(1)
+		)[0];
+		if (next) await db.update(patternFiles).set({ isPrimary: true }).where(eq(patternFiles.id, next.id));
+	}
+	if (f.mimeType === 'application/pdf') await refreshExtractedText(p.id);
+	return true;
+}
+
+// Replaces one file of a pattern by a new upload, in place: same primary
+// mark, same cover if the cover was that file.
+export async function replacePatternFile(
+	uid: string,
+	p: { id: string; coverPath: string | null },
+	fileId: string,
+	file: File
+): Promise<boolean> {
+	const old = (
+		await db
+			.select()
+			.from(patternFiles)
+			.where(and(eq(patternFiles.id, fileId), eq(patternFiles.patternId, p.id)))
+			.limit(1)
+	)[0];
+	if (!old) return false;
+	const saved = await saveUpload(uid, file, 'patterns');
+	await db
+		.update(patternFiles)
+		.set({ filename: saved.filename, storedPath: saved.storedPath, mimeType: saved.mimeType, sizeBytes: saved.sizeBytes })
+		.where(eq(patternFiles.id, old.id));
+	if (p.coverPath === old.storedPath) {
+		// The cover follows the file only if the new one is an image too.
+		const cover = saved.mimeType.startsWith('image/') ? saved.storedPath : null;
+		await db.update(patterns).set({ coverPath: cover }).where(eq(patterns.id, p.id));
+	}
+	await deleteStored(old.storedPath);
+	if (old.mimeType === 'application/pdf' || saved.mimeType === 'application/pdf') await refreshExtractedText(p.id);
+	return true;
 }

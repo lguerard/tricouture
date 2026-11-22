@@ -7,7 +7,7 @@ import { getTagColorOverrides } from '$lib/server/tagColorOverrides';
 import { assignTagColors } from '$lib/tagColor';
 import { findCoverCandidates } from '$lib/server/cover-search';
 import { t } from '$lib/i18n';
-import { deletePattern, removeCover, setCoverFromUrl } from '$lib/server/services/patterns';
+import { deletePattern, deletePatternFile, removeCover, replacePatternFile, setCoverFromUrl } from '$lib/server/services/patterns';
 import type { Actions, PageServerLoad } from './$types';
 
 // Pattern accessible if the user owns it OR it is shared.
@@ -106,6 +106,29 @@ export const actions: Actions = {
 		if (!pattern) return fail(403, { error: 'Owner only' });
 		await deletePattern(pattern);
 		throw redirect(303, '/patterns');
+	},
+
+	// One file of the pattern: delete it, or replace it by a new upload.
+	deleteFile: async ({ locals, params, request }) => {
+		const uid = locals.user!.id;
+		const p = await ownedPattern(uid, params.id);
+		if (!p) return fail(403, { error: 'Owner only' });
+		const fileId = String((await request.formData()).get('fileId') ?? '');
+		if (!(await deletePatternFile(p, fileId))) return fail(404, { error: t(locals.locale, 'patterns.detail.fileMissing') });
+		return { ok: true };
+	},
+
+	replaceFile: async ({ locals, params, request }) => {
+		const uid = locals.user!.id;
+		const p = await ownedPattern(uid, params.id);
+		if (!p) return fail(403, { error: 'Owner only' });
+		const form = await request.formData();
+		const file = form.get('file');
+		if (!(file instanceof File) || file.size === 0) return fail(400, { error: t(locals.locale, 'patterns.detail.fileNone') });
+		if (!(await replacePatternFile(uid, p, String(form.get('fileId') ?? ''), file))) {
+			return fail(404, { error: t(locals.locale, 'patterns.detail.fileMissing') });
+		}
+		return { ok: true };
 	},
 
 	addPiece: async ({ locals, params, request }) => {

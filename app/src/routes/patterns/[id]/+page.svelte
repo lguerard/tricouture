@@ -11,6 +11,8 @@
 	let { data, form } = $props();
 	const locale = $derived(data.locale);
 	const p = $derived(data.pattern);
+	// File whose deletion waits for a second click.
+	let confirmDelete = $state<string | null>(null);
 
 	// Champs suggérés (analyse IA) : tags, type d'objet, créateur·rice, langue,
 	// difficulté, tailles, jauge, métrage -- tout ce qui est encore vide.
@@ -225,9 +227,34 @@
 					<div class="file card">
 						<div class="file-head">
 							<strong>{f.filename}</strong>
-							{#if !isPdf(f.mimeType)}
-								<a href={`/media/${f.storedPath}`} target="_blank" rel="noopener">{t(locale, 'patterns.detail.open')}</a>
-							{/if}
+							<span class="file-actions">
+								{#if !isPdf(f.mimeType)}
+									<a href={`/media/${f.storedPath}`} target="_blank" rel="noopener">{t(locale, 'patterns.detail.open')}</a>
+								{/if}
+								{#if data.isOwner}
+									<form method="POST" action="?/replaceFile" enctype="multipart/form-data" use:enhance={withFeedback({ success: 'patterns.detail.fileReplaced' })}>
+										<input type="hidden" name="fileId" value={f.id} />
+										<label class="file-btn">
+											{t(locale, 'patterns.detail.fileReplace')}
+											<input
+												type="file"
+												name="file"
+												accept=".pdf,image/*"
+												onchange={(e) => e.currentTarget.files?.length && e.currentTarget.form?.requestSubmit()}
+											/>
+										</label>
+									</form>
+									{#if confirmDelete === f.id}
+										<form method="POST" action="?/deleteFile" use:enhance={withFeedback({ success: 'patterns.detail.fileDeleted', inner: () => async ({ update }) => { confirmDelete = null; await update(); } })}>
+											<input type="hidden" name="fileId" value={f.id} />
+											<button type="submit" class="danger-btn">{t(locale, 'patterns.detail.fileDeleteConfirm')}</button>
+											<button type="button" onclick={() => (confirmDelete = null)}>{t(locale, 'patterns.detail.fileCancel')}</button>
+										</form>
+									{:else}
+										<button type="button" class="link-btn" onclick={() => (confirmDelete = f.id)}>{t(locale, 'patterns.detail.fileDelete')}</button>
+									{/if}
+								{/if}
+							</span>
 						</div>
 						{#if isImage(f.mimeType)}
 							<img src={mediaUrl(f.storedPath, 800)} loading="lazy" alt={f.filename} />
@@ -507,7 +534,45 @@
 	.file-head {
 		display: flex;
 		justify-content: space-between;
+		align-items: center;
+		gap: 0.6rem;
+		flex-wrap: wrap;
 		margin-bottom: 0.5rem;
+	}
+	.file-head strong {
+		min-width: 0;
+		overflow-wrap: anywhere;
+	}
+	.file-actions {
+		display: flex;
+		gap: 0.6rem;
+		align-items: center;
+		flex-wrap: wrap;
+	}
+	.file-actions form {
+		display: flex;
+		gap: 0.4rem;
+	}
+	.file-btn {
+		cursor: pointer;
+		color: var(--accent);
+		font-size: 0.9rem;
+	}
+	.file-btn input {
+		display: none;
+	}
+	.link-btn {
+		border: 0;
+		background: none;
+		padding: 0;
+		color: var(--danger);
+		font-size: 0.9rem;
+		cursor: pointer;
+	}
+	.danger-btn {
+		background: var(--danger);
+		color: #fff;
+		border-color: var(--danger);
 	}
 	.file img {
 		max-width: 100%;
