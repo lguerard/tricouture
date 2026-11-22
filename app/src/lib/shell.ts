@@ -114,9 +114,17 @@ export function shellAccent(): string | null | undefined {
 export function sendPlanToShell(plan: ShellPlan[], ids: number[], sig: string, back: string): boolean {
 	const shell = knownShell();
 	if (!shell || shell.version < SHELL_MIN_VERSION_NOTIFY) return false;
+	const planSig = shellPlanSig(sig, shell.version);
 	const lastTry = Number(get(TRY_KEY)) || 0;
-	if (!shouldSend(sig, get(SIG_KEY), lastTry, Date.now())) return false;
+	if (!shouldSend(planSig, get(SIG_KEY), lastTry, Date.now())) return false;
 	set(TRY_KEY, String(Date.now()));
-	location.replace(bounceUrl(shell, { plan, ids, sig, back }));
+	location.replace(bounceUrl(shell, { plan, ids, sig: planSig, back }));
 	return true;
+}
+
+// The plan's signature for a given version of the start page. Updating the
+// app (a new start page) may drop the notifications Android had scheduled:
+// a new version gives a new signature, so the plan is sent again once.
+export function shellPlanSig(sig: string, version: number): string {
+	return sig === 'none' ? sig : `${sig}@v${version}`;
 }
