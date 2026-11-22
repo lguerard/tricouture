@@ -299,6 +299,26 @@ l'interface comme par le script, annule les liens en attente pour ce compte.
 
 ---
 
+## Calendrier de l'Avent
+
+L'onglet ✨ *Calendrier de l'Avent* permet de préparer 24 portes pour un autre
+compte : un indice pour trouver la laine cachée, le code caché avec elle, le
+patron et la laine du jour (copiés dans sa bibliothèque et son stock à
+l'ouverture). Tout se règle dans l'*Atelier du lutin* (`/avent/atelier`).
+
+Pour remplir les 24 jours d'un coup depuis un fichier JSON (format décrit en
+tête du script) :
+
+```bash
+# simulation : montre ce qui serait fait et ce qui cloche, n'écrit rien
+docker compose exec -T app node scripts/advent-fill.js elle@exemple.fr < calendrier.json
+# remplissage
+docker compose exec -T app node scripts/advent-fill.js elle@exemple.fr --apply < calendrier.json
+```
+
+Les patrons sont retrouvés par leur titre dans la bibliothèque du lutin ; les
+portes déjà ouvertes ne sont jamais modifiées.
+
 ## Application Android
 
 L'app est une **coque Capacitor** (`mobile/`) qui charge ton serveur. Elle est
