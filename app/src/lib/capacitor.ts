@@ -100,3 +100,17 @@ export function listenNotificationTaps(go: (href: string) => void): void {
 		if (typeof href === 'string' && href.startsWith('/')) go(href);
 	});
 }
+
+// Material You : couleur principale du fond d'écran (Android 12 et plus),
+// donnée par le plugin SystemColors de l'app (mobile/native). null ailleurs.
+export async function systemAccentColor(): Promise<string | null> {
+	if (!isCapacitor()) return null;
+	const SystemColors = plugin('SystemColors');
+	if (!SystemColors) return null;
+	try {
+		const { accent } = await SystemColors.get();
+		return typeof accent === 'string' && /^#[0-9a-f]{6}$/i.test(accent) ? accent : null;
+	} catch {
+		return null;
+	}
+}
