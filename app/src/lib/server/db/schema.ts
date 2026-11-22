@@ -693,6 +693,9 @@ export const adventDays = pgTable(
 		patternId: uuid('pattern_id').references(() => patterns.id, { onDelete: 'set null' }),
 		yarns: jsonb('yarns').$type<AdventYarn[]>().notNull().default([]),
 		message: text('message'), // a word revealed with the pattern
+		// Time of this day's notification ("HH:MM", Paris); empty = the
+		// calendar's weekday or weekend time.
+		notifyTime: varchar('notify_time', { length: 5 }),
 		openedAt: timestamp('opened_at', { withTimezone: true }),
 		openedPatternId: uuid('opened_pattern_id').references(() => patterns.id, { onDelete: 'set null' }),
 		failedAttempts: integer('failed_attempts').notNull().default(0),

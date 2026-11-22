@@ -3,7 +3,7 @@
 	import { withFeedback } from '$lib/feedback';
 	import { t } from '$lib/i18n';
 	import { mediaUrl } from '$lib/media';
-	import { ADVENT_TODO, ADVENT_TODO_AUTO, NOTIFY_MODES, groupTodos, normalizeCode, type AdventYarn } from '$lib/advent';
+	import { ADVENT_TODO, ADVENT_TODO_AUTO, NOTIFY_MODES, groupTodos, isWeekend, normalizeCode, type AdventYarn } from '$lib/advent';
 
 	let { data } = $props();
 	const locale = $derived(data.locale);
@@ -38,6 +38,9 @@
 		if (!previewDate && data.calendar) previewDate = `${data.calendar.year}-12-01`;
 	});
 	let openDay = $state<number | null>(null);
+	function isWeekendDay(day: number): boolean {
+		return isWeekend(data.calendar?.year ?? new Date().getFullYear(), 12, day);
+	}
 
 	// Preparation checklist: ticked ids are stored on the calendar; "fill" ticks
 	// itself once the 24 days are complete.
@@ -316,6 +319,11 @@
 							</div>
 						{/each}
 					</fieldset>
+					<div class="field narrow">
+						<label for="nt{d.day}">{t(locale, 'advent.ws.dayNotifyTime')}</label>
+						<input id="nt{d.day}" name="notifyTime" type="time" value={d.notifyTime ?? ''} />
+						<span class="muted small">{t(locale, 'advent.ws.dayNotifyTimeHelp', { time: isWeekendDay(d.day) ? data.calendar.notifyTimeWeekend : data.calendar.notifyTimeWeek })}</span>
+					</div>
 					<div class="field">
 						<label for="m{d.day}">{t(locale, 'advent.ws.message')}</label>
 						<textarea id="m{d.day}" name="message" rows="2" placeholder={t(locale, 'advent.ws.messagePh')}>{d.message ?? ''}</textarea>
@@ -339,6 +347,7 @@
 	.grow { flex: 1 1 220px; }
 	.check { display: flex; gap: 0.4rem; align-items: center; white-space: nowrap; padding-bottom: 0.5rem; }
 	.check input { width: auto; }
+	.narrow input { max-width: 10rem; }
 	form { display: grid; gap: 0.8rem; }
 	.create summary, .day summary { cursor: pointer; font-weight: 600; }
 	.calform { margin-bottom: 0.8rem; }

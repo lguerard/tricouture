@@ -207,3 +207,15 @@ describe('notification times', () => {
 		expect(plan[0].at.toISOString()).toBe('2026-12-01T07:00:00.000Z');
 	});
 });
+
+describe('time set on a day', () => {
+	it('wins over the weekday and weekend times', () => {
+		const now = new Date('2026-11-21T10:00:00Z');
+		const plan = notificationPlan(2026, 'daily', now, { week: '08:00', weekend: '09:00' }, { 1: '06:45', 6: '11:00', 7: 'oups' });
+		const at = (d: number) => plan.find((n) => n.day === d)!.at.toISOString();
+		expect(at(1)).toBe('2026-12-01T05:45:00.000Z'); // 6 h 45 à Paris
+		expect(at(6)).toBe('2026-12-06T10:00:00.000Z'); // dimanche, 11 h
+		expect(at(7)).toBe('2026-12-07T07:00:00.000Z'); // heure illisible : heure de semaine
+		expect(at(5)).toBe('2026-12-05T08:00:00.000Z'); // samedi sans heure propre : 9 h
+	});
+});

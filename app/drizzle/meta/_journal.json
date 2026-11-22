@@ -141,6 +141,13 @@
       "when": 1795333219707,
       "tag": "0019_advent_notify_times",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1795333453804,
+      "tag": "0020_advent_day_notify_time",
+      "breakpoints": true
     }
   ]
 }

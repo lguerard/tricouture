@@ -189,19 +189,21 @@ export function parisInstant(year: number, month: number, day: number, hour: num
 }
 
 // Which notifications to schedule from `now` on: December 1st for 'first',
-// every door for 'daily', only those still in the future, at the weekday or
-// weekend time of each day.
+// every door for 'daily', only those still in the future, at the time set on
+// the day itself, else the weekday or weekend time.
 export function notificationPlan(
 	year: number,
 	mode: NotifyMode,
 	now: Date,
-	times: NotifyTimes = DEFAULT_NOTIFY_TIMES
+	times: NotifyTimes = DEFAULT_NOTIFY_TIMES,
+	perDay: Record<number, string> = {}
 ): { day: number; at: Date }[] {
 	if (mode === 'off') return [];
 	const days = mode === 'first' ? [1] : Array.from({ length: ADVENT_DAYS }, (_, i) => i + 1);
 	return days
 		.map((day) => {
-			const time = cleanTime(isWeekend(year, 12, day) ? times.weekend : times.week) ?? '08:00';
+			// A time set on the day itself wins over the weekday/weekend time.
+			const time = cleanTime(perDay[day]) ?? cleanTime(isWeekend(year, 12, day) ? times.weekend : times.week) ?? '08:00';
 			const [h, m] = time.split(':').map(Number);
 			return { day, at: parisInstant(year, 12, day, h, m) };
 		})

@@ -208,7 +208,8 @@ export const actions: Actions = {
 				code: code || null,
 				patternId,
 				yarns: yarnList,
-				message: str(form, 'message', 4000) || null
+				message: str(form, 'message', 4000) || null,
+				notifyTime: cleanTime(form.get('notifyTime'))
 			})
 			.where(eq(adventDays.id, current.id));
 		return { ok: true, day: dayNo };

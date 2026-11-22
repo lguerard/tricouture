@@ -1,0 +1,1 @@
+ALTER TABLE "advent_days" ADD COLUMN "notify_time" varchar(5);
