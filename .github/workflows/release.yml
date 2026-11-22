@@ -74,18 +74,13 @@ jobs:
         with:
           name: release-notes
 
-      - name: Download debug APK
-        uses: actions/download-artifact@v4
-        with:
-          name: tricouture-android-debug
-          path: apk
-
-      - name: Download release APK (if signed)
+      # Only the signed APK is published (the debug one, built by
+      # android.yml, stays a workflow artifact for manual builds).
+      - name: Download release APK
         uses: actions/download-artifact@v4
         with:
           name: tricouture-android-release
           path: apk-release
-        continue-on-error: true
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -94,6 +89,4 @@ jobs:
           target_commitish: ${{ github.sha }}
           name: ${{ needs.changelog.outputs.version }}
           body_path: RELEASE_NOTES.md
-          files: |
-            apk/app-debug.apk
-            apk-release/app-release.apk
+          files: apk-release/app-release.apk
