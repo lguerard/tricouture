@@ -1,0 +1,4 @@
+-keep class app.tricouture.data.** { *; }
+-keepattributes Signature
+-keepattributes *Annotation*
+-dontwarn okhttp3.**
