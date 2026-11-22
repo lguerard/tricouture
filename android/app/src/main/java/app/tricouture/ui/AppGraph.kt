@@ -10,6 +10,7 @@ import app.tricouture.data.tr
 import app.tricouture.ui.screens.*
 import app.tricouture.ui.screens.patterns.*
 import app.tricouture.ui.screens.projects.*
+import app.tricouture.ui.screens.stash.*
 
 private fun str(name: String, default: String? = "") = navArgument(name) {
     type = NavType.StringType
@@ -40,15 +41,18 @@ fun NavGraphBuilder.appGraph(nav: NavHostController) {
     composable(Routes.PROJECTS) { ProjectsBoardScreen() }
     composable("projects/new?pattern={pattern}", listOf(str("pattern"))) { ProjectNewScreen(it.arg("pattern")) }
     composable("project/{id}", listOf(str("id"))) { ProjectDetailScreen(it.arg("id")) }
-    composable(Routes.STASH) { TodoScreen(tr0("nav.stash"), back) }
+    // Stock
+    composable(Routes.STASH) { StashScreen() }
+    composable("stash/{tab}?q={q}", listOf(str("tab"), str("q"))) { StashScreen(it.arg("tab"), it.arg("q")) }
 
     // Pas encore réécrits en natif.
     composable("assistant?kind={kind}&id={id}&title={title}&q={q}", listOf(str("kind"), str("id"), str("title"), str("q"))) {
         TodoScreen(tr0("nav.assistant"), back)
     }
+    composable("bins") { BinsScreen() }
     for ((route, key) in listOf(
         "calendar" to "nav.calendar", "goals" to "nav.goals", "stats" to "nav.stats", "achievements" to "nav.achievements",
-        "bins" to "nav.bins", "recipients" to "nav.recipients", "gallery" to "nav.gallery", "moodboards" to "nav.moodboards",
+        "recipients" to "nav.recipients", "gallery" to "nav.gallery", "moodboards" to "nav.moodboards",
         "embroidery" to "nav.embroidery", "avent" to "nav.advent", "account" to "nav.account", "admin/users" to "nav.users",
     )) composable(route) { TodoScreen(tr0(key), back) }
 }
