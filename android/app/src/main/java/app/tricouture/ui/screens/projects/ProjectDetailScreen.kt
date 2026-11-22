@@ -133,7 +133,11 @@ private fun Counter(page: PageModel, p: JsonObject, readOnly: Boolean, toast: (S
                 Text(tr("projects.detail.addRow"), fontSize = 22.sp)
             }
         }
-        if (!readOnly) TextButton(onClick = speech) { Text(tr("projects.detail.micStart")) }
+        if (!readOnly) Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            TextButton(onClick = speech) { Text(tr("projects.detail.micStart")) }
+            val nav = LocalNav.current
+            FilledTonalButton(onClick = { nav.navigate("project/${p.str("id")}/focus") }) { Text(tr("app.focus.open")) }
+        }
         heard?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
         Text(tr("projects.detail.percentDone", "n" to pct), style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant)

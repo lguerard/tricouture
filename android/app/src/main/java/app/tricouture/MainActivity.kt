@@ -30,7 +30,9 @@ import app.tricouture.data.tr
 import app.tricouture.ui.LocalNav
 import app.tricouture.ui.Routes
 import app.tricouture.ui.appGraph
+import app.tricouture.ui.components.FloatingNavBar
 import app.tricouture.ui.components.LocalSnackbar
+import app.tricouture.ui.components.NavItem
 import app.tricouture.ui.screens.ForgotPasswordDialog
 import app.tricouture.ui.screens.LoginScreen
 import app.tricouture.ui.screens.RegisterScreen
@@ -139,11 +141,11 @@ class MainActivity : ComponentActivity() {
         }
 
         val tabs = listOf(
-            Triple(Routes.HOME, "nav.home", Icons.Default.Home),
-            Triple(Routes.PATTERNS, "nav.patterns", Icons.Default.Description),
-            Triple(Routes.PROJECTS, "nav.projects", Icons.Default.ViewKanban),
-            Triple(Routes.STASH, "nav.stash", Icons.Default.Inventory2),
-            Triple(Routes.MORE, "app.more", Icons.Default.Menu),
+            NavItem(Routes.HOME, tr("nav.home"), Icons.Default.Home),
+            NavItem(Routes.PATTERNS, tr("nav.patterns"), Icons.Default.Description),
+            NavItem(Routes.PROJECTS, tr("nav.projects"), Icons.Default.ViewKanban),
+            NavItem(Routes.STASH, tr("nav.stash"), Icons.Default.Inventory2),
+            NavItem(Routes.MORE, tr("app.more"), Icons.Default.Menu),
         )
         fun openTab(r: String) = nav.navigate(r) {
             popUpTo(nav.graph.findStartDestination().id) { saveState = true }
@@ -155,17 +157,9 @@ class MainActivity : ComponentActivity() {
             Scaffold(
                 contentWindowInsets = WindowInsets(0, 0, 0, 0),
                 bottomBar = {
-                    if (route in tabs.map { it.first }) {
-                        NavigationBar {
-                            tabs.forEach { (r, key, icon) ->
-                                NavigationBarItem(
-                                    selected = route == r,
-                                    onClick = { openTab(r) },
-                                    icon = { Icon(icon, null) },
-                                    label = { Text(tr(key), maxLines = 1) },
-                                )
-                            }
-                        }
+                    // Barre flottante : une pilule, l'onglet ouvert s'élargit avec son nom.
+                    if (route in tabs.map { it.route }) {
+                        FloatingNavBar(tabs, route, onSelect = { openTab(it) })
                     }
                 },
             ) { inner ->

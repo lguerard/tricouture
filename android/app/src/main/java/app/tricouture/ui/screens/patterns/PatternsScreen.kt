@@ -17,6 +17,9 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -86,27 +89,28 @@ fun PatternsScreen(presetTag: String = "", onBack: (() -> Unit)? = null) {
         },
     ) { padding ->
         Column(Modifier.padding(padding)) {
-            OutlinedTextField(
+            PillSearchField(
                 typed, { typed = it },
-                placeholder = { Text(tr("patterns.list.searchPlaceholder"), maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                leadingIcon = { Icon(Icons.Default.Search, null) },
-                trailingIcon = {
+                placeholder = tr("patterns.list.searchPlaceholder"),
+                trailing = {
                     if (typed.isNotEmpty()) IconButton(onClick = { typed = ""; q = ""; pageNum = 1 }) { Icon(Icons.Default.Close, null) }
                 },
-                singleLine = true,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                 keyboardActions = KeyboardActions(onSearch = { q = typed.trim(); pageNum = 1 }),
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
             )
+            // Type de travail : en pilules, un toucher suffit.
+            Row(
+                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 6.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                RoundChip(tr("patterns.list.allTypes"), craft.isEmpty(), onClick = { craft = ""; pageNum = 1 })
+                CRAFTS.forEach { c -> RoundChip(craftLabel(c), craft == c, onClick = { craft = c; pageNum = 1 }) }
+            }
             Row(
                 Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                FilterMenu(
-                    if (craft.isEmpty()) tr("patterns.list.allTypes") else craftLabel(craft),
-                    craft.isNotEmpty(),
-                    listOf("" to tr("patterns.list.allTypes")) + CRAFTS.map { it to craftLabel(it) },
-                ) { craft = it; pageNum = 1 }
                 FilterMenu(
                     when (scope) { "mine" -> tr("patterns.list.mine"); "shared" -> tr("patterns.list.sharedWithMe"); else -> tr("patterns.list.allScope") },
                     scope.isNotEmpty(),
@@ -132,9 +136,9 @@ fun PatternsScreen(presetTag: String = "", onBack: (() -> Unit)? = null) {
                 }
                 LazyVerticalGrid(
                     columns = GridCells.Adaptive(160.dp),
-                    contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 96.dp),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 96.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
                     modifier = Modifier.fillMaxSize(),
                 ) {
                     item(span = { GridItemSpan(maxLineSpan) }) {
@@ -174,30 +178,37 @@ fun FilterMenu(label: String, active: Boolean, options: List<Pair<String, String
     }
 }
 
+/** Carte d'un patron : grande couverture arrondie (type, PDF), titre, créatrice, tags. */
 @Composable
 private fun PatternCard(p: JsonObject, colors: JsonObject?, onTag: (String) -> Unit, onClick: () -> Unit) {
-    ElevatedCard(onClick = onClick, modifier = Modifier.fillMaxWidth()) {
-        MediaImage(p.str("coverPath"), Modifier.fillMaxWidth().aspectRatio(0.8f), width = 400, placeholder = "📄")
-        Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(p.str("title").orEmpty(), style = MaterialTheme.typography.titleSmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
-            ChipRow {
-                Pill(craftLabel(p.str("craft")))
-                if (p.bool("hasFile")) Pill(tr("patterns.list.hasPdf"), container = MaterialTheme.colorScheme.tertiaryContainer,
-                    content = MaterialTheme.colorScheme.onTertiaryContainer)
-                if (p.bool("hasLink")) Pill(tr("patterns.list.hasLink"), container = MaterialTheme.colorScheme.tertiaryContainer,
-                    content = MaterialTheme.colorScheme.onTertiaryContainer)
+    val cs = MaterialTheme.colorScheme
+    Column(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp)).clickable(onClick = onClick).padding(bottom = 4.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Box {
+            MediaImage(p.str("coverPath"), Modifier.fillMaxWidth().aspectRatio(0.85f).clip(RoundedCornerShape(22.dp)),
+                width = 400, placeholder = "📄")
+            Row(Modifier.align(Alignment.TopStart).padding(8.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                if (p.bool("hasFile")) Pill(tr("patterns.list.hasPdf"), container = cs.inverseSurface, content = cs.inverseOnSurface)
+                if (p.bool("hasLink")) Pill(tr("patterns.list.hasLink"), container = cs.inverseSurface, content = cs.inverseOnSurface)
             }
-            if (!p.bool("mine")) Text(tr("patterns.list.sharedBy", "name" to p.str("ownerName")), style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.primary)
-            else if (p.bool("isShared")) Text(tr("patterns.list.shared"), style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.primary)
-            val sub = listOfNotNull(p.str("garmentType"), p.str("designer")).filter { it.isNotBlank() }.joinToString(" · ")
-            if (sub.isNotEmpty()) Text(sub, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+            Pill(craftLabel(p.str("craft")), Modifier.align(Alignment.BottomStart).padding(8.dp),
+                container = cs.surface.copy(alpha = 0.92f), content = cs.onSurface)
+        }
+        Column(Modifier.padding(horizontal = 4.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            Text(p.str("title").orEmpty(), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.ExtraBold,
+                maxLines = 2, overflow = TextOverflow.Ellipsis)
+            val sub = listOfNotNull(p.str("designer"), p.str("garmentType"), difficultyLabel(p.int("difficulty")).ifEmpty { null })
+                .filter { it.isNotBlank() }.joinToString(" · ")
+            if (sub.isNotEmpty()) Text(sub, style = MaterialTheme.typography.labelMedium, color = cs.onSurfaceVariant,
                 maxLines = 1, overflow = TextOverflow.Ellipsis)
-            val diff = difficultyLabel(p.int("difficulty"))
-            if (diff.isNotEmpty()) Text(diff, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (!p.bool("mine")) Text(tr("patterns.list.sharedBy", "name" to p.str("ownerName")), style = MaterialTheme.typography.labelSmall,
+                color = cs.primary, fontWeight = FontWeight.Bold)
+            else if (p.bool("isShared")) Text(tr("patterns.list.shared"), style = MaterialTheme.typography.labelSmall,
+                color = cs.primary, fontWeight = FontWeight.Bold)
             val tags = p.strs("tags")
-            if (tags.isNotEmpty()) ChipRow { tags.forEach { TagChip(it, colors) { onTag(it) } } }
+            if (tags.isNotEmpty()) ChipRow { tags.take(3).forEach { TagChip(it, colors) { onTag(it) } } }
         }
     }
 }
