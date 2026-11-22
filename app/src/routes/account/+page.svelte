@@ -141,7 +141,9 @@
 		padding: 0;
 	}
 	.colors-row {
-		align-items: flex-start;
+		flex-direction: column;
+		align-items: stretch;
+		gap: 0.5rem;
 	}
 	.ai-toggle-row {
 		display: flex;
