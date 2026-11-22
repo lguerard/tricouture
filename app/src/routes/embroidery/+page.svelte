@@ -62,6 +62,10 @@
 	onMount(() => {
 		// Android app (WebView): file downloads don't reach the phone there.
 		inApp = '__capacitor' in window || 'Capacitor' in window || / wv\)/.test(navigator.userAgent);
+		// Opened from the native Android app's library (?edit=<id>): reopen that patch.
+		const edit = new URLSearchParams(location.search).get('edit');
+		const toEdit = edit ? data.designs.find((d) => d.id === edit && d.source !== 'import') : undefined;
+		if (toEdit) void reopen(toEdit);
 	});
 
 	const threads = $derived(design ? design.threads.map((i) => swaps[i] ?? i) : []);

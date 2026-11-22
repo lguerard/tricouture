@@ -47,7 +47,6 @@ fun NavGraphBuilder.appGraph(nav: NavHostController) {
     composable(Routes.STASH) { StashScreen() }
     composable("stash/{tab}?q={q}", listOf(str("tab"), str("q"))) { StashScreen(it.arg("tab"), it.arg("q")) }
 
-    // Pas encore réécrits en natif.
     composable("assistant?kind={kind}&id={id}&title={title}&q={q}", listOf(str("kind"), str("id"), str("title"), str("q"))) {
         app.tricouture.ui.assistant.AssistantScreen(it.arg("kind"), it.arg("id"), it.arg("title"), it.arg("q"))
     }
@@ -60,15 +59,14 @@ fun NavGraphBuilder.appGraph(nav: NavHostController) {
     composable("recipients") { RecipientsScreen() }
     composable("gallery") { GalleryScreen() }
     composable("admin/users") { AdminUsersScreen() }
+    composable("moodboards") { MoodboardsScreen() }
+    composable("moodboards/{id}", listOf(str("id"))) { MoodboardScreen(it.arg("id")) }
 
     // Calendrier de l'Avent
     composable("avent?preview={preview}&date={date}", listOf(str("preview"), str("date"))) { AdventScreen(it.arg("preview"), it.arg("date")) }
     composable("avent/atelier?c={c}", listOf(str("c"))) { AtelierScreen(it.arg("c")) }
-    for ((route, key) in listOf(
-        
-        "moodboards" to "nav.moodboards",
-        "embroidery" to "nav.embroidery",
-    )) composable(route) { TodoScreen(tr0(key), back) }
+    composable("embroidery") { EmbroideryScreen() }
+    composable("embroidery/editor?edit={edit}", listOf(str("edit"))) { EmbroideryEditorScreen(it.arg("edit")) }
 }
 
 private fun androidx.navigation.NavBackStackEntry.arg(name: String): String = arguments?.getString(name).orEmpty()
