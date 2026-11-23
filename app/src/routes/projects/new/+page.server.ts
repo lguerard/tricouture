@@ -1,5 +1,6 @@
 import { fail, redirect } from '@sveltejs/kit';
 import { and, eq, or, desc, sql } from 'drizzle-orm';
+import { notAdventSecret } from '$lib/server/access';
 import { db } from '$lib/server/db';
 import { projects, patterns } from '$lib/server/db/schema';
 import type { Actions, PageServerLoad } from './$types';
@@ -11,7 +12,7 @@ async function visiblePatternIds(uid: string) {
 	return db
 		.select({ id: patterns.id, title: patterns.title, craft: patterns.craft, mine: patterns.ownerId })
 		.from(patterns)
-		.where(or(eq(patterns.ownerId, uid), eq(patterns.isShared, true)))
+		.where(and(or(eq(patterns.ownerId, uid), eq(patterns.isShared, true)), notAdventSecret(uid, patterns.id)))
 		.orderBy(desc(patterns.updatedAt));
 }
 
@@ -49,7 +50,7 @@ export const actions: Actions = {
 					.where(
 						and(
 							eq(patterns.id, requestedPatternId),
-							or(eq(patterns.ownerId, uid), eq(patterns.isShared, true))
+							and(or(eq(patterns.ownerId, uid), eq(patterns.isShared, true)), notAdventSecret(uid, patterns.id))
 						)
 					)
 					.limit(1)

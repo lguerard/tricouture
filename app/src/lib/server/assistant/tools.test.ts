@@ -72,6 +72,17 @@ describe('scoping', () => {
 		expect(JSON.parse(r.content).titre).toBe('Secret de Bob');
 	});
 
+	it('hides a pattern waiting behind a closed advent door, even public or shared', async () => {
+		const { f, env: e } = env();
+		f.shares.push({ type: 'pattern', id: T.BOB_PATTERN, userId: T.ALICE, role: 'view' });
+		f.adventSecrets.push({ uid: T.ALICE, id: T.BOB_PUBLIC_PATTERN }, { uid: T.ALICE, id: T.BOB_PATTERN });
+		for (const id of [T.BOB_PUBLIC_PATTERN, T.BOB_PATTERN]) {
+			const r = await runTool(call('lire_patron', { id }), e);
+			expect(r.error).toBe(true);
+			expect(r.content).toContain('introuvable');
+		}
+	});
+
 	it('hides other accounts\' projects and yarns, also as screen context', async () => {
 		const { env: e } = env();
 		expect((await runTool(call('lire_projet', { id: T.BOB_PROJECT }), e)).error).toBe(true);

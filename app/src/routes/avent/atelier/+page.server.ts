@@ -2,7 +2,7 @@ import { error, fail, redirect } from '@sveltejs/kit';
 import { and, asc, eq, ne } from 'drizzle-orm';
 import { db } from '$lib/server/db';
 import { adventCalendars, adventDays, patterns, users } from '$lib/server/db/schema';
-import { createCalendar, daysOf, ownedCalendar } from '$lib/server/advent';
+import { adventRoles, createCalendar, daysOf, ownedCalendar } from '$lib/server/advent';
 import { deleteStored, isSupportedImage, saveImageUpload } from '$lib/server/storage';
 import { randomUUID } from 'node:crypto';
 import { ADVENT_DAYS, cleanTime, CUSTOM_TODO_MAX, parseTodoText, NOTIFY_MODES, type NotifyMode, ADVENT_TODO_AUTO, ADVENT_TODO_IDS, cleanYarn, normalizeCode, parisDate, type AdventYarn } from '$lib/advent';
@@ -20,7 +20,8 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		.innerJoin(users, eq(users.id, adventCalendars.recipientId))
 		.where(eq(adventCalendars.ownerId, user.id))
 		.orderBy(asc(adventCalendars.year));
-	if (!calendars.length && !user.isAdmin) throw error(404, 'Not found');
+	// An administrator who has a calendar on its way sees no workshop either.
+	if (!calendars.length && (!user.isAdmin || (await adventRoles(user.id)).waiting)) throw error(404, 'Not found');
 
 	const wanted = url.searchParams.get('c');
 	const selectedId = calendars.find((c) => c.id === wanted)?.id ?? calendars.at(-1)?.id ?? null;

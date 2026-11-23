@@ -7,6 +7,6 @@ export const load: LayoutServerLoad = async ({ locals }) => {
 	// administrators, who may prepare one); see $lib/server/advent.ts.
 	const advent = locals.user
 		? await adventForLayout(locals.user.id)
-		: { recipient: false, owner: false, notify: null, waitingDoor: null };
+		: { recipient: false, owner: false, waiting: false, notify: null, waitingDoor: null };
 	return { user: locals.user, locale: locals.locale, ai: aiConfigured(), advent };
 };

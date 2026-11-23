@@ -1,7 +1,7 @@
 import { sql, eq, and, ne, isNotNull, desc, asc, or } from 'drizzle-orm';
 import { db } from '$lib/server/db';
 import { patterns, projects, yarns } from '$lib/server/db/schema';
-import { visibleTo } from '$lib/server/access';
+import { notAdventSecret, visibleTo } from '$lib/server/access';
 import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ locals }) => {
@@ -65,7 +65,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 		db
 			.select({ id: patterns.id, title: patterns.title, coverPath: patterns.coverPath, craft: patterns.craft })
 			.from(patterns)
-			.where(or(visibleTo(uid, 'pattern', patterns.ownerId, patterns.id), eq(patterns.isShared, true)))
+			.where(and(or(visibleTo(uid, 'pattern', patterns.ownerId, patterns.id), eq(patterns.isShared, true)), notAdventSecret(uid, patterns.id)))
 			.orderBy(desc(patterns.createdAt))
 			.limit(6)
 	]);

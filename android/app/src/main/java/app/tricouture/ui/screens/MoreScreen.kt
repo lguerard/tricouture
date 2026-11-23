@@ -48,7 +48,7 @@ fun MoreScreen() {
     val adv by Session.advent.collectAsState()
     val me by Session.me.collectAsState()
     // Comme sur le site : la personne qui reçoit un calendrier, le lutin qui en prépare un, et les administrateurs.
-    val items = moreItems(adv?.bool("recipient") == true || adv?.bool("owner") == true || me?.isAdmin == true)
+    val items = moreItems(adv?.bool("recipient") == true || adv?.bool("owner") == true || (me?.isAdmin == true && adv?.bool("waiting") != true))
     Screen(tr("app.more"), actions = {
         IconButton(onClick = { nav.navigate(Routes.SETTINGS) }) { Icon(Icons.Default.Settings, tr("app.settings")) }
     }) { padding ->

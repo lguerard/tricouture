@@ -6,7 +6,7 @@ import { extname } from 'node:path';
 import { and, eq } from 'drizzle-orm';
 import { db } from '$lib/server/db';
 import { patternFiles, patterns, projectPhotos, projects } from '$lib/server/db/schema';
-import { visibleTo } from '$lib/server/access';
+import { notAdventSecret, visibleTo } from '$lib/server/access';
 import { absolutePath, ownsPath } from '$lib/server/storage';
 import { ensureThumbnail, isResizable, isThumbWidth } from '$lib/server/thumbnails';
 import { isVisibleHintPhoto } from '$lib/server/advent';
@@ -14,14 +14,15 @@ import { parisDate } from '$lib/advent';
 import type { RequestHandler } from './$types';
 
 // A file not owned by the user is still accessible if it belongs to a shared
-// pattern — either one of its files or its cover image.
-async function isSharedPatternFile(rel: string): Promise<boolean> {
+// pattern — either one of its files or its cover image — unless that pattern
+// waits behind a closed advent door for this user.
+async function isSharedPatternFile(uid: string, rel: string): Promise<boolean> {
 	const file = (
 		await db
 			.select({ shared: patterns.isShared })
 			.from(patternFiles)
 			.innerJoin(patterns, eq(patternFiles.patternId, patterns.id))
-			.where(and(eq(patternFiles.storedPath, rel), eq(patterns.isShared, true)))
+			.where(and(eq(patternFiles.storedPath, rel), eq(patterns.isShared, true), notAdventSecret(uid, patterns.id)))
 			.limit(1)
 	)[0];
 	if (file) return true;
@@ -29,7 +30,7 @@ async function isSharedPatternFile(rel: string): Promise<boolean> {
 		await db
 			.select({ id: patterns.id })
 			.from(patterns)
-			.where(and(eq(patterns.coverPath, rel), eq(patterns.isShared, true)))
+			.where(and(eq(patterns.coverPath, rel), eq(patterns.isShared, true), notAdventSecret(uid, patterns.id)))
 			.limit(1)
 	)[0];
 	return !!cover;
@@ -63,7 +64,7 @@ export const GET: RequestHandler = async ({ params, locals, url }) => {
 	if (!locals.user) throw error(403, 'Access denied');
 	if (
 		!ownsPath(locals.user.id, rel) &&
-		!(await isSharedPatternFile(rel)) &&
+		!(await isSharedPatternFile(locals.user.id, rel)) &&
 		!(await isVisibleProjectPhoto(locals.user.id, rel)) &&
 		!(await isVisibleHintPhoto(locals.user.id, rel, parisDate(new Date())))
 	) {
