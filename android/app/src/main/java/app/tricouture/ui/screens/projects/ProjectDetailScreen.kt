@@ -73,7 +73,8 @@ fun ProjectDetailScreen(id: String) {
                             modifier = Modifier.clickable { nav.navigate("pattern/${pat.str("id")}") })
                     }
                 }
-                Counter(page, proj, readOnly, toast)
+                // La couture avance par pièces (à couper, cousue…), pas par rangs.
+                if (d.obj("pattern")?.str("craft") != "couture") Counter(page, proj, readOnly, toast)
                 Pace(page, proj, d, readOnly, toast)
                 if (d.obj("pattern") != null && d.objs("pieces").isNotEmpty()) Pieces(page, d, readOnly, toast)
                 if (!readOnly) Details(page, proj, toast)

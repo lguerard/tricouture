@@ -120,7 +120,8 @@
 	{/if}
 
 	<div class="cols">
-		<!-- Row counter -->
+		<!-- Row counter (not for sewing: it moves forward piece by piece) -->
+		{#if data.pattern?.craft !== 'couture'}
 		<section class="card counter">
 			<h2>{t(locale, 'projects.detail.counterTitle')}</h2>
 			<div class="count-display">{p.currentRow}{p.totalRows ? ` / ${p.totalRows}` : ''}</div>
@@ -141,6 +142,7 @@
 			{#if voiceMsg}<div class="muted small">{voiceMsg}</div>{/if}
 			<span class="muted small">{t(locale, 'projects.detail.percentDone', { n: p.progressPct })}</span>
 		</section>
+		{/if}
 
 		<!-- Pace & deadline prediction -->
 		<section class="card">
