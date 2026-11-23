@@ -1,5 +1,6 @@
 import { json } from '@sveltejs/kit';
 import { and, eq, isNotNull, or, sql } from 'drizzle-orm';
+import { notAdventSecret } from '$lib/server/access';
 import { db } from '$lib/server/db';
 import { patterns, yarns } from '$lib/server/db/schema';
 import { embed, aiConfigured, AiUnavailable } from '$lib/server/ai/ollama';
@@ -46,7 +47,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 				distance: patternDistance
 			})
 			.from(patterns)
-			.where(and(or(eq(patterns.ownerId, uid), eq(patterns.isShared, true)), isNotNull(patterns.embedding)))
+			.where(and(or(eq(patterns.ownerId, uid), eq(patterns.isShared, true)), notAdventSecret(uid, patterns.id), isNotNull(patterns.embedding)))
 			.orderBy(patternDistance)
 			.limit(LIMIT),
 		db

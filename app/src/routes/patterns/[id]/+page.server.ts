@@ -1,5 +1,6 @@
 import { error, fail, redirect } from '@sveltejs/kit';
 import { and, asc, eq, or } from 'drizzle-orm';
+import { notAdventSecret } from '$lib/server/access';
 import { db } from '$lib/server/db';
 import { patterns, patternFiles, patternPieces, users } from '$lib/server/db/schema';
 import { getAllVisibleTags } from '$lib/server/patternTags';
@@ -17,7 +18,7 @@ async function accessiblePattern(uid: string, id: string) {
 			.select({ pattern: patterns, ownerName: users.displayName })
 			.from(patterns)
 			.innerJoin(users, eq(patterns.ownerId, users.id))
-			.where(and(eq(patterns.id, id), or(eq(patterns.ownerId, uid), eq(patterns.isShared, true))))
+			.where(and(eq(patterns.id, id), or(eq(patterns.ownerId, uid), eq(patterns.isShared, true)), notAdventSecret(uid, patterns.id)))
 			.limit(1)
 	)[0];
 }

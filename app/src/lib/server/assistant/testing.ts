@@ -82,11 +82,16 @@ export function fakeData() {
 	const shares: { type: ResourceType; id: string; userId: string; role: 'view' | 'edit' }[] = [];
 	const notes: { id: string; note: string }[] = [];
 	const covers: string[] = []; // patterns for which a cover "is found"
+	const adventSecrets: { uid: string; id: string }[] = []; // behind a closed advent door
 
 	const data: AssistantData = {
 		async access(uid, type, id, ownerId): Promise<Access> {
 			if (uid === ownerId) return 'owner';
+			if (type === 'pattern' && adventSecrets.some((x) => x.uid === uid && x.id === id)) return null;
 			return shares.find((s) => s.type === type && s.id === id && s.userId === uid)?.role ?? null;
+		},
+		async adventSecret(uid, id) {
+			return adventSecrets.some((x) => x.uid === uid && x.id === id);
 		},
 		async findPatterns(uid, text) {
 			return patterns.filter((p) => (p.ownerId === uid || p.isShared) && p.title.toLowerCase().includes(text.toLowerCase().split(' ')[0]));
@@ -136,7 +141,7 @@ export function fakeData() {
 			return p.coverPath;
 		}
 	};
-	return { data, shares, notes, covers, patterns, projects, yarns };
+	return { data, shares, notes, covers, adventSecrets, patterns, projects, yarns };
 }
 
 // Stand-in for the domain tools' writes (actions.ts): records every call and

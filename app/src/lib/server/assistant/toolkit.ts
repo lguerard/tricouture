@@ -237,7 +237,8 @@ export function yarnSummary(y: YarnRecord) {
 }
 
 export async function canSeePattern(env: ToolEnv, p: PatternRecord): Promise<boolean> {
-	if (p.ownerId === env.uid || p.isShared) return true;
+	if (p.ownerId === env.uid) return true;
+	if (p.isShared) return !(await env.data.adventSecret(env.uid, p.id));
 	return (await env.data.access(env.uid, 'pattern', p.id, p.ownerId)) !== null;
 }
 

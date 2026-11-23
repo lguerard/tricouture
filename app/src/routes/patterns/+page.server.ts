@@ -1,4 +1,5 @@
 import { and, or, eq, desc, isNull, sql } from 'drizzle-orm';
+import { notAdventSecret } from '$lib/server/access';
 import { db } from '$lib/server/db';
 import { patterns, patternFiles, users, type Craft } from '$lib/server/db/schema';
 import { getAllVisibleTags } from '$lib/server/patternTags';
@@ -18,7 +19,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	const pageNum = Math.max(1, parseInt(url.searchParams.get('page') ?? '1', 10) || 1);
 
 	// Visible: own patterns + those shared by others.
-	const conds = [or(eq(patterns.ownerId, uid), eq(patterns.isShared, true))!];
+	const conds = [or(eq(patterns.ownerId, uid), eq(patterns.isShared, true))!, notAdventSecret(uid, patterns.id)];
 	if (scope === 'mine') conds.push(eq(patterns.ownerId, uid));
 	if (scope === 'shared') conds.push(and(eq(patterns.isShared, true), sql`${patterns.ownerId} <> ${uid}`)!);
 	if (craftFilter) conds.push(eq(patterns.craft, craftFilter));

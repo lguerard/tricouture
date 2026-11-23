@@ -2,7 +2,7 @@ import { json } from '@sveltejs/kit';
 import { and, desc, eq, ilike, or, sql } from 'drizzle-orm';
 import { db } from '$lib/server/db';
 import { embroideryDesigns, fabrics, notions, patterns, projects, yarns } from '$lib/server/db/schema';
-import { visibleTo } from '$lib/server/access';
+import { notAdventSecret, visibleTo } from '$lib/server/access';
 import type { RequestHandler } from './$types';
 
 export type SearchHit = {
@@ -41,6 +41,7 @@ export const GET: RequestHandler = async ({ url, locals }) => {
 			.where(
 				and(
 					or(visibleTo(uid, 'pattern', patterns.ownerId, patterns.id), eq(patterns.isShared, true)),
+					notAdventSecret(uid, patterns.id),
 					or(
 						ilike(patterns.title, like),
 						ilike(patterns.designer, like),

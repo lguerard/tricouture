@@ -161,7 +161,7 @@
 		{ href: '/gallery', key: 'nav.gallery', icon: '🖼️' },
 		{ href: '/moodboards', key: 'nav.moodboards', icon: '🎨' },
 		{ href: '/embroidery', key: 'nav.embroidery', icon: '🪡' },
-		...(data.advent?.recipient || data.advent?.owner || data.user?.isAdmin
+		...(data.advent?.recipient || data.advent?.owner || (data.user?.isAdmin && !data.advent?.waiting)
 			? [{ href: '/avent', key: 'nav.advent', icon: '✨' }]
 			: []),
 		{ href: '/account', key: 'nav.account', icon: '👤' },

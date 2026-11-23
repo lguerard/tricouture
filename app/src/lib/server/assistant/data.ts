@@ -10,7 +10,7 @@
 import { and, asc, desc, eq, ilike, inArray, isNotNull, isNull, or, sql, type SQL } from 'drizzle-orm';
 import { db } from '$lib/server/db';
 import { patternPieces, patterns, projectPieceProgress, projects, projectYarns, yarns } from '$lib/server/db/schema';
-import { accessFor, visibleTo, type Access, type ResourceType } from '$lib/server/access';
+import { accessFor, isAdventSecret, notAdventSecret, visibleTo, type Access, type ResourceType } from '$lib/server/access';
 import { aiConfigured, embed } from '$lib/server/ai/ollama';
 import { embedDocument, ensureEmbeddingScheme, patternEmbeddingText } from '$lib/server/embeddings';
 import { fillMissingCover } from '$lib/server/patternCover';
@@ -85,6 +85,8 @@ export type ProjectStatus = 'idee' | 'monte' | 'bloque' | 'fini';
 
 export interface AssistantData {
 	access(uid: string, type: ResourceType, id: string, ownerId: string): Promise<Access>;
+	// A pattern behind a closed advent door, for the calendar's recipient.
+	adventSecret(uid: string, patternId: string): Promise<boolean>;
 	findPatterns(uid: string, text: string, limit: number): Promise<PatternHit[]>;
 	getPattern(id: string): Promise<PatternRecord | null>;
 	getPatternPieces(patternId: string): Promise<PieceRecord[]>;
@@ -120,7 +122,7 @@ const MIN_SIMILARITY = 0.45;
 
 // Patterns this account may see: own, shared with it, or made public.
 export function patternScope(uid: string): SQL {
-	return or(visibleTo(uid, 'pattern', patterns.ownerId, patterns.id), eq(patterns.isShared, true))!;
+	return and(or(visibleTo(uid, 'pattern', patterns.ownerId, patterns.id), eq(patterns.isShared, true)), notAdventSecret(uid, patterns.id))!;
 }
 
 const patternHitFields = {
@@ -256,6 +258,7 @@ async function semanticPatterns(uid: string, text: string, limit: number): Promi
 
 export const dbData: AssistantData = {
 	access: accessFor,
+	adventSecret: isAdventSecret,
 
 	async findPatterns(uid, text, limit) {
 		const [semantic, literal] = await Promise.all([semanticPatterns(uid, text, limit), patternTextQuery(uid, text, limit)]);

@@ -32,7 +32,12 @@ export const ADVENT_TAG = 'calendrier-avent';
 
 // Which advent links the menu shows for this account. A calendar not yet
 // revealed (before December 1st) does not count for its recipient.
-export async function adventRoles(uid: string, today: ParisDate = parisDate(new Date())): Promise<{ recipient: boolean; owner: boolean }> {
+// `waiting`: a calendar for this account is still hidden. Even an
+// administrator then sees no advent link, or the surprise is spoiled.
+export async function adventRoles(
+	uid: string,
+	today: ParisDate = parisDate(new Date())
+): Promise<{ recipient: boolean; owner: boolean; waiting: boolean }> {
 	const rows = await db
 		.select({
 			ownerId: adventCalendars.ownerId,
@@ -44,7 +49,8 @@ export async function adventRoles(uid: string, today: ParisDate = parisDate(new 
 		.where(or(eq(adventCalendars.ownerId, uid), eq(adventCalendars.recipientId, uid)));
 	return {
 		recipient: rows.some((r) => r.recipientId === uid && isRevealed(r.year, today, r.revealEarly)),
-		owner: rows.some((r) => r.ownerId === uid)
+		owner: rows.some((r) => r.ownerId === uid),
+		waiting: rows.some((r) => r.recipientId === uid && !isRevealed(r.year, today, r.revealEarly))
 	};
 }
 
@@ -288,6 +294,7 @@ export async function isVisibleHintPhoto(uid: string, rel: string, today: ParisD
 export type AdventLayout = {
 	recipient: boolean;
 	owner: boolean;
+	waiting: boolean;
 	// Phone notifications to schedule for the recipient. Sent even before the
 	// calendar is revealed (only a year and a mode, nothing about its content),
 	// so the phone can hold the December 1st notification in advance.

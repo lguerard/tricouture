@@ -1,4 +1,5 @@
-import { or, eq } from 'drizzle-orm';
+import { and, or, eq } from 'drizzle-orm';
+import { notAdventSecret } from '$lib/server/access';
 import { db } from '$lib/server/db';
 import { patterns } from '$lib/server/db/schema';
 
@@ -10,7 +11,7 @@ export async function getAllVisibleTags(uid: string): Promise<string[]> {
 	const rows = await db
 		.select({ tags: patterns.tags })
 		.from(patterns)
-		.where(or(eq(patterns.ownerId, uid), eq(patterns.isShared, true))!);
+		.where(and(or(eq(patterns.ownerId, uid), eq(patterns.isShared, true)), notAdventSecret(uid, patterns.id))!);
 	const set = new Set<string>();
 	for (const r of rows) for (const t of r.tags ?? []) set.add(t);
 	return [...set].sort((a, b) => a.localeCompare(b));

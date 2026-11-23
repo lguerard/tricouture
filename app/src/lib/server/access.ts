@@ -10,10 +10,10 @@
 // Deleting and re-sharing stay with the owner on purpose: a shared object is
 // someone else's, and losing it to a mis-click on another account's screen is
 // exactly what a family server should not allow.
-import { and, eq, inArray, or, type SQL } from 'drizzle-orm';
+import { and, eq, inArray, isNotNull, isNull, notInArray, or, type SQL } from 'drizzle-orm';
 import type { AnyPgColumn } from 'drizzle-orm/pg-core';
 import { db } from './db';
-import { shares, users } from './db/schema';
+import { adventCalendars, adventDays, shares, users } from './db/schema';
 
 export type ShareRole = 'view' | 'edit';
 export type Access = 'owner' | ShareRole | null;
@@ -44,6 +44,36 @@ function sharedIds(uid: string, type: ResourceType, needEdit = false) {
 	return db.select({ id: shares.resourceId }).from(shares).where(and(...conds));
 }
 
+// --- Advent calendar secrets ------------------------------------------------
+//
+// A pattern the lutin put behind a door that is still closed must not exist
+// for the person the calendar is for: not in a listing, a search, the
+// assistant or /media, even if the lutin shared it with them or made it
+// public. Opening the door gives them their own copy (a new id). Nobody else
+// is affected: for any other account the sub-select is empty.
+function adventSecretIds(uid: string) {
+	return db
+		.select({ id: adventDays.patternId })
+		.from(adventDays)
+		.innerJoin(adventCalendars, eq(adventCalendars.id, adventDays.calendarId))
+		.where(and(eq(adventCalendars.recipientId, uid), isNull(adventDays.openedAt), isNotNull(adventDays.patternId)));
+}
+
+// Add to any query listing patterns that `uid` does not own.
+export function notAdventSecret(uid: string, patternIdCol: AnyPgColumn): SQL {
+	return notInArray(patternIdCol, adventSecretIds(uid));
+}
+
+export async function isAdventSecret(uid: string, patternId: string): Promise<boolean> {
+	const rows = await db
+		.select({ id: adventDays.id })
+		.from(adventDays)
+		.innerJoin(adventCalendars, eq(adventCalendars.id, adventDays.calendarId))
+		.where(and(eq(adventCalendars.recipientId, uid), isNull(adventDays.openedAt), eq(adventDays.patternId, patternId)))
+		.limit(1);
+	return rows.length > 0;
+}
+
 // Drop-in replacement for `eq(table.ownerId, uid)` in a listing: mine, plus
 // what has been shared with me.
 //
@@ -55,7 +85,8 @@ export function visibleTo(
 	idCol: AnyPgColumn,
 	needEdit = false
 ): SQL {
-	return or(eq(ownerCol, uid), inArray(idCol, sharedIds(uid, type, needEdit)))!;
+	const seen = or(eq(ownerCol, uid), inArray(idCol, sharedIds(uid, type, needEdit)))!;
+	return type === 'pattern' ? and(seen, notAdventSecret(uid, idCol))! : seen;
 }
 
 // What `uid` may do with one object, given the object's owner.
@@ -69,6 +100,7 @@ export async function accessFor(
 	ownerId: string
 ): Promise<Access> {
 	if (ownerId === uid) return 'owner';
+	if (type === 'pattern' && (await isAdventSecret(uid, resourceId))) return null;
 	const row = (
 		await db
 			.select({ role: shares.role })

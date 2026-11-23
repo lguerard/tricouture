@@ -24,7 +24,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	const r = await resolve(user.id, url);
 	if (!r) {
 		const roles = await adventRoles(user.id);
-		if (roles.owner || user.isAdmin) throw redirect(303, '/avent/atelier');
+		if (roles.owner || (user.isAdmin && !roles.waiting)) throw redirect(303, '/avent/atelier');
 		throw error(404, 'Not found');
 	}
 	const days = await daysOf(r.cal.id);
