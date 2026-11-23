@@ -54,16 +54,7 @@ jobs:
             CHANGELOG.md
             RELEASE_NOTES.md
 
-  android:
-    needs: changelog
-    if: needs.changelog.outputs.released == 'true'
-    uses: ./.github/workflows/android.yml
-    with:
-      version: ${{ needs.changelog.outputs.version }}
-    secrets: inherit
-
-  # The native app (android/), published next to the Capacitor one. A failed
-  # native build does not hold back the release.
+  # The Android app (android/, Kotlin/Compose).
   android-native:
     needs: changelog
     if: needs.changelog.outputs.released == 'true'
@@ -74,8 +65,8 @@ jobs:
     secrets: inherit
 
   publish:
-    needs: [changelog, android, android-native]
-    if: ${{ !cancelled() && needs.changelog.outputs.released == 'true' && needs.android.result == 'success' }}
+    needs: [changelog, android-native]
+    if: ${{ !cancelled() && needs.changelog.outputs.released == 'true' && needs.android-native.result == 'success' }}
     runs-on: ubuntu-latest
     outputs:
       tag_name: ${{ needs.changelog.outputs.version }}
@@ -85,17 +76,9 @@ jobs:
         with:
           name: release-notes
 
-      # Only the signed APK is published (the debug one, built by
-      # android.yml, stays a workflow artifact for manual builds).
+      # Only the signed APK is published (the debug one stays a workflow
+      # artifact). Its file name is kept: updaters may match on it.
       - name: Download release APK
-        uses: actions/download-artifact@v4
-        with:
-          name: tricouture-android-release
-          path: apk-release
-
-      - name: Download native release APK
-        if: needs.android-native.result == 'success'
-        continue-on-error: true
         uses: actions/download-artifact@v4
         with:
           name: tricouture-native-release
@@ -103,11 +86,11 @@ jobs:
 
       - name: Name the native APK
         run: |
-          if [ -f apk-native/app-release.apk ]; then
-            mv apk-native/app-release.apk apk-native/tricouture-native.apk
-          else
-            echo "::warning::No native APK for this release."
+          if [ ! -f apk-native/app-release.apk ]; then
+            echo "::error::No signed APK for this release (KEYSTORE_BASE64 secret missing?)."
+            exit 1
           fi
+          mv apk-native/app-release.apk apk-native/tricouture-native.apk
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -116,6 +99,4 @@ jobs:
           target_commitish: ${{ github.sha }}
           name: ${{ needs.changelog.outputs.version }}
           body_path: RELEASE_NOTES.md
-          files: |
-            apk-release/app-release.apk
-            apk-native/tricouture-native.apk
+          files: apk-native/tricouture-native.apk

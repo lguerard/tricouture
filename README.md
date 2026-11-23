@@ -152,7 +152,7 @@ besoin :
 ```text
 ┌─────────────┐     ┌────────────────────┐
 │  Navigateur │     │   App Android       │
-│   / PWA     │     │   (Capacitor)       │
+│   / PWA     │     │   (Kotlin/Compose)  │
 └──────┬──────┘     └─────────┬──────────┘
        │  HTTPS                │  HTTPS (Bearer)
        └───────────┬──────────┘
@@ -321,35 +321,28 @@ portes déjà ouvertes ne sont jamais modifiées.
 
 ## Application Android
 
-L'app est une **coque Capacitor** (`mobile/`) qui charge ton serveur. Elle est
-compilée par **GitHub Actions** — aucun SDK Android à installer en local.
+L'app est une **application native** (Kotlin, Jetpack Compose, dossier
+`android/`) qui parle à ton serveur. Elle est compilée par **GitHub Actions**,
+sans SDK Android à installer en local.
 
-**Par défaut, l'app demande l'URL de ton serveur au premier lancement** et la
-mémorise : aucune adresse n'est codée en dur dans le dépôt.
+**Aucune adresse de serveur n'est intégrée à l'app** (le dépôt et l'APK sont
+publics) : elle la demande à la connexion, avec l'e-mail et le mot de passe,
+et la mémorise.
 
-1. Onglet *Actions* → **Build Android APK** → *Run workflow*
-   (ou un tag déclenche la [release](#versions-et-releases)).
-2. Récupère l'artefact `tricouture-android-debug` (`app-debug.apk`),
-   installe-le sur le téléphone (autoriser les sources inconnues).
-3. Au lancement, saisis l'URL de ton serveur : le site s'ouvre **dans l'app**
-   (pas dans le navigateur) et l'adresse est retenue. Si le serveur ne répond
-   pas au démarrage suivant, l'écran de saisie réapparaît, pré-rempli.
+- **Version de test** : chaque modification de `android/` lance le workflow
+  *Android native*. Son artefact `tricouture-native-debug` s'installe à côté
+  de l'app publiée, sous le nom « Tricouture (test) ».
+- **Version publiée** : chaque [release](#versions-et-releases) joint
+  l'APK signé `tricouture-native.apk` (identifiant `app.tricouture.native`).
+  Installe-le sur le téléphone en autorisant les sources inconnues.
 
-> Recommandé : pour figer l'URL au build (sans écran de saisie), définis la
-> variable de dépôt **`SERVER_URL`** (*Settings → Actions → Variables*).
-> C'est aussi ce qui active les fonctions natives (rappels d'échéance,
-> scan de code-barres) : Capacitor ne les injecte que pour une adresse connue
-> au build. Cette valeur reste privée (variable d'Actions), elle n'apparaît
-> pas dans le code source.
+Les rappels (échéances de projets, portes du calendrier de l'Avent) sont
+programmés par l'app elle-même sur le téléphone, à partir de ce que le serveur
+lui renvoie.
 
-**Notifications du calendrier de l'Avent sans adresse figée.** Si l'app est
-construite sans `SERVER_URL` (dépôt et APK publics), le site ne peut pas
-programmer de notification lui-même. Il confie le programme à la page de
-démarrage de l'app (`mobile/www/index.html`), qui, elle, y a accès : la page
-s'annonce dans l'adresse du site à l'ouverture, le site lui renvoie le
-programme une seule fois, elle le programme sur le téléphone et revient
-aussitôt. Aucune adresse n'est enregistrée dans l'APK ; il faut seulement une
-app compilée avec cette page (à partir de cette version).
+L'icône (app et site) est l'emoji 🪡 de [Noto Emoji](https://github.com/googlefonts/noto-emoji)
+(Google, licence Apache 2.0) : `android/app/src/main/res/mipmap-*` et
+`app/static/` (`favicon.svg`, `apple-touch-icon.png`, `icon-192.png`, `icon-512.png`).
 
 ---
 
@@ -378,10 +371,8 @@ Deux endroits indépendants utilisent l'URL :
 1. **Serveur (Docker)** — variable `ORIGIN` dans `.env`. Elle doit correspondre
    exactement à l'URL vue par le navigateur (sinon cookies/formulaires rejetés).
    Voir [Configurer l'URL côté Docker](docs/SELF-HOSTING.md#configurer-lurl-publique-docker).
-2. **App Android** — par défaut, **l'application demande l'URL au premier
-   lancement** (elle est mémorisée). Aucune URL n'est codée en dur dans le
-   dépôt. Tu peux éventuellement la figer au build via la variable d'Actions
-   `SERVER_URL` (voir ci-dessous).
+2. **App Android** — **l'application demande l'URL à la connexion** (elle est
+   mémorisée). Aucune URL n'est codée en dur, ni dans le dépôt ni dans l'APK.
 
 ---
 
@@ -424,7 +415,7 @@ Chaque **push sur `main`** déclenche le workflow *Release* :
 - ✅ Motivation (stats, objectifs, succès, calendrier)
 - ✅ IA texte (traduction, assistant avec outils, génération)
 - ✅ IA vision/voix (lecture d'étiquette, compteur vocal)
-- ✅ App Android (Capacitor) + CI release
+- ✅ App Android native (Kotlin/Compose) + CI release
 - ✅ Aperçu coloris (recoloration de la photo dans le navigateur)
 - ✅ Recherche sémantique (indexation + résultats « proches par le sens »)
 - ✅ Mood boards (palette de couleurs automatique), photos de projets, galerie

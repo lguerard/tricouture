@@ -104,8 +104,8 @@ docker compose up -d        # relit .env et recrée le conteneur app
 - En **local**, garde `http://localhost:3000`.
 - En **production**, mets l'URL HTTPS publique (le cookie de session passe
   alors automatiquement en `Secure`).
-- L'**app Android** ne dépend pas de `ORIGIN` : elle demande son URL au premier
-  lancement (ou via la variable d'Actions `SERVER_URL`, voir §11).
+- L'**app Android** ne dépend pas de `ORIGIN` : elle demande son URL à la
+  connexion (voir §11).
 
 ---
 
@@ -519,35 +519,31 @@ Les migrations de base s'appliquent automatiquement au redémarrage du conteneur
 
 ## 11. Application Android
 
-L'app Android est une **coque Capacitor** qui charge ton serveur. Elle se compile via GitHub
-Actions (aucun environnement Android à installer en local).
+L'app Android est une **application native** (Kotlin, Jetpack Compose) qui
+parle à ton serveur. Elle se compile via GitHub Actions, sans environnement
+Android à installer en local.
 
-> Par défaut, **aucune URL n'est codée en dur** : l'app demande l'adresse du
-> serveur au premier lancement et la mémorise. Tu n'as donc rien à configurer
-> pour compiler une APK générique.
+> **Aucune URL n'est codée en dur** : l'app demande l'adresse du serveur à la
+> connexion (avec l'e-mail et le mot de passe) et la mémorise.
 
-### Compiler l'APK
+### Récupérer l'APK
 
-1. Pousse le dépôt sur GitHub.
-2. Lance le workflow : onglet *Actions* → **Build Android APK** → *Run workflow*.
-   Un tag déclenche aussi le build via la release.
-3. Récupère l'artefact **`tricouture-android-debug`** (contient `app-debug.apk`).
-
-> Optionnel — figer l'URL au build : *Settings → Secrets and variables →
-> Actions → Variables → New variable*, nom `SERVER_URL`, valeur
-> `https://tricouture.exemple.fr`. Cette variable reste privée (elle n'est pas
-> versionnée). Sans elle, l'app affiche l'écran de saisie d'URL.
+- **Version publiée** : sur la page *Releases* du dépôt, télécharge
+  `tricouture-native.apk`, signé avec la clé du dépôt (secrets
+  `KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD`).
+- **Version de test** : onglet *Actions* → **Android native** → *Run
+  workflow*, puis l'artefact **`tricouture-native-debug`**. Elle s'installe à
+  côté de la version publiée, sous le nom « Tricouture (test) ».
 
 ### Installer sur le téléphone
 
-1. Transfère `app-debug.apk` sur le téléphone (câble, Drive, etc.).
+1. Transfère l'APK sur le téléphone (câble, Drive, etc.).
 2. Ouvre-le : Android demandera d'**autoriser l'installation depuis cette source** → accepte.
-3. Au lancement, **saisis l'URL de ton serveur** (mémorisée ensuite). Si
-   `SERVER_URL` avait été défini au build, l'app se connecte directement.
+3. À la connexion, **saisis l'URL de ton serveur**, ton e-mail et ton mot de passe.
 
-> La caméra (scan d'étiquette) et le micro (compteur vocal) demanderont une autorisation au
-> premier usage. L'APK debug n'est pas signé pour le Play Store : c'est une installation
-> directe (« sideload »), parfaite pour un usage personnel/familial.
+> La caméra et le micro demandent une autorisation au premier usage, et les
+> rappels l'autorisation d'envoyer des notifications. C'est une installation
+> directe (« sideload »), hors Play Store, pour un usage personnel/familial.
 
 ---
 
@@ -563,4 +559,4 @@ Actions (aucun environnement Android à installer en local).
 | Voix sans effet | service `whisper` non prêt | `docker compose logs -f whisper` |
 | L'assistant répond sans connaître la bibliothèque | modèle sans appel d'outils | revenir à `gemma4:12b` (ou un autre modèle « tools ») |
 | L'assistant « n'a pas répondu à temps » | GPU occupé par une autre tâche, modèle chargé à froid | réessayer ; `docker compose logs -f ollama` |
-| APK ne se connecte pas | mauvaise URL / HTTP bloqué | vérifier `SERVER_URL`, préférer HTTPS |
+| APK ne se connecte pas | mauvaise URL / HTTP bloqué | vérifier l'adresse saisie, préférer HTTPS |

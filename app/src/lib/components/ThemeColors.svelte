@@ -8,29 +8,12 @@
 
 	onMount(() => theme.init());
 
-	// Material You n'existe que dans l'app Android (12 et plus) : dans un
-	// navigateur, le choix n'apparaît pas ; dans l'app, il est grisé avec la
-	// raison (app à mettre à jour, Android trop ancien).
-	const options = $derived(
-		[
-			{ value: 'default' as ThemeColors, key: 'theme.colors.default' },
-			...(theme.systemMissing === 'web' ? [] : [{ value: 'system' as ThemeColors, key: 'theme.colors.system' }]),
-			{ value: 'custom' as ThemeColors, key: 'theme.colors.custom' }
-		]
-	);
-	// Material You choisi ailleurs (sur le téléphone) : ici, c'est le violet.
-	const current = $derived(theme.colors === 'system' && !theme.systemAccent ? 'default' : theme.colors);
-	const hint = $derived(
-		theme.systemMissing === 'app'
-			? 'theme.colors.needApp'
-			: theme.systemMissing === 'android'
-				? 'theme.colors.needAndroid'
-				: current === 'system'
-					? 'theme.colors.systemHint'
-					: current === 'custom'
-						? 'theme.colors.customHint'
-						: 'theme.colors.defaultHint'
-	);
+	const options: { value: ThemeColors; key: string }[] = [
+		{ value: 'default', key: 'theme.colors.default' },
+		{ value: 'custom', key: 'theme.colors.custom' }
+	];
+	const current = $derived(theme.colors);
+	const hint = $derived(current === 'custom' ? 'theme.colors.customHint' : 'theme.colors.defaultHint');
 </script>
 
 <div class="themecolors">
@@ -41,13 +24,10 @@
 				role="radio"
 				class:on={current === o.value}
 				aria-checked={current === o.value}
-				disabled={o.value === 'system' && !theme.systemAccent}
 				onclick={() => theme.setColors(o.value)}
 			>
 				{#if o.value === 'default'}
 					<span class="dot" style:background="#7c4d8b"></span>
-				{:else if o.value === 'system' && theme.systemAccent}
-					<span class="dot" style:background={theme.systemAccent}></span>
 				{:else if o.value === 'custom'}
 					<span class="dot" style:background={theme.custom}></span>
 				{/if}

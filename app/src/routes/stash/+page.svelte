@@ -6,7 +6,6 @@
 	import { withFeedback } from '$lib/feedback';
 	import { undoableDelete } from '$lib/undo';
 	import { YARN_WEIGHTS, MOTIF_VALUES, motifLabel, COLOR_NAMES, toolTypeOptions, toolTypeLabel } from '$lib/labels';
-	import { isCapacitor, scanBarcode } from '$lib/capacitor';
 	import { t } from '$lib/i18n';
 	import { recolorImage } from '$lib/recolor';
 	let { data, form } = $props();
@@ -160,54 +159,6 @@
 		}
 	}
 
-	// Barcode scan via Capacitor (native Android), then a UPC lookup for brand/fiber/photo.
-	let barcodeBusy = $state(false);
-	async function scanBarcodeNative() {
-		barcodeBusy = true;
-		scanMsg = '';
-		fetchedPhoto = null;
-		// Hors application Android, scanBarcode() renvoie null tout de suite (ML Kit
-		// n'existe que derrière Capacitor). Sortir sans rien dire donnait un bouton
-		// qui semble cassé : on explique au lieu de se taire.
-		if (!isCapacitor()) {
-			scanMsg = t(locale, 'stash.barcodeAppOnly');
-			barcodeBusy = false;
-			return;
-		}
-		const code = await scanBarcode();
-		if (!code) {
-			scanMsg = t(locale, 'stash.barcodeNoCode');
-			barcodeBusy = false;
-			return;
-		}
-		// Yarn keeps the raw code in "notes" for manual reference (other tabs have no notes field).
-		if (tab === 'yarn') {
-			const el = document.getElementById('yarn-notes') as HTMLInputElement | null;
-			if (el) el.value = code;
-		}
-		try {
-			const res = await fetch('/api/ai/lookup-barcode', {
-				method: 'POST',
-				headers: { 'content-type': 'application/json' },
-				body: JSON.stringify({ code, kind: tab })
-			});
-			const data = await res.json();
-			if (res.ok) {
-				applyFields(data.fields ?? {});
-				if (data.photoDataUrl) {
-					fetchedPhoto = data.photoDataUrl;
-					await analyzeDataUrl(data.photoDataUrl);
-				}
-				scanMsg = t(locale, 'stash.fieldsPrefilled');
-			} else {
-				scanMsg = t(locale, 'stash.codeScanned', { code });
-			}
-		} catch {
-			scanMsg = t(locale, 'stash.codeScanned', { code });
-		}
-		barcodeBusy = false;
-	}
-
 	// Label scan: the local vision model reads the label photo, pre-fills the form.
 	// It returns yarn-shaped fields; for fabric, "fiber" reads as composition.
 	let scanBusy = $state(false);
@@ -342,11 +293,6 @@
 	{#if adding}
 		<div class="card add">
 			<div class="scan">
-				{#if isCapacitor()}
-					<button type="button" class="scan-btn" onclick={scanBarcodeNative} disabled={barcodeBusy}>
-						{barcodeBusy ? t(locale, 'stash.scanning') : `📦 ${t(locale, 'stash.scanBarcode')}`}
-					</button>
-				{/if}
 				{#if tab === 'yarn' || tab === 'fabric'}
 					<label class="scan-btn">
 						📷 {t(locale, 'stash.scanLabel')}
