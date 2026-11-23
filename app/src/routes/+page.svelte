@@ -39,6 +39,14 @@
 				<span class="pill">{t(locale, 'dash.resume')}</span>
 				<a class="hero-title" href={`/projects/${r.id}`}>{r.title}</a>
 				<div class="hero-bar" aria-hidden="true"><div class="hero-fill" style={`width:${r.progressPct}%`}></div></div>
+				{#if r.craft === 'couture'}
+					<div class="hero-row">
+						<div class="hero-count">
+							<span class="big">{r.progressPct}%</span>
+							<span class="hero-muted">{t(locale, 'dash.sewProgress')}</span>
+						</div>
+					</div>
+				{:else}
 				<div class="hero-row">
 					<div class="hero-count">
 						<span class="big">{r.currentRow}</span>
@@ -56,6 +64,7 @@
 						</button>
 					</form>
 				</div>
+				{/if}
 				<a class="hero-link" href={`/projects/${r.id}`}>{t(locale, 'dash.open')} →</a>
 			</section>
 		{:else}

@@ -19,6 +19,8 @@ export const load: PageServerLoad = async ({ locals }) => {
 		deadline: projects.deadline,
 		currentRow: projects.currentRow,
 		totalRows: projects.totalRows,
+		// Sewing has no rows: the dashboard shows its progress instead.
+		craft: patterns.craft,
 		coverPath: patterns.coverPath
 	};
 

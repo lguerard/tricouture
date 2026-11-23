@@ -123,6 +123,8 @@ private fun ResumeHero(page: PageModel, r: JsonObject, toast: (String) -> Unit) 
     val id = r.str("id")
     val row = r.int("currentRow") ?: 0
     val total = r.int("totalRows")?.takeIf { it > 0 }
+    // La couture ne se compte pas en rangs : on montre l'avancement.
+    val sewing = r.str("craft") == "couture"
     fun step(delta: Int) {
         // Affichage immédiat, le site confirme ensuite.
         page.patch { d ->
@@ -146,7 +148,7 @@ private fun ResumeHero(page: PageModel, r: JsonObject, toast: (String) -> Unit) 
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Pill(tr("dash.resume"), container = hero.accent, content = hero.onAccent)
                 Spacer(Modifier.weight(1f))
-                TextButton(onClick = { nav.navigate("project/$id/focus") },
+                if (!sewing) TextButton(onClick = { nav.navigate("project/$id/focus") },
                     colors = ButtonDefaults.textButtonColors(contentColor = hero.content)) {
                     Text(tr("app.focus.open"), fontWeight = FontWeight.Bold)
                 }
@@ -154,7 +156,10 @@ private fun ResumeHero(page: PageModel, r: JsonObject, toast: (String) -> Unit) 
             Text(r.str("title").orEmpty(), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Black,
                 maxLines = 2, overflow = TextOverflow.Ellipsis)
             WavyProgress(((r.int("progressPct") ?: 0) / 100f), color = hero.accent, trackColor = hero.raised)
-            Row(verticalAlignment = Alignment.Bottom) {
+            if (sewing) Column {
+                Text("${r.int("progressPct") ?: 0}%", fontSize = 88.sp, lineHeight = 84.sp, fontWeight = FontWeight.Black)
+                Text(tr("dash.sewProgress"), style = MaterialTheme.typography.titleSmall, color = hero.muted)
+            } else Row(verticalAlignment = Alignment.Bottom) {
                 Column(Modifier.weight(1f)) {
                     Text("$row", fontSize = 88.sp, lineHeight = 84.sp, fontWeight = FontWeight.Black)
                     Text(
@@ -207,10 +212,13 @@ private fun Tiles(d: JsonObject, advent: JsonObject?, ai: Boolean) {
     val nav = LocalNav.current
     val cs = MaterialTheme.colorScheme
     val tiles = mutableListOf<@Composable (Modifier) -> Unit>()
-    if (advent != null) tiles += { m ->
+    // Comme le menu : rien avant la révélation pour la personne qui le reçoit,
+    // sinon la surprise est gâchée. Le lutin voit son compte à rebours.
+    val adventShown = advent != null && (advent.bool("recipient") || advent.bool("owner"))
+    if (adventShown) tiles += { m ->
         BentoTile(cs.tertiaryContainer, cs.onTertiaryContainer, onClick = { nav.navigate("avent") }, m) {
             Text(tr("nav.advent"), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, maxLines = 1)
-            val door = advent.int("waitingDoor")
+            val door = advent!!.int("waitingDoor")
             val today = LocalDate.now()
             // En novembre : le compte à rebours jusqu'à la première porte.
             val daysToFirst = if (today.monthValue == 11) 31 - today.dayOfMonth else null
