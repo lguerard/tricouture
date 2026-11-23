@@ -4,10 +4,8 @@
 	import { withFeedback } from '$lib/feedback';
 	import { undoableDelete } from '$lib/undo';
 	import { mediaUrl } from '$lib/media';
-	import { onMount } from 'svelte';
 	import { statusLabel, STATUS_ORDER, pieceStatusLabel, PIECE_STATUS_ORDER } from '$lib/labels';
 	import { formatDeadline } from '$lib/format';
-	import { scheduleDeadlineReminder } from '$lib/capacitor';
 	import { t } from '$lib/i18n';
 	let { data } = $props();
 	const p = $derived(data.project);
@@ -17,12 +15,6 @@
 	const access = $derived(data.access);
 	const isOwner = $derived(access === 'owner');
 	const readOnly = $derived(access === 'view');
-
-	onMount(() => {
-		if (p.deadline && p.status !== 'fini') {
-			scheduleDeadlineReminder(p.id, p.title, new Date(p.deadline));
-		}
-	});
 
 	const savings = $derived(
 		p.retailPriceCents != null ? (p.retailPriceCents - p.costCents) / 100 : null

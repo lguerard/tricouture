@@ -1,6 +1,6 @@
 name: Android native
 
-# Native app (android/, Kotlin/Compose), rewritten from the Capacitor shell.
+# The Android app (android/, Kotlin/Compose).
 # Debug build on every change (installs as "Tricouture (test)"). Releases are
 # built by release.yml, which reuses this workflow with `release: true`.
 on:
@@ -68,8 +68,9 @@ jobs:
           name: tricouture-native-debug
           path: android/app/build/outputs/apk/debug/app-debug.apk
 
-      # Signed with the same key as the Capacitor app. Installs next to it
-      # (app.tricouture.native, "Tricouture (natif)") until the switch.
+      # Published as app.tricouture.native: the id phones already have (it
+      # first lived next to the former Capacitor app). Changing it would mean
+      # reinstalling the app.
       - name: Build signed release APK
         if: ${{ inputs.release }}
         working-directory: android

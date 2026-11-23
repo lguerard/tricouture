@@ -1,9 +1,9 @@
-import { systemColors } from '$lib/capacitor';
 import { THEME_SWATCHES, themeCss, themeVars } from '$lib/palette';
 
 export type Theme = 'auto' | 'light' | 'dark';
-/** D'où viennent les couleurs : violet d'origine, Material You, ou une couleur choisie. */
-export type ThemeColors = 'default' | 'system' | 'custom';
+/** D'où viennent les couleurs : violet d'origine ou une couleur choisie.
+ *  (Material You est réglé dans l'appli Android elle-même.) */
+export type ThemeColors = 'default' | 'custom';
 
 const STYLE_ID = 'theme-colors';
 
@@ -14,10 +14,6 @@ class ThemeState {
 	value = $state<Theme>('auto');
 	colors = $state<ThemeColors>('default');
 	custom = $state<string>(THEME_SWATCHES[1]);
-	/** Couleur du fond d'écran (app Android 12+), null ailleurs. */
-	systemAccent = $state<string | null>(null);
-	/** Pourquoi Material You manque : navigateur, app à mettre à jour, Android < 12. */
-	systemMissing = $state<'web' | 'app' | 'android' | null>('web');
 	private started = false;
 
 	init() {
@@ -27,16 +23,13 @@ class ThemeState {
 		this.started = true;
 		try {
 			const colors = localStorage.getItem('themeColors');
-			if (colors === 'system' || colors === 'custom') this.colors = colors;
+			// 'system' (Material You de l'ancienne appli) : retour au violet.
+			if (colors === 'custom') this.colors = colors;
 			this.custom = localStorage.getItem('themeColor') || this.custom;
 		} catch {
 			// storage blocked: default colors
 		}
-		void this.refreshSystemAccent();
-		// Fond d'écran changé pendant que l'app était en arrière-plan.
-		document.addEventListener('visibilitychange', () => {
-			if (document.visibilityState === 'visible') void this.refreshSystemAccent();
-		});
+		this.apply();
 	}
 
 	set(value: Theme) {
@@ -67,21 +60,9 @@ class ThemeState {
 		this.apply();
 	}
 
-	/** Relit la couleur Material You (appelé aussi quand la page de départ de l'app l'a passée). */
-	async refreshSystemAccent() {
-		if (!this.started) return this.init();
-		const found = await systemColors();
-		this.systemAccent = found.accent;
-		this.systemMissing = 'missing' in found ? found.missing : null;
-		// Material You choisi sur un appareil qui ne le propose plus : retour au violet.
-		this.apply();
-	}
-
 	/** Couleur d'où le thème est tiré, ou null pour la palette d'origine (app.css). */
 	get seed(): string | null {
-		if (this.colors === 'custom') return this.custom;
-		if (this.colors === 'system') return this.systemAccent;
-		return null;
+		return this.colors === 'custom' ? this.custom : null;
 	}
 
 	private apply() {

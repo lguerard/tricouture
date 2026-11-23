@@ -9,8 +9,6 @@ android {
     compileSdk = 35
 
     defaultConfig {
-        // Même identifiant que l'ancienne appli (Capacitor) : la nouvelle la
-        // remplacera à l'installation, signée avec la même clé.
         applicationId = "app.tricouture"
         minSdk = 26
         targetSdk = 35
@@ -26,15 +24,13 @@ android {
             applicationIdSuffix = ".test"
             resValue("string", "app_name", "Tricouture (test)")
         }
-        // Tant que les releases publient aussi l'ancienne appli, la native
-        // s'installe à côté : -PappIdSuffix=.native lui donne un autre
-        // identifiant et un autre nom.
+        // Les releases passent -PappIdSuffix=.native : c'est l'identifiant
+        // sous lequel l'appli est installée sur les téléphones (elle a d'abord
+        // vécu à côté de l'ancienne appli Capacitor, retirée depuis). Le
+        // changer obligerait à la réinstaller.
         release {
             val suffix = (project.findProperty("appIdSuffix") as String?).orEmpty()
-            if (suffix.isNotEmpty()) {
-                applicationIdSuffix = suffix
-                resValue("string", "app_name", "Tricouture (natif)")
-            }
+            if (suffix.isNotEmpty()) applicationIdSuffix = suffix
             // Pas de R8 pour l'instant : rien ne le vérifie à l'exécution avant
             // la publication, et une classe retirée à tort ferait planter l'appli.
             isMinifyEnabled = false
