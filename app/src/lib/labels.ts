@@ -29,6 +29,24 @@ export const YARN_WEIGHTS = [
 	'super-bulky'
 ];
 
+// A weight typed by hand ("DK", "Aran", "super bulky", "chunky"…) → its code
+// in YARN_WEIGHTS, so the stash can label and filter it. Anything unknown is
+// kept as typed rather than lost.
+const WEIGHT_ALIASES: Record<string, string> = {
+	'light fingering': 'fingering',
+	'sock': 'fingering',
+	'chunky': 'bulky',
+	'super bulky': 'super-bulky',
+	'super chunky': 'super-bulky'
+};
+export function yarnWeightCode(v: string | null | undefined): string {
+	const raw = String(v ?? '').trim();
+	const k = raw.toLowerCase().replace(/[\s_]+/g, ' ');
+	if (YARN_WEIGHTS.includes(k)) return k;
+	if (YARN_WEIGHTS.includes(k.replace(/ /g, '-'))) return k.replace(/ /g, '-');
+	return WEIGHT_ALIASES[k] ?? raw;
+}
+
 // Color name -> representative hex, FR+EN. Used both for client-side stash
 // search (name/hex -> nearest colorHex) and server-side color guessing from
 // scraped product text (lib/server/ai/product-lookup.ts).
