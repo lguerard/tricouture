@@ -1,7 +1,7 @@
 // Advent calendar, server side: everything the recipient may see goes through
 // `board()`, which is the only place a day row is turned into page data. Codes,
 // patterns and yarns of a door that is not open never leave this module.
-import { and, desc, eq, inArray, isNull, or } from 'drizzle-orm';
+import { and, desc, eq, ilike, inArray, isNull, or, sql } from 'drizzle-orm';
 import { db } from '$lib/server/db';
 import {
 	adventCalendars,
@@ -14,6 +14,7 @@ import {
 	type AdventDay
 } from '$lib/server/db/schema';
 import { copyStored } from '$lib/server/storage';
+import { yarnWeightCode } from '$lib/labels';
 import {
 	ADVENT_DAYS,
 	MAX_ATTEMPTS,
@@ -201,9 +202,13 @@ export async function tryDoor(
 	if (!claimed.length) return { ok: true };
 
 	try {
-		const given = d.patternId ? await givePattern(d.patternId, cal.recipientId, cal.year) : null;
-		if (given) await db.update(adventDays).set({ openedPatternId: given }).where(eq(adventDays.id, d.id));
-		await giveYarns(d.yarns, cal.recipientId, cal.year, d.day);
+		// Pattern and yarn together or not at all: a retry after a failure must
+		// not give the pattern twice.
+		await db.transaction(async (tx) => {
+			const given = d.patternId ? await givePattern(d.patternId, cal.recipientId, cal.year, tx) : null;
+			if (given) await tx.update(adventDays).set({ openedPatternId: given }).where(eq(adventDays.id, d.id));
+			await giveYarns(d.yarns, cal.recipientId, cal.year, d.day, tx);
+		});
 	} catch (e) {
 		await db.update(adventDays).set({ openedAt: null }).where(eq(adventDays.id, d.id));
 		throw e;
@@ -214,11 +219,13 @@ export async function tryDoor(
 // Copies the lutin's pattern into the recipient's library: she owns her copy,
 // can annotate it and start projects from it, and the lutin's library stays
 // private (nothing is shared, so nothing shows before the door opens).
-export async function givePattern(sourceId: string, recipientId: string, year: number): Promise<string | null> {
-	const src = (await db.select().from(patterns).where(eq(patterns.id, sourceId)).limit(1))[0];
+type Exec = typeof db | Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+export async function givePattern(sourceId: string, recipientId: string, year: number, exec: Exec = db): Promise<string | null> {
+	const src = (await exec.select().from(patterns).where(eq(patterns.id, sourceId)).limit(1))[0];
 	if (!src) return null;
-	const files = await db.select().from(patternFiles).where(eq(patternFiles.patternId, src.id));
-	const pieces = await db.select().from(patternPieces).where(eq(patternPieces.patternId, src.id));
+	const files = await exec.select().from(patternFiles).where(eq(patternFiles.patternId, src.id));
+	const pieces = await exec.select().from(patternPieces).where(eq(patternPieces.patternId, src.id));
 
 	const copied = new Map<string, string>();
 	for (const f of files) copied.set(f.storedPath, await copyStored(f.storedPath, recipientId, 'patterns'));
@@ -229,12 +236,12 @@ export async function givePattern(sourceId: string, recipientId: string, year: n
 
 	const { id: _id, ownerId: _o, createdAt: _c, updatedAt: _u, ...rest } = src;
 	const tags = [...new Set([...(src.tags ?? []), ADVENT_TAG, `avent-${year}`])];
-	const [p] = await db
+	const [p] = await exec
 		.insert(patterns)
 		.values({ ...rest, ownerId: recipientId, isShared: false, coverPath, tags })
 		.returning({ id: patterns.id });
 	if (files.length) {
-		await db.insert(patternFiles).values(
+		await exec.insert(patternFiles).values(
 			files.map((f) => ({
 				patternId: p.id,
 				filename: f.filename,
@@ -246,7 +253,7 @@ export async function givePattern(sourceId: string, recipientId: string, year: n
 		);
 	}
 	if (pieces.length) {
-		await db.insert(patternPieces).values(
+		await exec.insert(patternPieces).values(
 			pieces.map((x) => ({
 				patternId: p.id,
 				name: x.name,
@@ -259,24 +266,59 @@ export async function givePattern(sourceId: string, recipientId: string, year: n
 	return p.id;
 }
 
-// The day's yarn lands in the recipient's stash.
-async function giveYarns(list: AdventYarn[], recipientId: string, year: number, day: number) {
-	if (!list.length) return;
-	await db.insert(yarns).values(
-		list.map((y) => ({
+// The day's yarn lands in the recipient's stash. The same yarn handed out on
+// several days (the big project's colour, door after door) piles up on one
+// line, "Calendrier de l'Avent 2026, jours 1, 6, 13", rather than one line a
+// day. Only lines this calendar created are topped up: a ball she already had
+// may come from another dye lot.
+export async function giveYarns(list: AdventYarn[], recipientId: string, year: number, day: number, exec: Exec = db) {
+	const marker = `Calendrier de l'Avent ${year}, jour`;
+	for (const y of list) {
+		const same = (col: typeof yarns.brand | typeof yarns.name | typeof yarns.colorway, v: string) => (v ? ilike(col, v.replace(/[\\%_]/g, '\\$&')) : isNull(col));
+		const existing = (
+			await exec
+				.select({ id: yarns.id, notes: yarns.notes })
+				.from(yarns)
+				.where(
+					and(
+						eq(yarns.ownerId, recipientId),
+						same(yarns.brand, y.brand),
+						same(yarns.name, y.name),
+						same(yarns.colorway, y.colorway),
+						ilike(yarns.notes, `${marker}%`)
+					)
+				)
+				.limit(1)
+		)[0];
+		if (existing) {
+			await exec
+				.update(yarns)
+				.set({ skeins: sql`${yarns.skeins} + ${y.skeins}`, notes: addDay(existing.notes, year, day) })
+				.where(eq(yarns.id, existing.id));
+			continue;
+		}
+		await exec.insert(yarns).values({
 			ownerId: recipientId,
 			brand: y.brand || null,
 			name: y.name || null,
 			colorway: y.colorway || null,
 			colorHex: y.colorHex || null,
-			weightCategory: y.weightCategory || null,
+			weightCategory: yarnWeightCode(y.weightCategory) || null,
 			fiber: y.fiber || null,
 			yardsPerSkein: y.metersPerSkein ? Math.round(y.metersPerSkein) : null,
 			gramsPerSkein: y.gramsPerSkein ? Math.round(y.gramsPerSkein) : null,
 			skeins: y.skeins,
-			notes: `Calendrier de l'Avent ${year}, jour ${day}`
-		}))
-	);
+			notes: `${marker} ${day}`
+		});
+	}
+}
+
+// "Calendrier de l'Avent 2026, jour 1" + 6 → "…, jours 1, 6".
+export function addDay(notes: string | null, year: number, day: number): string {
+	const m = /^Calendrier de l'Avent \d+, jours? ([\d, ]+)$/.exec(notes ?? '');
+	if (!m) return `${notes ?? ''} · jour ${day}`.trim();
+	const days = [...new Set([...m[1].split(',').map((x) => Number(x.trim())).filter(Boolean), day])].sort((a, b) => a - b);
+	return `Calendrier de l'Avent ${year}, ${days.length > 1 ? 'jours' : 'jour'} ${days.join(', ')}`;
 }
 
 // Hint photos live in the lutin's folder: the recipient may load one once
